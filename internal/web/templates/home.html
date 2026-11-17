@@ -1,31 +1,29 @@
 {{define "content"}}
 <section class="hero">
-  <h1>Trouvez des bénévoles pour vos événements</h1>
-  <p>Fête de l'école, marché de Noël, kermesse… Créez un planning par stand et par créneau horaire,
-     partagez le lien aux parents : chacun s'inscrit en deux clics, sans créer de compte.</p>
+  <h1>Trouvez des bénévoles</h1>
+  <p>Un planning par stand et par créneau. Les parents s'inscrivent en deux clics, sans compte.</p>
 </section>
 
 <div class="card narrow">
-  <h2>Créer un événement</h2>
   {{with .Error}}<div class="callout error" role="alert">{{.}}</div>{{end}}
   <form method="post" action="/events" class="stack">
-    <label>Nom de l'événement <span class="req">*</span>
+    <label>Nom de l'événement
       <input name="title" value="{{.Form.Title}}" required maxlength="120" placeholder="Fête de l'école 2027">
     </label>
     <div class="row2">
       <label>Date <input type="date" name="date" value="{{.Form.Date}}"></label>
-      <label>Lieu <input name="location" value="{{.Form.Location}}" maxlength="120" placeholder="Cour de l'école"></label>
+      <label>Lieu <input name="location" value="{{.Form.Location}}" maxlength="120"></label>
     </div>
-    <label>Message pour les bénévoles
-      <textarea name="description" rows="3" maxlength="2000" placeholder="Merci de venir 10 minutes avant votre créneau…">{{.Form.Description}}</textarea>
+    <label>Message pour les bénévoles (facultatif)
+      <textarea name="description" rows="2" maxlength="2000">{{.Form.Description}}</textarea>
     </label>
     {{if .NeedPassword}}
-    <label>Mot de passe de création <span class="req">*</span>
+    <label>Mot de passe de création
       <input type="password" name="password" required autocomplete="current-password">
     </label>
     {{end}}
-    <button type="submit" class="btn big">Créer l'événement</button>
+    <button type="submit" class="btn block">Créer l'événement</button>
+    <p class="hint">Vous recevrez un lien d'administration secret pour gérer l'événement.</p>
   </form>
-  <p class="hint">Vous recevrez un lien d'administration secret : c'est votre seule clé pour gérer l'événement.</p>
 </div>
 {{end}}

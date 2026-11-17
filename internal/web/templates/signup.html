@@ -11,11 +11,10 @@
 {{end}}
 
 {{define "signup_form"}}{{$s := .Slot}}
-<h2 id="signup-title" style="--stand: {{css $s.Stand.Color}}"><span class="dot"></span>{{$s.Stand.Name}}</h2>
-<p class="slot-when">{{day $s.StartsAt}}, <strong>{{span $s.StartsAt $s.EndsAt}}</strong></p>
-<p class="muted">
-  {{$s.Count}} / {{$s.MinPeople}} {{plural $s.MinPeople "personne" "personnes"}}{{if $s.MaxPeople}} (max {{$s.MaxPeople}}){{end}}
-  {{if $s.Signups}} · déjà là : {{range $i, $p := $s.Signups}}{{if $i}}, {{end}}{{pub $p.Name}}{{end}}{{end}}
+<h2 id="signup-title" class="signup-title" style="--stand: {{css $s.Stand.Color}}"><span class="dot"></span>{{$s.Stand.Name}}</h2>
+<p class="signup-sub">
+  {{day $s.StartsAt}} · {{span $s.StartsAt $s.EndsAt}} · {{$s.Count}}/{{$s.MinPeople}}
+  {{if $s.Signups}}<br>Avec {{range $i, $p := $s.Signups}}{{if $i}}, {{end}}{{pub $p.Name}}{{end}}{{end}}
 </p>
 
 {{with .Error}}<div class="callout error" role="alert">{{.}}</div>{{end}}
@@ -28,9 +27,8 @@
   <div class="callout info">Ce créneau est complet. Merci !</div>
 {{else}}
 <form method="post" action="{{.EventURL}}/slots/{{$s.ID}}/signup" class="stack">
-  {{if .Me}}<p class="muted">Vous êtes reconnu·e comme <strong>{{.Me.Name}}</strong>.</p>{{end}}
-  <label>Prénom et nom <span class="req">*</span>
-    <input name="name" value="{{.Form.Name}}" required maxlength="80" autocomplete="name" placeholder="Marie Dupont">
+  <label>Prénom et nom
+    <input name="name" value="{{.Form.Name}}" required maxlength="80" autocomplete="name">
   </label>
   <div class="row2">
     <label>E-mail
@@ -40,12 +38,12 @@
       <input type="tel" name="phone" value="{{.Form.Phone}}" maxlength="30" autocomplete="tel">
     </label>
   </div>
-  <p class="hint">E-mail ou téléphone : au moins l'un des deux, visible uniquement par les organisateurs. Sur le planning public, seuls votre prénom et l'initiale de votre nom apparaissent.</p>
+  <p class="hint">E-mail ou téléphone, vus seulement par les organisateurs.</p>
   <label>Commentaire (facultatif)
-    <input name="comment" value="{{.Form.Comment}}" maxlength="300" placeholder="ex. : j'arrive 10 minutes en retard">
+    <input name="comment" value="{{.Form.Comment}}" maxlength="300">
   </label>
   <label class="hp" aria-hidden="true">Site web <input name="website" tabindex="-1" autocomplete="off"></label>
-  <button type="submit" class="btn big">Je m'inscris</button>
+  <button type="submit" class="btn block">Je m'inscris</button>
 </form>
 {{end}}
 {{end}}

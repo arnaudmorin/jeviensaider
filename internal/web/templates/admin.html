@@ -1,129 +1,97 @@
 {{define "content"}}{{$a := .AdminPath}}
-<section class="admin-head">
-  <p class="kicker">Administration</p>
-  <h1>{{.Event.Title}}</h1>
-  <p class="meta">
-    {{with .Event.Date}}<span>{{date .}}</span>{{end}}
-    {{with .Event.Location}}<span>{{.}}</span>{{end}}
-    <span class="pill ev-{{.Event.Status}}">{{evlabel .Event.Status}}</span>
-  </p>
-
-  <form method="post" action="{{$a}}/status" class="status-switch">
+<section class="page-head">
+  <div>
+    <h1>{{.Event.Title}}</h1>
+    <p class="meta">{{with .Event.Date}}{{date .}}{{end}}{{if and .Event.Date .Event.Location}} · {{end}}{{with .Event.Location}}{{.}}{{end}}</p>
+  </div>
+  <form method="post" action="{{$a}}/status" class="segmented" aria-label="Statut des inscriptions">
     {{range .Statuses}}
-    <button type="submit" name="status" value="{{.}}" class="btn small{{if eq . $.Event.Status}} current{{else}} ghost{{end}}" {{if eq . $.Event.Status}}disabled{{end}}>
-      {{if eq . "draft"}}Brouillon{{else if eq . "open"}}Ouvrir les inscriptions{{else}}Clore les inscriptions{{end}}
+    <button type="submit" name="status" value="{{.}}" {{if eq . $.Event.Status}}class="on" disabled aria-pressed="true"{{end}}>
+      {{if eq . "draft"}}Brouillon{{else if eq . "open"}}Ouvert{{else}}Clos{{end}}
     </button>
     {{end}}
   </form>
-  {{if .Event.IsDraft}}<p class="hint">En brouillon, les parents voient seulement « inscriptions bientôt ouvertes ». Préparez vos stands puis ouvrez les inscriptions.</p>{{end}}
 </section>
+{{if .Event.IsDraft}}<div class="callout info">Brouillon : les parents ne voient pas encore le planning. Ajoutez vos stands puis cliquez sur « Ouvert ».</div>{{end}}
 
-<section class="card share">
-  <div>
-    <h2>Lien à partager aux parents</h2>
+<section class="card links">
+  <div class="link-row">
+    <span class="link-label">Lien public</span>
     <div class="copy-row">
       <input type="text" readonly value="{{.PublicURL}}" id="public-link" aria-label="Lien public">
-      <button type="button" class="btn small" data-copy="#public-link">Copier</button>
-      <a class="btn small ghost" href="{{.EventURL}}" target="_blank" rel="noopener">Ouvrir</a>
+      <button type="button" class="btn text small" data-copy="#public-link">Copier</button>
+      <a class="btn text small" href="{{.EventURL}}" target="_blank" rel="noopener">Ouvrir</a>
     </div>
   </div>
-  <div>
-    <h2>Lien d'administration <small class="warn">secret</small></h2>
+  <div class="link-row">
+    <span class="link-label">Lien admin</span>
     <div class="copy-row">
       <input type="text" readonly value="{{.AdminURL}}" id="admin-link" aria-label="Lien d'administration">
-      <button type="button" class="btn small" data-copy="#admin-link">Copier</button>
+      <button type="button" class="btn text small" data-copy="#admin-link">Copier</button>
     </div>
-    <p class="hint">À garder en favori et à ne partager qu'avec les organisateurs.</p>
   </div>
+  <p class="hint">Le lien admin est secret : gardez-le en favori, partagez-le seulement avec les organisateurs.</p>
 </section>
 
-<section class="stats">
-  <div class="stat"><strong>{{.P.Count}}</strong><span>/ {{.P.Needed}} places couvertes</span></div>
-  <div class="stat"><strong>{{.P.Missing}}</strong><span>{{plural .P.Missing "personne manquante" "personnes manquantes"}}</span></div>
-  <div class="stat"><strong>{{.Volunteers}}</strong><span>{{plural .Volunteers "bénévole" "bénévoles"}}</span></div>
-  <div class="stat actions">
-    <a class="btn small ghost" href="{{$a}}/export.csv">Export CSV</a>
-    <a class="btn small ghost" href="{{$a}}/print" target="_blank" rel="noopener">Planning imprimable</a>
+<div class="overview">
+  <p><strong>{{.P.Count}}/{{.P.Needed}}</strong> places couvertes · {{.Volunteers}} {{plural .Volunteers "bénévole" "bénévoles"}}{{if .P.Missing}} · <span class="missing">{{.P.Missing}} {{plural .P.Missing "manquante" "manquantes"}}</span>{{end}}</p>
+  <div>
+    <a class="btn text small" href="{{$a}}/export.csv">Exporter CSV</a>
+    <a class="btn text small" href="{{$a}}/print" target="_blank" rel="noopener">Imprimer</a>
   </div>
-</section>
+</div>
 {{template "progress" .P}}
 
-<details class="card">
-  <summary>Modifier l'événement</summary>
-  <form method="post" action="{{$a}}/event" class="stack">
-    <label>Nom <input name="title" value="{{.Event.Title}}" required maxlength="120"></label>
-    <div class="row2">
-      <label>Date <input type="date" name="date" value="{{.Event.Date}}"></label>
-      <label>Lieu <input name="location" value="{{.Event.Location}}" maxlength="120"></label>
-    </div>
-    <label>Message pour les bénévoles <textarea name="description" rows="3" maxlength="2000">{{.Event.Description}}</textarea></label>
-    <button class="btn" type="submit">Enregistrer</button>
-  </form>
-</details>
-
 <h2 class="section-title">Stands</h2>
-{{if not .P.Stands}}<p class="empty">Aucun stand pour l'instant : commencez par en ajouter un ci-dessous (ex. « Pêche aux canards », « Buvette », « Crêpes »…).</p>{{end}}
+{{if not .P.Stands}}<p class="empty">Aucun stand. Ajoutez-en un ci-dessous, par exemple « Pêche aux canards ».</p>{{end}}
 
 {{range $i, $st := .P.Stands}}
-<section class="card stand-admin" id="stand-{{$st.ID}}" style="--stand: {{css $st.Color}}">
-  <header class="stand-admin-head">
-    <h3><span class="dot"></span>{{$st.Name}}
-      {{if $st.Missing}}<span class="badge">il manque {{$st.Missing}}</span>{{else if $st.Slots}}<span class="badge ok">complet</span>{{end}}
-    </h3>
+<section class="card stand" id="stand-{{$st.ID}}" style="--stand: {{css $st.Color}}">
+  <header class="stand-head">
+    <h3><span class="dot"></span>{{$st.Name}}</h3>
+    {{if $st.Missing}}<span class="status st-empty">il manque {{$st.Missing}}</span>{{else if $st.Slots}}<span class="status st-ok">complet</span>{{end}}
     <div class="row-actions">
-      <form method="post" action="{{$a}}/stands/{{$st.ID}}/move"><input type="hidden" name="dir" value="up"><button class="btn tiny ghost" type="submit" title="Monter" {{if eq $i 0}}disabled{{end}}>↑</button></form>
-      <form method="post" action="{{$a}}/stands/{{$st.ID}}/move"><input type="hidden" name="dir" value="down"><button class="btn tiny ghost" type="submit" title="Descendre">↓</button></form>
-      <form method="post" action="{{$a}}/stands/{{$st.ID}}/delete" data-confirm="Supprimer le stand « {{$st.Name}} » avec tous ses créneaux et inscriptions ?"><button class="btn tiny danger" type="submit">Supprimer</button></form>
+      <form method="post" action="{{$a}}/stands/{{$st.ID}}/move"><input type="hidden" name="dir" value="up"><button class="btn text icon" type="submit" title="Monter" aria-label="Monter" {{if eq $i 0}}disabled{{end}}>↑</button></form>
+      <form method="post" action="{{$a}}/stands/{{$st.ID}}/move"><input type="hidden" name="dir" value="down"><button class="btn text icon" type="submit" title="Descendre" aria-label="Descendre">↓</button></form>
     </div>
   </header>
-  {{with $st.Description}}<p class="desc">{{.}}</p>{{end}}
 
-  <details>
-    <summary>Modifier le stand</summary>
-    <form method="post" action="{{$a}}/stands/{{$st.ID}}" class="stack">
-      <div class="row2">
-        <label>Nom <input name="name" value="{{$st.Name}}" required maxlength="80"></label>
-        <label>Couleur <input type="color" name="color" value="{{css $st.Color}}"></label>
-      </div>
-      <label>Description <textarea name="description" rows="2" maxlength="1000">{{$st.Description}}</textarea></label>
-      <button class="btn small" type="submit">Enregistrer</button>
-    </form>
-  </details>
-
+  <div class="stand-body">
   {{if $st.Slots}}
   <div class="table-wrap">
   <table class="slots-admin">
-    <thead><tr><th>Créneau</th><th>Min</th><th>Max</th><th>Bénévoles</th><th></th></tr></thead>
+    <thead><tr><th>Horaire</th><th>Min</th><th>Max</th><th>Bénévoles</th><th></th></tr></thead>
     <tbody>
     {{range $st.Slots}}
-    <tr class="st-{{.Status}}">
+    <tr>
       <td class="when">
-        {{if $.P.MultiDay}}<small>{{day .StartsAt}}</small><br>{{end}}
+        {{if $.P.MultiDay}}<small class="muted">{{day .StartsAt}}</small><br>{{end}}
         <input type="time" name="from" value="{{timeVal .StartsAt}}" form="slot-{{.ID}}" required aria-label="Début">
         <input type="time" name="to" value="{{timeVal .EndsAt}}" form="slot-{{.ID}}" required aria-label="Fin">
         <input type="hidden" name="date" value="{{dateVal .StartsAt}}" form="slot-{{.ID}}">
       </td>
       <td><input type="number" name="min" value="{{.MinPeople}}" min="1" max="1000" form="slot-{{.ID}}" class="num" aria-label="Minimum"></td>
       <td><input type="number" name="max" value="{{if .MaxPeople}}{{.MaxPeople}}{{end}}" min="1" max="1000" form="slot-{{.ID}}" class="num" placeholder="—" aria-label="Maximum"></td>
-      <td class="who">
-        <span class="pill st-{{.Status}}">{{.Count}}/{{.MinPeople}}</span>
+      <td>
+        <span class="status st-{{.Status}}">{{.Count}}/{{.MinPeople}}</span>
+        {{if .Signups}}
         <ul class="people-admin">
         {{range .Signups}}
           <li>
-            <strong>{{.Name}}</strong>
-            {{with .Phone}}<a href="tel:{{.}}">{{.}}</a>{{end}}
-            {{with .Email}}<a href="mailto:{{.}}">{{.}}</a>{{end}}
+            <span>{{.Name}}</span>
+            <span class="contact">{{with .Phone}}<a href="tel:{{.}}">{{.}}</a>{{end}}{{if and .Phone .Email}} · {{end}}{{with .Email}}<a href="mailto:{{.}}">{{.}}</a>{{end}}</span>
             {{with .Comment}}<em>« {{.}} »</em>{{end}}
             <form method="post" action="{{$a}}/signups/{{.ID}}/delete" data-confirm="Retirer {{.Name}} de ce créneau ?" class="inline">
-              <button type="submit" class="linklike danger" title="Retirer">retirer</button>
+              <button type="submit" class="linklike danger">retirer</button>
             </form>
           </li>
         {{end}}
         </ul>
+        {{end}}
       </td>
       <td class="row-actions">
-        <form method="post" action="{{$a}}/slots/{{.ID}}" id="slot-{{.ID}}"><button class="btn tiny" type="submit">OK</button></form>
-        <form method="post" action="{{$a}}/slots/{{.ID}}/delete" data-confirm="Supprimer ce créneau{{if .Count}} et ses {{.Count}} inscription(s){{end}} ?"><button class="btn tiny danger" type="submit" title="Supprimer">×</button></form>
+        <form method="post" action="{{$a}}/slots/{{.ID}}" id="slot-{{.ID}}"><button class="btn text small" type="submit">Enregistrer</button></form>
+        <form method="post" action="{{$a}}/slots/{{.ID}}/delete" data-confirm="Supprimer ce créneau{{if .Count}} et ses {{.Count}} inscription(s){{end}} ?"><button class="btn text icon danger" type="submit" title="Supprimer le créneau" aria-label="Supprimer le créneau">×</button></form>
       </td>
     </tr>
     {{end}}
@@ -133,97 +101,120 @@
   {{end}}
 
   {{$g := index $.Gen $st.ID}}
-  <form method="post" action="{{$a}}/stands/{{$st.ID}}/slots" class="generator">
-    <h4>{{if $st.Slots}}Ajouter des créneaux{{else}}Créer les créneaux de ce stand{{end}}</h4>
-    <div class="gen-grid">
-      <label>Jour <input type="date" name="date" value="{{$g.Date}}" required></label>
-      <label>De <input type="time" name="from" value="{{$g.From}}" required></label>
-      <label>À <input type="time" name="to" value="{{$g.To}}" required></label>
-      <label>Durée d'un créneau
-        <select name="step">
-          <option value="30">30 min</option>
-          <option value="60" selected>1 h</option>
-          <option value="90">1 h 30</option>
-          <option value="120">2 h</option>
-          <option value="0">un seul créneau</option>
-        </select>
-      </label>
-      <label>Personnes min <input type="number" name="min" value="2" min="1" max="1000" required class="num"></label>
-      <label>Max <small>(facultatif)</small> <input type="number" name="max" min="1" max="1000" class="num" placeholder="—"></label>
-    </div>
-    <button class="btn small" type="submit">Générer</button>
-    <p class="hint">Ex. : de 14h à 17h, créneaux d'1 h, 2 personnes → 3 créneaux, 6 bénévoles.</p>
-  </form>
+  <details {{if not $st.Slots}}open{{end}}>
+    <summary>{{if $st.Slots}}Ajouter des créneaux{{else}}Créer les créneaux{{end}}</summary>
+    <form method="post" action="{{$a}}/stands/{{$st.ID}}/slots">
+      <div class="gen-grid">
+        <label>Jour <input type="date" name="date" value="{{$g.Date}}" required></label>
+        <label>De <input type="time" name="from" value="{{$g.From}}" required></label>
+        <label>À <input type="time" name="to" value="{{$g.To}}" required></label>
+        <label>Durée
+          <select name="step">
+            <option value="30">30 min</option>
+            <option value="60" selected>1 h</option>
+            <option value="90">1 h 30</option>
+            <option value="120">2 h</option>
+            <option value="0">un seul créneau</option>
+          </select>
+        </label>
+        <label>Personnes <input type="number" name="min" value="2" min="1" max="1000" required></label>
+        <label>Max <input type="number" name="max" min="1" max="1000" placeholder="—"></label>
+      </div>
+      <button class="btn small" type="submit">Générer</button>
+    </form>
+  </details>
+
+  <details>
+    <summary>Modifier le stand</summary>
+    <form method="post" action="{{$a}}/stands/{{$st.ID}}" class="stack">
+      <div class="add-stand">
+        <label>Nom <input name="name" value="{{$st.Name}}" required maxlength="80"></label>
+        <label>Couleur <input type="color" name="color" value="{{css $st.Color}}"></label>
+      </div>
+      <label>Description <textarea name="description" rows="2" maxlength="1000">{{$st.Description}}</textarea></label>
+      <div><button class="btn small" type="submit">Enregistrer</button></div>
+    </form>
+    <form method="post" action="{{$a}}/stands/{{$st.ID}}/delete" data-confirm="Supprimer le stand « {{$st.Name}} » avec tous ses créneaux et inscriptions ?">
+      <p><button class="btn text small danger" type="submit">Supprimer ce stand</button></p>
+    </form>
+  </details>
+  </div>
 </section>
 {{end}}
 
-<section class="card">
-  <h3>Ajouter un stand</h3>
-  <form method="post" action="{{$a}}/stands" class="stack">
-    <div class="row2">
-      <label>Nom <input name="name" required maxlength="80" placeholder="Pêche aux canards"></label>
-      <label>Couleur <input type="color" name="color" value="{{.NextColor}}"></label>
-    </div>
-    <label>Description (facultatif) <textarea name="description" rows="2" maxlength="1000" placeholder="Tenir le stand, encaisser les tickets…"></textarea></label>
-    <button class="btn" type="submit">Ajouter le stand</button>
-  </form>
-</section>
+<form method="post" action="{{$a}}/stands" class="card add-stand">
+  <label>Nouveau stand <input name="name" required maxlength="80" placeholder="Pêche aux canards, Buvette…"></label>
+  <label>Couleur <input type="color" name="color" value="{{.NextColor}}"></label>
+  <button class="btn" type="submit">Ajouter</button>
+</form>
 
-{{if .P.Columns}}
-<section class="card">
-  <h3>Inscrire quelqu'un manuellement</h3>
-  <p class="hint">Pour un parent qui vous a répondu par téléphone ou sur papier. Fonctionne même si les inscriptions sont fermées.</p>
-  <form method="post" action="{{$a}}/signups" class="stack">
-    <label>Créneau
-      <select name="slot" required>
-        <option value="">— choisir —</option>
-        {{range .P.Stands}}{{if .Slots}}
-        <optgroup label="{{.Name}}">
-          {{range .Slots}}<option value="{{.ID}}" {{if .Full}}disabled{{end}}>{{if $.P.MultiDay}}{{day .StartsAt}}, {{end}}{{span .StartsAt .EndsAt}} ({{.Count}}/{{.MinPeople}}{{if .Full}}, complet{{end}})</option>{{end}}
-        </optgroup>
-        {{end}}{{end}}
-      </select>
-    </label>
-    <div class="row3">
-      <label>Nom <input name="name" required maxlength="80"></label>
-      <label>E-mail <input type="email" name="email" maxlength="120"></label>
-      <label>Téléphone <input type="tel" name="phone" maxlength="30"></label>
-    </div>
-    <label>Commentaire <input name="comment" maxlength="300"></label>
-    <button class="btn" type="submit">Inscrire</button>
-  </form>
-</section>
-{{end}}
-
-<h2 class="section-title">Outils</h2>
+<h2 class="section-title">Plus d'options</h2>
 <div class="tools">
   <details class="card">
+    <summary>Modifier l'événement</summary>
+    <form method="post" action="{{$a}}/event" class="stack">
+      <label>Nom <input name="title" value="{{.Event.Title}}" required maxlength="120"></label>
+      <div class="row2">
+        <label>Date <input type="date" name="date" value="{{.Event.Date}}"></label>
+        <label>Lieu <input name="location" value="{{.Event.Location}}" maxlength="120"></label>
+      </div>
+      <label>Message pour les bénévoles <textarea name="description" rows="3" maxlength="2000">{{.Event.Description}}</textarea></label>
+      <div><button class="btn" type="submit">Enregistrer</button></div>
+    </form>
+  </details>
+
+  {{if .P.Columns}}
+  <details class="card">
+    <summary>Inscrire quelqu'un manuellement</summary>
+    <form method="post" action="{{$a}}/signups" class="stack">
+      <p class="hint">Pour un parent qui a répondu par téléphone ou sur papier, même si les inscriptions sont closes.</p>
+      <label>Créneau
+        <select name="slot" required>
+          <option value="">Choisir…</option>
+          {{range .P.Stands}}{{if .Slots}}
+          <optgroup label="{{.Name}}">
+            {{range .Slots}}<option value="{{.ID}}" {{if .Full}}disabled{{end}}>{{if $.P.MultiDay}}{{day .StartsAt}}, {{end}}{{span .StartsAt .EndsAt}} ({{.Count}}/{{.MinPeople}}{{if .Full}}, complet{{end}})</option>{{end}}
+          </optgroup>
+          {{end}}{{end}}
+        </select>
+      </label>
+      <div class="row3">
+        <label>Nom <input name="name" required maxlength="80"></label>
+        <label>E-mail <input type="email" name="email" maxlength="120"></label>
+        <label>Téléphone <input type="tel" name="phone" maxlength="30"></label>
+      </div>
+      <div><button class="btn" type="submit">Inscrire</button></div>
+    </form>
+  </details>
+  {{end}}
+
+  <details class="card">
     <summary>Dupliquer pour un nouvel événement</summary>
-    <p class="hint">Copie les stands et les créneaux (sans les bénévoles). Si vous indiquez une nouvelle date, les créneaux sont décalés d'autant.</p>
     <form method="post" action="{{$a}}/duplicate" class="stack">
+      <p class="hint">Copie les stands et les créneaux, sans les bénévoles. Avec une nouvelle date, les créneaux sont décalés d'autant.</p>
       <div class="row2">
         <label>Nouveau nom <input name="title" required maxlength="120" value="{{.Event.Title}} (copie)"></label>
         <label>Nouvelle date <input type="date" name="date"></label>
       </div>
-      <button class="btn" type="submit">Dupliquer</button>
+      <div><button class="btn" type="submit">Dupliquer</button></div>
     </form>
   </details>
 
   <details class="card danger-zone">
-    <summary>Effacer les données personnelles (RGPD)</summary>
-    <p>Après l'événement, supprimez les noms, e-mails et téléphones des {{.Volunteers}} bénévoles. Les stands et créneaux sont conservés.</p>
+    <summary>Effacer les données personnelles</summary>
     <form method="post" action="{{$a}}/purge" class="stack">
-      <label class="check"><input type="checkbox" name="confirm" value="yes" required> Je confirme : effacer toutes les inscriptions</label>
-      <button class="btn danger" type="submit">Effacer les données</button>
+      <p class="hint">Après l'événement : supprime les noms, e-mails et téléphones des {{.Volunteers}} bénévoles. Les stands et créneaux sont conservés.</p>
+      <label class="check"><input type="checkbox" name="confirm" value="yes" required> Je confirme</label>
+      <div><button class="btn danger" type="submit">Effacer les données</button></div>
     </form>
   </details>
 
   <details class="card danger-zone">
     <summary>Supprimer l'événement</summary>
-    <p>Supprime définitivement l'événement, ses stands, créneaux et inscriptions. Les liens ne fonctionneront plus.</p>
     <form method="post" action="{{$a}}/delete" class="stack">
-      <label class="check"><input type="checkbox" name="confirm" value="yes" required> Je confirme la suppression définitive</label>
-      <button class="btn danger" type="submit">Supprimer l'événement</button>
+      <p class="hint">Suppression définitive de l'événement, de ses stands, créneaux et inscriptions. Les liens ne fonctionneront plus.</p>
+      <label class="check"><input type="checkbox" name="confirm" value="yes" required> Je confirme</label>
+      <div><button class="btn danger" type="submit">Supprimer l'événement</button></div>
     </form>
   </details>
 </div>

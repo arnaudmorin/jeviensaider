@@ -1,23 +1,19 @@
 {{define "content"}}
 <section class="event-head">
   <h1>{{.Event.Title}}</h1>
-  <p class="meta">
-    {{with .Event.Date}}<span>{{date .}}</span>{{end}}
-    {{with .Event.Location}}<span>{{.}}</span>{{end}}
-  </p>
+  <p class="meta">{{with .Event.Date}}{{date .}}{{end}}{{if and .Event.Date .Event.Location}} · {{end}}{{with .Event.Location}}{{.}}{{end}}</p>
   {{with .Event.Description}}<p class="desc">{{.}}</p>{{end}}
 
   {{if .Event.IsDraft}}
     <div class="callout info">Les inscriptions ne sont pas encore ouvertes. Revenez bientôt !</div>
   {{else}}
     {{if .Event.IsClosed}}<div class="callout info">Les inscriptions sont closes. Merci à toutes et à tous !</div>{{end}}
+    {{if .P.Needed}}
     <div class="summary">
       {{template "progress" .P}}
-      <p>
-        <strong>{{.P.Count}}</strong> {{plural .P.Count "inscription" "inscriptions"}} sur <strong>{{.P.Needed}}</strong> nécessaires
-        {{if .P.Missing}} · <span class="missing">il manque encore {{.P.Missing}} {{plural .P.Missing "personne" "personnes"}}</span>{{else if .P.Needed}} · tout est couvert, merci !{{end}}
-      </p>
+      <p>{{if .P.Missing}}<span class="missing">Il manque encore {{.P.Missing}} {{plural .P.Missing "personne" "personnes"}}</span> · {{.P.Count}} sur {{.P.Needed}}{{else}}Tous les créneaux sont couverts, merci !{{end}}</p>
     </div>
+    {{end}}
   {{end}}
 </section>
 
@@ -26,15 +22,13 @@
   <nav class="tabs" aria-label="Stands" hx-boost="true" hx-target="#planning" hx-select="#planning" hx-swap="outerHTML">
     <a href="{{tabURL .EventURL 0 .TodoOnly}}" {{if eq .Tab "grid"}}class="active" aria-current="page"{{end}}>Vue d'ensemble</a>
     {{range .P.Stands}}
-    <a href="{{tabURL $.EventURL .ID $.TodoOnly}}" style="--stand: {{css .Color}}"
-       {{if and (eq $.Tab "stand") (eq $.Stand.ID .ID)}}class="active" aria-current="page"{{end}}>
-      <span class="dot"></span>{{.Name}}
-      {{if .Missing}}<span class="badge" title="places à pourvoir">{{.Missing}}</span>{{else if .Slots}}<span class="badge ok" title="complet">✓</span>{{end}}
+    <a href="{{tabURL $.EventURL .ID $.TodoOnly}}" {{if and (eq $.Tab "stand") (eq $.Stand.ID .ID)}}class="active" aria-current="page"{{end}}>
+      {{.Name}}{{if .Missing}}<span class="count" title="places à pourvoir">{{.Missing}}</span>{{else if .Slots}}<span class="count done" title="complet">✓</span>{{end}}
     </a>
     {{end}}
     {{if .Me}}
     <a href="{{.MeURL}}" class="me{{if eq .Tab "me"}} active{{end}}" {{if eq .Tab "me"}}aria-current="page"{{end}}>
-      Mes créneaux <span class="badge mine">{{len .P.MySlots}}</span>
+      Mes créneaux<span class="count mine">{{len .P.MySlots}}</span>
     </a>
     {{end}}
   </nav>
@@ -42,19 +36,12 @@
   {{if ne .Tab "me"}}
   <div class="toolbar" hx-boost="true" hx-target="#planning" hx-select="#planning" hx-swap="outerHTML">
     {{$standID := 0}}{{if eq .Tab "stand"}}{{$standID = .Stand.ID}}{{end}}
-    <a class="toggle{{if .TodoOnly}} on{{end}}" href="{{tabURL .EventURL $standID (not .TodoOnly)}}" role="switch" aria-checked="{{.TodoOnly}}">
-      <span class="switch" aria-hidden="true"></span> Seulement les créneaux à compléter
+    <a class="chip{{if .TodoOnly}} on{{end}}" href="{{tabURL .EventURL $standID (not .TodoOnly)}}" role="switch" aria-checked="{{.TodoOnly}}">
+      {{if .TodoOnly}}✓ {{end}}Créneaux à compléter
     </a>
-    <span class="legend">
-      <span class="lg st-empty">personne</span>
-      <span class="lg st-partial">à compléter</span>
-      <span class="lg st-ok">OK</span>
-      <span class="lg st-full">complet</span>
-    </span>
   </div>
   {{end}}
 
-  <div class="panel">
   {{if eq .Tab "grid"}}
     {{if not .P.Columns}}
       <p class="empty">Aucun créneau n'a encore été proposé.</p>
@@ -63,7 +50,7 @@
         <table class="grid">
           <thead>
             <tr>
-              <th scope="col" class="corner">Stand</th>
+              <th scope="col"></th>
               {{range .P.Columns}}
               <th scope="col">{{if $.P.MultiDay}}<small>{{day .StartsAt}}</small><br>{{end}}{{hm .StartsAt}}<small> – {{hm .EndsAt}}</small></th>
               {{end}}
@@ -97,35 +84,36 @@
     {{end}}
 
   {{else if eq .Tab "stand"}}{{with .Stand}}
-    <section class="stand-tab" style="--stand: {{css .Color}}">
-      <h2><span class="dot"></span>{{.Name}}</h2>
+    <section class="stand-tab">
       {{with .Description}}<p class="desc">{{.}}</p>{{end}}
       {{if .Slots}}
-        {{template "progress" .}}
-        <p class="muted">{{.Count}} {{plural .Count "inscription" "inscriptions"}} · {{.Needed}} nécessaires{{if .Missing}} · <span class="missing">il manque {{.Missing}} {{plural .Missing "personne" "personnes"}}</span>{{end}}</p>
-      {{end}}
-      <div class="cards">
+      <div class="slots">
         {{range .Slots}}{{if or (not $.TodoOnly) .Missing}}
-        <article class="slot-card st-{{.Status}}{{if .Mine}} mine{{end}}">
-          <header>
-            <h3>{{if $.P.MultiDay}}<small>{{day .StartsAt}}</small><br>{{end}}{{span .StartsAt .EndsAt}}</h3>
-            <span class="pill st-{{.Status}}">{{label .Status}}</span>
-          </header>
-          <p class="need">{{.Count}} / {{.MinPeople}} {{plural .MinPeople "personne" "personnes"}}{{if .MaxPeople}} (max {{.MaxPeople}}){{end}}</p>
-          <ul class="people">
-            {{range .Signups}}<li>{{pub .Name}}{{if and $.Me (eq .VolunteerID $.Me.ID)}} <em>(vous)</em>{{end}}</li>{{end}}
-            {{range seq .Missing}}<li class="free">place libre</li>{{end}}
-          </ul>
-          {{if .Mine}}
-            <a class="btn ghost" href="{{$.MeURL}}">Gérer mon inscription</a>
-          {{else if and $.Event.IsOpen (not .Full)}}
-            <a class="btn" href="{{$.EventURL}}/slots/{{.ID}}/signup" hx-get="{{$.EventURL}}/slots/{{.ID}}/signup" hx-target="#modal">Je m'inscris</a>
+        <article class="slot{{if .Mine}} mine{{end}}">
+          <div class="slot-top">
+            <h3>{{if $.P.MultiDay}}<small>{{day .StartsAt}}</small>{{end}}{{span .StartsAt .EndsAt}}</h3>
+            <span class="status st-{{.Status}}" title="{{label .Status}}">{{.Count}}/{{.MinPeople}}</span>
+          </div>
+          {{if .Signups}}
+          <p class="slot-names">{{range $i, $p := .Signups}}{{if $i}}, {{end}}{{pub $p.Name}}{{if and $.Me (eq $p.VolunteerID $.Me.ID)}} (vous){{end}}{{end}}</p>
+          {{else}}
+          <p class="slot-names muted">Personne pour l'instant</p>
           {{end}}
+          <div class="slot-actions">
+          {{if .Mine}}
+            <a class="btn text small" href="{{$.MeURL}}">Gérer</a>
+          {{else if and $.Event.IsOpen (not .Full)}}
+            <a class="btn tonal small" href="{{$.EventURL}}/slots/{{.ID}}/signup" hx-get="{{$.EventURL}}/slots/{{.ID}}/signup" hx-target="#modal">S'inscrire</a>
+          {{else if .Full}}
+            <span class="muted">Complet</span>
+          {{end}}
+          </div>
         </article>
-        {{end}}{{else}}
-        <p class="empty">Pas encore de créneau pour ce stand.</p>
-        {{end}}
+        {{end}}{{end}}
       </div>
+      {{else}}
+      <p class="empty">Pas encore de créneau pour ce stand.</p>
+      {{end}}
     </section>
   {{end}}
 
@@ -134,59 +122,57 @@
       {{if .Welcome}}
       <div class="callout success">
         <strong>Merci {{.Me.Name}} !</strong> Votre inscription est enregistrée.
-        Cet appareil se souviendra de vous. Pour modifier ou annuler vos créneaux depuis un autre appareil,
-        <strong>gardez ce lien personnel</strong> (ne le partagez pas) :
+        Gardez le lien personnel ci-dessous pour modifier vos créneaux depuis un autre appareil.
       </div>
       {{end}}
-      <h2>Mes créneaux</h2>
+
       {{if .P.MySlots}}
-      <ul class="my-slots">
+      <ul class="list">
         {{range .P.MySlots}}
-        <li style="--stand: {{css .Stand.Color}}">
+        <li>
           <div>
-            <strong><span class="dot"></span>{{.Stand.Name}}</strong><br>
-            {{if $.P.MultiDay}}{{day .StartsAt}}, {{end}}{{span .StartsAt .EndsAt}}
-            {{if overlaps $.P.MySlots .}}<br><span class="warn">⚠ chevauche un autre de vos créneaux</span>{{end}}
+            {{.Stand.Name}}
+            <div class="sub">{{if $.P.MultiDay}}{{day .StartsAt}}, {{end}}{{span .StartsAt .EndsAt}}{{if overlaps $.P.MySlots .}} · <span class="warn">chevauche un autre créneau</span>{{end}}</div>
           </div>
           {{if $.Event.IsOpen}}
           {{range .Signups}}{{if eq .VolunteerID $.Me.ID}}
           <form method="post" action="{{$.MeURL}}/signups/{{.ID}}/delete" data-confirm="Annuler votre inscription sur ce créneau ?">
-            <button class="btn small danger" type="submit">Annuler</button>
+            <button class="btn text small danger" type="submit">Annuler</button>
           </form>
           {{end}}{{end}}
           {{end}}
         </li>
         {{end}}
       </ul>
-      <p><a href="{{tabURL .EventURL 0 true}}">Voir les autres créneaux à compléter →</a></p>
       {{else}}
-      <p class="empty">Vous n'êtes inscrit·e sur aucun créneau pour l'instant. <a href="{{.EventURL}}">Voir le planning →</a></p>
+      <p class="empty">Vous n'êtes inscrit·e sur aucun créneau. <a href="{{.EventURL}}">Voir le planning</a></p>
       {{end}}
 
       <div class="card">
-        <h3>Mon lien personnel</h3>
+        <label for="me-link">Mon lien personnel (à ne pas partager)</label>
         <div class="copy-row">
-          <input type="text" readonly value="{{.MeAbsURL}}" id="me-link" aria-label="Lien personnel">
-          <button type="button" class="btn small" data-copy="#me-link">Copier</button>
+          <input type="text" readonly value="{{.MeAbsURL}}" id="me-link">
+          <button type="button" class="btn text small" data-copy="#me-link">Copier</button>
         </div>
       </div>
 
-      <details class="card">
+      <details>
         <summary>Mes coordonnées</summary>
-        <form method="post" action="{{.MeURL}}" class="stack">
+        <form method="post" action="{{.MeURL}}" class="stack card">
           <label>Nom <input name="name" value="{{.Me.Name}}" required maxlength="80" autocomplete="name"></label>
-          <label>E-mail <input type="email" name="email" value="{{.Me.Email}}" maxlength="120" autocomplete="email"></label>
-          <label>Téléphone <input type="tel" name="phone" value="{{.Me.Phone}}" maxlength="30" autocomplete="tel"></label>
-          <button class="btn" type="submit">Enregistrer</button>
+          <div class="row2">
+            <label>E-mail <input type="email" name="email" value="{{.Me.Email}}" maxlength="120" autocomplete="email"></label>
+            <label>Téléphone <input type="tel" name="phone" value="{{.Me.Phone}}" maxlength="30" autocomplete="tel"></label>
+          </div>
+          <div><button class="btn" type="submit">Enregistrer</button></div>
         </form>
       </details>
 
-      <form method="post" action="{{.EventURL}}/forget" class="forget">
-        <button type="submit" class="linklike">Ce n'est pas moi / oublier cet appareil</button>
+      <form method="post" action="{{.EventURL}}/forget">
+        <p><button type="submit" class="linklike">Ce n'est pas moi</button></p>
       </form>
     </section>
   {{end}}
-  </div>
 </div>
 {{end}}
 {{end}}
