@@ -1,0 +1,35 @@
+# systemd unit for the APE volunteer sign-up app.
+#
+#   sudo useradd --system --home /var/lib/benevole --create-home benevole
+#   sudo install -m 0755 benevole /usr/local/bin/benevole
+#   sudo cp deploy/benevole.service /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now benevole
+#
+# Optional secrets in /etc/benevole.env (chmod 600), e.g.:
+#   BENEVOLE_CREATE_PASSWORD=un-mot-de-passe-pour-creer-des-evenements
+
+[Unit]
+Description=Bénévoles APE (inscription des bénévoles)
+After=network.target
+
+[Service]
+User=benevole
+Group=benevole
+WorkingDirectory=/var/lib/benevole
+Environment=BENEVOLE_ADDR=127.0.0.1:8080
+Environment=BENEVOLE_DB=/var/lib/benevole/benevole.db
+Environment=BENEVOLE_BASE_URL=https://benevoles.example.org
+Environment=BENEVOLE_TRUST_PROXY=true
+EnvironmentFile=-/etc/benevole.env
+ExecStart=/usr/local/bin/benevole
+Restart=on-failure
+
+# Hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/benevole
+
+[Install]
+WantedBy=multi-user.target

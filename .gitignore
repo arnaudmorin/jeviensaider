@@ -1,0 +1,6 @@
+/benevole
+/benevole-linux-*
+*.db
+*.db-wal
+*.db-shm
+backup-*.db

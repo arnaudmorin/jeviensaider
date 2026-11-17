@@ -1,0 +1,148 @@
+// Package model holds the domain types shared by the store and the web layer,
+// plus small pure helpers (display names, fill status, overlaps).
+package model
+
+import (
+	"strings"
+	"time"
+	"unicode"
+	"unicode/utf8"
+)
+
+// TimeLayout is how slot times are stored in SQLite: local wall-clock time,
+// without timezone (an APE event happens in one place, one timezone).
+const TimeLayout = "2006-01-02 15:04"
+
+// DateLayout is the layout of Event.Date.
+const DateLayout = "2006-01-02"
+
+// Event statuses.
+const (
+	StatusDraft  = "draft"
+	StatusOpen   = "open"
+	StatusClosed = "closed"
+)
+
+type Event struct {
+	ID          int64
+	Slug        string
+	Title       string
+	Description string
+	Location    string
+	Date        string // YYYY-MM-DD, may be empty
+	AdminToken  string
+	Status      string
+	CreatedAt   time.Time
+}
+
+// ParsedDate returns the event date, or zero time if unset/invalid.
+func (e *Event) ParsedDate() time.Time {
+	t, err := time.Parse(DateLayout, e.Date)
+	if err != nil {
+		return time.Time{}
+	}
+	return t
+}
+
+func (e *Event) IsOpen() bool   { return e.Status == StatusOpen }
+func (e *Event) IsDraft() bool  { return e.Status == StatusDraft }
+func (e *Event) IsClosed() bool { return e.Status == StatusClosed }
+
+type Stand struct {
+	ID          int64
+	EventID     int64
+	Name        string
+	Description string
+	Position    int
+	Color       string
+}
+
+type Slot struct {
+	ID        int64
+	StandID   int64
+	StartsAt  time.Time
+	EndsAt    time.Time
+	MinPeople int
+	MaxPeople int // 0 = no maximum
+}
+
+// Overlaps reports whether two slots share some time.
+func (s Slot) Overlaps(o Slot) bool {
+	return s.StartsAt.Before(o.EndsAt) && o.StartsAt.Before(s.EndsAt)
+}
+
+// IsFull reports whether no more volunteers can sign up for the slot.
+func (s Slot) IsFull(count int) bool {
+	return s.MaxPeople > 0 && count >= s.MaxPeople
+}
+
+// Fill statuses, used as CSS classes.
+const (
+	FillEmpty   = "empty"   // nobody yet (and somebody is needed)
+	FillPartial = "partial" // some people, but fewer than needed
+	FillOK      = "ok"      // minimum reached, more people still welcome
+	FillFull    = "full"    // maximum reached, sign-ups closed
+)
+
+// FillStatus classifies a slot given its current number of sign-ups.
+func (s Slot) FillStatus(count int) string {
+	switch {
+	case s.IsFull(count):
+		return FillFull
+	case count >= s.MinPeople:
+		return FillOK
+	case count == 0:
+		return FillEmpty
+	default:
+		return FillPartial
+	}
+}
+
+// Missing is the number of people still needed to reach the minimum.
+func (s Slot) Missing(count int) int {
+	if count >= s.MinPeople {
+		return 0
+	}
+	return s.MinPeople - count
+}
+
+type Volunteer struct {
+	ID        int64
+	EventID   int64
+	Name      string
+	Email     string
+	Phone     string
+	EditToken string
+	CreatedAt time.Time
+}
+
+type Signup struct {
+	ID          int64
+	SlotID      int64
+	VolunteerID int64
+	Comment     string
+	CreatedAt   time.Time
+}
+
+// SignupRow is a sign-up joined with its volunteer, as listed on pages.
+type SignupRow struct {
+	Signup
+	Name  string
+	Email string
+	Phone string
+}
+
+// DisplayName returns the public form of a name: first name plus the initial
+// of the last word ("Marie Dupont" -> "Marie D."). Single words are kept.
+func DisplayName(name string) string {
+	parts := strings.Fields(name)
+	switch len(parts) {
+	case 0:
+		return ""
+	case 1:
+		return parts[0]
+	}
+	last := parts[len(parts)-1]
+	r, _ := utf8.DecodeRuneInString(last)
+	return parts[0] + " " + string(unicode.ToUpper(r)) + "."
+}

@@ -1,0 +1,23 @@
+{{define "layout"}}<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>{{.Title}}</title>
+<link rel="stylesheet" href="{{asset "app.css"}}">
+<script src="{{asset "htmx.min.js"}}" defer></script>
+<script src="{{asset "app.js"}}" defer></script>
+</head>
+<body>
+<header class="topbar">
+  <div class="container"><a href="/" class="brand"><span class="logo" aria-hidden="true"></span>Bénévoles APE</a></div>
+</header>
+<main class="container" id="main">
+{{template "flash" .Flash}}
+{{template "content" .}}
+</main>
+<footer class="container footer">Merci à toutes les bénévoles et tous les bénévoles !</footer>
+<div id="modal"></div>
+</body>
+</html>{{end}}

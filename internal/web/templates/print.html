@@ -1,0 +1,51 @@
+{{define "print"}}<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Planning · {{.Event.Title}}</title>
+<link rel="stylesheet" href="{{asset "print.css"}}">
+<script src="{{asset "app.js"}}" defer></script>
+</head>
+<body>
+<div class="noprint bar">
+  <button type="button" data-print>Imprimer</button>
+  <span>Une page par stand. Les cases vides permettent d'ajouter des noms à la main.</span>
+</div>
+{{range .P.Stands}}
+<section class="page" style="--stand: {{css .Color}}">
+  <header>
+    <p class="event">{{$.Event.Title}}{{with $.Event.Date}} · {{date .}}{{end}}{{with $.Event.Location}} · {{.}}{{end}}</p>
+    <h1>{{.Name}}</h1>
+    {{with .Description}}<p class="desc">{{.}}</p>{{end}}
+  </header>
+  {{if .Slots}}
+  <table>
+    <thead><tr><th class="when">Créneau</th><th>Bénévoles</th><th class="tel">Téléphone</th></tr></thead>
+    <tbody>
+    {{range .Slots}}{{$s := .}}
+      {{range $i, $p := .Signups}}
+      <tr>
+        {{if eq $i 0}}<th class="when" rowspan="{{add $s.Count $s.Missing}}">{{if $.P.MultiDay}}{{day $s.StartsAt}}<br>{{end}}{{span $s.StartsAt $s.EndsAt}}</th>{{end}}
+        <td>{{$p.Name}}{{with $p.Comment}} <em>({{.}})</em>{{end}}</td>
+        <td class="tel">{{$p.Phone}}</td>
+      </tr>
+      {{end}}
+      {{range $i, $x := seq .Missing}}
+      <tr class="blank">
+        {{if and (eq $i 0) (not $s.Count)}}<th class="when" rowspan="{{$s.Missing}}">{{if $.P.MultiDay}}{{day $s.StartsAt}}<br>{{end}}{{span $s.StartsAt $s.EndsAt}}</th>{{end}}
+        <td>&nbsp;</td><td class="tel"></td>
+      </tr>
+      {{end}}
+      {{if and (not .Count) (not .Missing)}}<tr><th class="when">{{span .StartsAt .EndsAt}}</th><td colspan="2"></td></tr>{{end}}
+    {{end}}
+    </tbody>
+  </table>
+  {{else}}<p>Aucun créneau.</p>{{end}}
+</section>
+{{else}}
+<p>Aucun stand.</p>
+{{end}}
+</body>
+</html>{{end}}

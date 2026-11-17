@@ -1,0 +1,28 @@
+{{define "flash"}}{{with .}}<div class="callout {{.Kind}}" role="status">{{.Message}}</div>{{end}}{{end}}
+
+{{/* A slot in the overview grid or timeline.
+     Args: R = eventPage, S = *SlotView, ShowStand = bool */}}
+{{define "cell"}}{{$s := .S}}{{$r := .R}}
+{{if or (not $r.TodoOnly) $s.Missing}}
+{{if and $r.Event.IsOpen (not $s.Full) (not $s.Mine)}}
+<a class="cell st-{{$s.Status}}" href="{{$r.EventURL}}/slots/{{$s.ID}}/signup"
+   hx-get="{{$r.EventURL}}/slots/{{$s.ID}}/signup" hx-target="#modal" hx-swap="innerHTML"
+   title="S'inscrire : {{$s.Stand.Name}}, {{span $s.StartsAt $s.EndsAt}}">
+{{else}}
+<div class="cell st-{{$s.Status}}{{if $s.Mine}} mine{{end}}">
+{{end}}
+  {{if .ShowStand}}<span class="cell-stand" style="--stand: {{css $s.Stand.Color}}">{{$s.Stand.Name}}</span>{{end}}
+  <span class="cell-count">{{$s.Count}}/{{$s.MinPeople}}{{if gt $s.MaxPeople $s.MinPeople}}<small> (max {{$s.MaxPeople}})</small>{{end}}</span>
+  <span class="cell-names">{{range $i, $p := $s.Signups}}{{if $i}}, {{end}}{{pub $p.Name}}{{end}}</span>
+  {{if $s.Mine}}<span class="cell-cta">✓ vous y êtes</span>
+  {{else if and $r.Event.IsOpen (not $s.Full)}}<span class="cell-cta">{{if $s.Missing}}+ il manque {{$s.Missing}}{{else}}+ je viens aussi{{end}}</span>
+  {{else if $s.Full}}<span class="cell-cta">complet</span>{{end}}
+{{if and $r.Event.IsOpen (not $s.Full) (not $s.Mine)}}</a>{{else}}</div>{{end}}
+{{end}}
+{{end}}
+
+{{define "progress"}}
+<div class="progress" role="img" aria-label="{{.Count}} inscriptions sur {{.Needed}} nécessaires">
+  <div class="progress-bar" style="width: {{pct .Count .Needed}}%"></div>
+</div>
+{{end}}
