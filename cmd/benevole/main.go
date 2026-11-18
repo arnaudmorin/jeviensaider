@@ -5,7 +5,9 @@ import (
 	"context"
 	"errors"
 	"flag"
+	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -30,7 +32,11 @@ func main() {
 	dbPath := flag.String("db", env("BENEVOLE_DB", "benevole.db"), "SQLite database file (env BENEVOLE_DB)")
 	baseURL := flag.String("base-url", env("BENEVOLE_BASE_URL", ""), "public URL, e.g. https://benevoles.example.org (env BENEVOLE_BASE_URL)")
 	trustProxy := flag.Bool("trust-proxy", trustDefault, "trust X-Forwarded-* headers from a reverse proxy (env BENEVOLE_TRUST_PROXY)")
+	healthcheck := flag.Bool("healthcheck", false, "query /healthz on the listen address and exit 0 if healthy (for container health checks)")
 	flag.Parse()
+	if *healthcheck {
+		os.Exit(checkHealth(*addr))
+	}
 	// The creation password is only read from the environment, so it never
 	// shows up in `ps` output.
 	createPassword := os.Getenv("BENEVOLE_CREATE_PASSWORD")
@@ -84,4 +90,29 @@ func main() {
 	if err := httpSrv.Shutdown(shutdownCtx); err != nil {
 		logger.Error("shutdown", "err", err)
 	}
+}
+
+// checkHealth calls /healthz on the local listen address. It lets minimal
+// container images (no curl or wget) run a health check with the binary itself.
+func checkHealth(addr string) int {
+	host, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "healthcheck:", err)
+		return 1
+	}
+	if host == "" || host == "0.0.0.0" || host == "::" {
+		host = "127.0.0.1"
+	}
+	client := &http.Client{Timeout: 3 * time.Second}
+	resp, err := client.Get("http://" + net.JoinHostPort(host, port) + "/healthz")
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "healthcheck:", err)
+		return 1
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		fmt.Fprintln(os.Stderr, "healthcheck: status", resp.StatusCode)
+		return 1
+	}
+	return 0
 }

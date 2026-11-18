@@ -1,0 +1,10 @@
+.git
+.github
+*.db
+*.db-shm
+*.db-wal
+backup-*.db
+benevole
+benevole-linux-*
+.env
+deploy
