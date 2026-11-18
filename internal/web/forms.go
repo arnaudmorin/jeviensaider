@@ -128,6 +128,15 @@ type volunteerForm struct {
 	Comment string
 }
 
+// readPublicVolunteerForm reads what a volunteer can type: a name, an
+// optional phone and comment. Volunteers are not asked for an e-mail.
+func readPublicVolunteerForm(r *http.Request) volunteerForm {
+	f := readVolunteerForm(r)
+	f.Email = ""
+	return f
+}
+
+// readVolunteerForm also reads an e-mail (organisers adding someone by hand).
 func readVolunteerForm(r *http.Request) volunteerForm {
 	return volunteerForm{
 		Name:    clean(r.FormValue("name"), 80, false),
@@ -152,7 +161,8 @@ func validEmail(s string) bool {
 	return err == nil && addr.Address == s
 }
 
-func (f volunteerForm) validate(requireContact bool) error {
+// validate checks a volunteer form: only the name is required.
+func (f volunteerForm) validate() error {
 	if f.Name == "" {
 		return errors.New("Merci d'indiquer votre nom.")
 	}
@@ -161,9 +171,6 @@ func (f volunteerForm) validate(requireContact bool) error {
 	}
 	if f.Phone != "" && !phoneRe.MatchString(f.Phone) {
 		return errors.New("Le numéro de téléphone ne semble pas valide.")
-	}
-	if requireContact && f.Email == "" && f.Phone == "" {
-		return errors.New("Merci d'indiquer un e-mail ou un téléphone, pour que l'APE puisse vous joindre.")
 	}
 	return nil
 }

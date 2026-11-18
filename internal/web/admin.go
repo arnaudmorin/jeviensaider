@@ -331,7 +331,7 @@ func (s *Server) adminAddSignup(w http.ResponseWriter, r *http.Request, ev *mode
 		return
 	}
 	form := readVolunteerForm(r)
-	if err := form.validate(false); err != nil {
+	if err := form.validate(); err != nil {
 		adminFail(w, r, ev, 0, err.Error())
 		return
 	}

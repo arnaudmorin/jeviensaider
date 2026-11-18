@@ -1,6 +1,7 @@
 package store
 
 import (
+	"cmp"
 	"context"
 	"database/sql"
 	"strings"
@@ -99,9 +100,11 @@ func (s *Store) SignUp(ctx context.Context, req SignupRequest) (*SignupResult, e
 				return err
 			}
 			res.NewVolunteer = true
-		} else if req.Name != "" && (req.Name != vol.Name || req.Email != vol.Email || req.Phone != vol.Phone) {
-			// Same person (same name): keep their details up to date.
-			vol.Name, vol.Email, vol.Phone = req.Name, req.Email, req.Phone
+		} else if email := cmp.Or(req.Email, vol.Email); req.Name != "" && (req.Name != vol.Name || email != vol.Email || req.Phone != vol.Phone) {
+			// Same person (same name): keep their details up to date. An
+			// empty e-mail keeps the stored one (volunteers are no longer
+			// asked for it).
+			vol.Name, vol.Email, vol.Phone = req.Name, email, req.Phone
 			if _, err := tx.ExecContext(ctx, `UPDATE volunteers SET name = ?, email = ?, phone = ? WHERE id = ?`,
 				vol.Name, vol.Email, vol.Phone, vol.ID); err != nil {
 				return err

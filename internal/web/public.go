@@ -278,7 +278,7 @@ func (s *Server) signupSubmit(w http.ResponseWriter, r *http.Request, ev *model.
 		return
 	}
 	me := s.cookieVolunteer(r, ev)
-	form := readVolunteerForm(r)
+	form := readPublicVolunteerForm(r)
 
 	fail := func(status int, msg string) {
 		var myID int64
@@ -297,7 +297,7 @@ func (s *Server) signupSubmit(w http.ResponseWriter, r *http.Request, ev *model.
 			Overlaps: overlaps,
 		})
 	}
-	if err := form.validate(true); err != nil {
+	if err := form.validate(); err != nil {
 		fail(http.StatusBadRequest, err.Error())
 		return
 	}
@@ -344,13 +344,13 @@ func capitalize(s string) string {
 // ---- volunteer self-service ----
 
 func (s *Server) meUpdate(w http.ResponseWriter, r *http.Request, ev *model.Event, vol *model.Volunteer) {
-	form := readVolunteerForm(r)
-	if err := form.validate(true); err != nil {
+	form := readPublicVolunteerForm(r)
+	if err := form.validate(); err != nil {
 		setFlash(w, "error", err.Error())
 		redirect(w, r, meURL(ev, vol))
 		return
 	}
-	vol.Name, vol.Email, vol.Phone = form.Name, form.Email, form.Phone
+	vol.Name, vol.Phone = form.Name, form.Phone // the e-mail, if any, is kept
 	if s.storeError(w, r, s.store.UpdateVolunteer(r.Context(), vol)) {
 		return
 	}

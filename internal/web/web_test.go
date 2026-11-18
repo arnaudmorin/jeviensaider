@@ -161,11 +161,15 @@ func TestFullFlow(t *testing.T) {
 	expect(t, e.do(marie, "GET", pub+"/slots/"+slots[0]+"/signup", nil, map[string]string{"HX-Request": "true"}), 200, "<dialog", "Je m'inscris")
 	expect(t, e.get(marie, pub+"/slots/"+slots[0]+"/signup"), 200, "<!doctype html>", "Prénom et nom")
 
-	// Missing contact is refused.
-	expect(t, e.post(marie, pub+"/slots/"+slots[0]+"/signup", url.Values{"name": {"Marie Dupont"}}), 400, "e-mail ou un téléphone")
+	// Volunteers are not asked for an e-mail; only the name is required.
+	if strings.Contains(e.get(marie, pub+"/slots/"+slots[0]+"/signup").body, `name="email"`) {
+		t.Error("the sign-up form still has an e-mail field")
+	}
+	expect(t, e.post(marie, pub+"/slots/"+slots[0]+"/signup", url.Values{"name": {" "}}), 400, "votre nom")
 
 	// First sign-up: redirected to the personal page with welcome message.
-	r := e.post(marie, pub+"/slots/"+slots[0]+"/signup", url.Values{"name": {"Marie Dupont"}, "email": {"marie@example.org"}})
+	// An e-mail sent anyway is ignored.
+	r := e.post(marie, pub+"/slots/"+slots[0]+"/signup", url.Values{"name": {"Marie Dupont"}, "phone": {"07 11 22 33 44"}, "email": {"marie@example.org"}})
 	expect(t, r, http.StatusSeeOther)
 	if !strings.Contains(r.location, "/me/") || !strings.Contains(r.location, "welcome=1") {
 		t.Fatalf("unexpected redirect %q", r.location)
@@ -181,7 +185,7 @@ func TestFullFlow(t *testing.T) {
 	}
 
 	// Second sign-up by Marie (cookie): flash + back to stand tab.
-	r = e.post(marie, pub+"/slots/"+slots[1]+"/signup", url.Values{"name": {"Marie Dupont"}, "email": {"marie@example.org"}})
+	r = e.post(marie, pub+"/slots/"+slots[1]+"/signup", url.Values{"name": {"Marie Dupont"}, "phone": {"07 11 22 33 44"}})
 	expect(t, r, http.StatusSeeOther)
 	if !strings.Contains(r.location, "stand=") {
 		t.Fatalf("expected stand tab redirect, got %q", r.location)
@@ -189,7 +193,7 @@ func TestFullFlow(t *testing.T) {
 	expect(t, e.get(marie, r.location), 200, "C&#39;est noté", "(vous)")
 
 	// Duplicate on same slot is refused.
-	expect(t, e.post(marie, pub+"/slots/"+slots[0]+"/signup", url.Values{"name": {"Marie Dupont"}, "email": {"marie@example.org"}}), 409, "déjà inscrit")
+	expect(t, e.post(marie, pub+"/slots/"+slots[0]+"/signup", url.Values{"name": {"Marie Dupont"}, "phone": {"07 11 22 33 44"}}), 409, "déjà inscrit")
 
 	// Paul fills slot 0; Léa is refused (max 2).
 	expect(t, e.post(e.client(), pub+"/slots/"+slots[0]+"/signup", url.Values{"name": {"Paul Martin"}, "phone": {"06 12 34 56 78"}}), http.StatusSeeOther)
@@ -202,9 +206,12 @@ func TestFullFlow(t *testing.T) {
 
 	// Admin sees contact details; CSV and print view work.
 	r = e.get(admin, adminPath)
-	expect(t, r, 200, "marie@example.org", "06 12 34 56 78", "Marie Dupont")
+	expect(t, r, 200, "07 11 22 33 44", "06 12 34 56 78", "Marie Dupont")
+	if strings.Contains(r.body, "marie@example.org") {
+		t.Error("an e-mail posted by a volunteer was stored")
+	}
 	r = e.get(admin, adminPath+"/export.csv")
-	expect(t, r, 200, "Stand;Date;Début;Fin;Nom", "Pêche aux canards;20/06/2026;14:00;15:00;Marie Dupont;marie@example.org", "(place libre)")
+	expect(t, r, 200, "Stand;Date;Début;Fin;Nom", "Pêche aux canards;20/06/2026;14:00;15:00;Marie Dupont;;07 11 22 33 44", "(place libre)")
 	if !strings.HasPrefix(r.body, "\ufeff") || r.header.Get("Content-Type") != "text/csv; charset=utf-8" {
 		t.Error("CSV must start with a BOM and have the right content type")
 	}
@@ -346,4 +353,14 @@ func TestRetentionNotice(t *testing.T) {
 	if r := e.get(admin, adminPath); strings.Contains(r.body, "supprimés automatiquement") {
 		t.Error("retention notice shown although retention is disabled")
 	}
+}
+
+// A name is enough: no phone, no e-mail.
+func TestSignupNameOnly(t *testing.T) {
+	e := newEnv(t, Config{})
+	_, pub, slots := setupEvent(t, e, e.client())
+	c := e.client()
+	r := e.post(c, pub+"/slots/"+slots[0]+"/signup", url.Values{"name": {"Jules"}})
+	expect(t, r, http.StatusSeeOther)
+	expect(t, e.get(c, r.location), 200, "Merci Jules", "Téléphone (facultatif)")
 }

@@ -76,3 +76,22 @@ func TestEventLimits(t *testing.T) {
 		t.Fatalf("slots: %d, want %d", len(all), MaxSlots)
 	}
 }
+
+// Volunteers are no longer asked for an e-mail: signing up again without
+// one keeps the address stored earlier.
+func TestSignupKeepsStoredEmail(t *testing.T) {
+	s := openTest(t)
+	ev, _, slots := fixture(t, s, 0)
+	a, err := s.SignUp(ctx, SignupRequest{EventID: ev.ID, SlotID: slots[0].ID, Name: "Marie", Email: "marie@example.org"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := s.SignUp(ctx, SignupRequest{EventID: ev.ID, SlotID: slots[1].ID, EditToken: a.Volunteer.EditToken, Name: "Marie", Phone: "0601020304"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	v, _ := s.VolunteerByToken(ctx, ev.ID, a.Volunteer.EditToken)
+	if b.NewVolunteer || v.Email != "marie@example.org" || v.Phone != "0601020304" {
+		t.Fatalf("got %+v", v)
+	}
+}

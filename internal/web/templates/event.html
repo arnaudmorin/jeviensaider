@@ -196,10 +196,7 @@
         <summary>Mes coordonnées</summary>
         <form method="post" action="{{.MeURL}}" class="stack card">
           <label>Nom <input name="name" value="{{.Me.Name}}" required maxlength="80" autocomplete="name"></label>
-          <div class="row2">
-            <label>E-mail <input type="email" name="email" value="{{.Me.Email}}" maxlength="120" autocomplete="email"></label>
-            <label>Téléphone <input type="tel" name="phone" value="{{.Me.Phone}}" maxlength="30" autocomplete="tel"></label>
-          </div>
+          <label>Téléphone (facultatif) <input type="tel" name="phone" value="{{.Me.Phone}}" maxlength="30" autocomplete="tel"></label>
           <div><button class="btn" type="submit">Enregistrer</button></div>
         </form>
       </details>

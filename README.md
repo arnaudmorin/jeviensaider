@@ -34,9 +34,9 @@ in a single SQLite file.
   shown as a list grouped by hour on phones.
 - **One tab per stand**, with a badge showing how many people are still
   missing.
-- Sign up with a name and an e-mail or phone number. There is no account:
-  the browser remembers them, and a personal link lets them manage their slots
-  from another device.
+- Sign up with just a name; a phone number is optional, and no e-mail is
+  asked. There is no account: the browser remembers them, and a personal link
+  lets them manage their slots from another device.
 - A **"Mes créneaux"** tab, with a warning when two of their slots overlap.
 
 ## Quick start
