@@ -19,24 +19,31 @@ type Mailer interface {
 // mailTemplates are plain text (text/template): the same helpers as the
 // pages, no HTML escaping.
 var mailTemplates = template.Must(template.New("mail").Funcs(templateFuncs()).Parse(`
-{{define "created"}}Bonjour,
+{{define "links"}}Bonjour,
 
+{{if .Resent -}}
+Voici les liens de votre événement « {{.Event.Title}} »{{with .Event.Date}} du {{date .}}{{end}} sur Je viens aider, envoyés depuis sa page d'administration.
+{{- else -}}
 Votre événement « {{.Event.Title}} »{{with .Event.Date}} du {{date .}}{{end}} a bien été créé sur Je viens aider.
+{{- end}}
 
 Lien d'administration, à garder précieusement :
 {{.AdminURL}}
 
 C'est la seule clé pour gérer l'événement : conservez ce message et ne partagez ce lien qu'avec les autres organisateurs.
-
+{{if .Resent}}
+Lien public, à partager avec les parents :
+{{.PublicURL}}
+{{else}}
 Prochaines étapes :
   1. Ajoutez vos stands et leurs créneaux.
   2. Passez l'événement en « Ouvert ».
   3. Partagez le lien public avec les parents :
      {{.PublicURL}}
-{{if .Event.NotifySignups}}
+{{end}}{{if .Event.NotifySignups}}
 Vous recevrez un e-mail à chaque inscription ou désinscription. Vous pouvez les désactiver depuis la page d'administration, dans « Modifier l'événement ».
 {{end}}
-Si vous n'avez pas créé cet événement, ignorez simplement ce message.
+{{if .Resent}}Si vous n'organisez pas cet événement{{else}}Si vous n'avez pas créé cet événement{{end}}, ignorez simplement ce message.
 
 -- 
 Je viens aider
@@ -95,22 +102,28 @@ func (s *Server) sendMail(m mail.Message) bool {
 	return true
 }
 
-// notifyCreated sends the organiser the admin link of a new event, and
-// reports whether the mail was queued. The address was typed by the
-// visitor, so mails to one address and in total are limited.
-func (s *Server) notifyCreated(r *http.Request, ev *model.Event) bool {
+// sendLinks e-mails the organiser the admin and public links of an event:
+// when it is created (or duplicated), or again on request (resent). It
+// reports whether the mail was queued. The address was typed by a visitor,
+// so mails to one address and in total are limited.
+func (s *Server) sendLinks(r *http.Request, ev *model.Event, resent bool) bool {
 	if s.cfg.Mailer == nil || ev.AdminEmail == "" {
 		return false
 	}
 	if ok, why := s.mails.allowCreated(ev.AdminEmail, s.now()); !ok {
-		s.log.Warn("creation mail not sent: "+why, "to", ev.AdminEmail)
+		s.log.Warn("links mail not sent: "+why, "to", ev.AdminEmail)
 		return false
+	}
+	subject := "Votre événement « " + ev.Title + " » est créé"
+	if resent {
+		subject = "Les liens de votre événement « " + ev.Title + " »"
 	}
 	return s.sendMail(mail.Message{
 		To:      ev.AdminEmail,
-		Subject: "Votre événement « " + ev.Title + " » est créé",
-		Body: renderMail("created", map[string]any{
+		Subject: subject,
+		Body: renderMail("links", map[string]any{
 			"Event":     ev,
+			"Resent":    resent,
 			"AdminURL":  s.absURL(r, adminURL(ev)),
 			"PublicURL": s.absURL(r, eventURL(ev)),
 		}),

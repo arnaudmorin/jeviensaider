@@ -76,6 +76,7 @@ type adminPage struct {
 	// NeedPassword: duplicating creates an event, so it asks for the
 	// creation password too.
 	NeedPassword bool
+	MailEnabled  bool // e-mails really leave the server (SMTP is set up)
 }
 
 func (s *Server) adminPage(w http.ResponseWriter, r *http.Request, ev *model.Event) {
@@ -113,6 +114,7 @@ func (s *Server) adminPage(w http.ResponseWriter, r *http.Request, ev *model.Eve
 		ExpiresOn:    expires,
 		Retention:    s.cfg.RetentionDays,
 		NeedPassword: s.cfg.CreatePassword != "",
+		MailEnabled:  s.cfg.MailEnabled,
 	})
 }
 
@@ -378,11 +380,27 @@ func (s *Server) adminDuplicate(w http.ResponseWriter, r *http.Request, ev *mode
 		return
 	}
 	msg := "Nouvel événement créé à partir de « " + ev.Title + " ». Voici son lien d'administration : conservez-le !"
-	if s.notifyCreated(r, dup) && s.cfg.MailEnabled {
+	if s.sendLinks(r, dup, false) && s.cfg.MailEnabled {
 		msg += " Il a aussi été envoyé à " + dup.AdminEmail + "."
 	}
 	setFlash(w, "success", msg)
 	redirect(w, r, adminURL(dup))
+}
+
+// adminResendLinks e-mails the admin and public links to the organiser
+// again: the first mail got lost, or the organiser's address changed.
+func (s *Server) adminResendLinks(w http.ResponseWriter, r *http.Request, ev *model.Event) {
+	switch {
+	case !s.cfg.MailEnabled:
+		adminFail(w, r, ev, 0, "L'envoi d'e-mails n'est pas configuré sur ce serveur.")
+	case ev.AdminEmail == "":
+		adminFail(w, r, ev, 0, "Indiquez d'abord l'e-mail de l'organisateur, dans « Modifier l'événement ».")
+	case !s.sendLinks(r, ev, true):
+		adminFail(w, r, ev, 0, "Trop d'envois récents vers "+ev.AdminEmail+" : réessayez plus tard.")
+	default:
+		setFlash(w, "success", "Les liens de l'événement ont été envoyés à "+ev.AdminEmail+".")
+		redirect(w, r, adminURL(ev))
+	}
 }
 
 func (s *Server) adminDeleteEvent(w http.ResponseWriter, r *http.Request, ev *model.Event) {

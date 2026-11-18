@@ -112,3 +112,53 @@ func TestOrganiserEmails(t *testing.T) {
 		t.Fatalf("duplicate mail: %+v", msgs)
 	}
 }
+
+// The organiser can have the links e-mailed again, for instance to a new
+// address; the per-address limit still applies.
+func TestResendLinks(t *testing.T) {
+	fm := &fakeMailer{}
+	e := newEnv(t, Config{Mailer: fm, MailEnabled: true, BaseURL: "https://jeviensaider.example"})
+	admin := e.client()
+	r := e.post(admin, "/events", url.Values{"title": {"Fête"}, "date": {"2026-06-20"}, "admin_email": {"orga@example.org"}})
+	adminPath := r.location
+	expect(t, e.get(admin, adminPath), 200, "Renvoyer les liens par e-mail")
+	fm.take() // the creation mail
+
+	// The organiser's address changed: the links go to the new one.
+	expect(t, e.post(admin, adminPath+"/event", url.Values{"title": {"Fête"}, "date": {"2026-06-20"}, "admin_email": {"new@example.org"}}), http.StatusSeeOther)
+	expect(t, e.post(admin, adminPath+"/resend", nil), http.StatusSeeOther)
+	expect(t, e.get(admin, adminPath), 200, "Les liens de l&#39;événement ont été envoyés à new@example.org")
+	msgs := fm.take()
+	if len(msgs) != 1 {
+		t.Fatalf("%d messages", len(msgs))
+	}
+	m := msgs[0]
+	for _, want := range []string{"envoyés depuis sa page d'administration", "https://jeviensaider.example" + adminPath, "Lien public, à partager avec les parents :\nhttps://jeviensaider.example/e/", "Si vous n'organisez pas cet événement"} {
+		if !strings.Contains(m.Body, want) {
+			t.Errorf("resent mail lacks %q:\n%s", want, m.Body)
+		}
+	}
+	if m.To != "new@example.org" || m.Subject != "Les liens de votre événement « Fête »" || strings.Contains(m.Body, "Prochaines étapes") {
+		t.Errorf("resent mail: %+v", m)
+	}
+
+	// The per-address limit (3 a day) counts resends.
+	expect(t, e.post(admin, adminPath+"/resend", nil), http.StatusSeeOther)
+	expect(t, e.post(admin, adminPath+"/resend", nil), http.StatusSeeOther)
+	expect(t, e.post(admin, adminPath+"/resend", nil), http.StatusSeeOther)
+	expect(t, e.get(admin, adminPath), 200, "Trop d&#39;envois récents vers new@example.org")
+	if n := len(fm.take()); n != 2 {
+		t.Errorf("%d more mails, want 2", n)
+	}
+}
+
+func TestResendLinksWithoutSMTP(t *testing.T) {
+	e := newEnv(t, Config{Mailer: &fakeMailer{}}) // mails are only logged
+	admin := e.client()
+	adminPath := e.post(admin, "/events", url.Values{"title": {"Fête"}, "admin_email": {"orga@example.org"}}).location
+	if strings.Contains(e.get(admin, adminPath).body, "Renvoyer les liens") {
+		t.Error("resend button shown without SMTP")
+	}
+	expect(t, e.post(admin, adminPath+"/resend", nil), http.StatusSeeOther)
+	expect(t, e.get(admin, adminPath), 200, "pas configuré sur ce serveur")
+}

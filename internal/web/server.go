@@ -114,6 +114,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /a/{token}/planning.pdf", s.withAdmin(s.adminPDF))
 	mux.HandleFunc("POST /a/{token}/purge", s.withAdmin(s.adminPurge))
 	mux.HandleFunc("POST /a/{token}/duplicate", s.withAdmin(s.adminDuplicate))
+	mux.HandleFunc("POST /a/{token}/resend", s.withAdmin(s.adminResendLinks))
 	mux.HandleFunc("POST /a/{token}/delete", s.withAdmin(s.adminDeleteEvent))
 
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {

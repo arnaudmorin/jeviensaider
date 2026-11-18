@@ -16,11 +16,12 @@ in a single SQLite file.
 
 **For organisers**
 - Create an event and get a **secret admin link**, with no account to create.
-  The organiser's e-mail is required: the link is also sent there.
+  The organiser's e-mail is required: the link is also sent there, and can be
+  **sent again** from the admin page (a lost e-mail, or a new address).
 - Get an **e-mail for each sign-up or cancellation** (who, which slot, what
   is still missing), which can be turned off per event.
-- Add stands, then generate their slots in one step: start, end, slot length
-  and number of people.
+- Add stands, with a description of what volunteers do there, then generate
+  their slots in one step: start, end, slot length and number of people.
 - Follow progress on a dashboard that shows who is signed up, with their
   contact details, and how many places are still missing.
 - Open and close sign-ups.
@@ -35,15 +36,18 @@ in a single SQLite file.
   A private instance can turn this off and keep its events forever.
 
 **For parents**
-- An **overview grid** (stands × hours, coloured red / orange / green),
-  shown as a list grouped by hour on phones.
-- **One tab per stand**, with a badge showing how many people are still
-  missing.
-- Sign up with just a name; a phone number is optional, and no e-mail is
-  asked or stored. There is no account: the browser remembers them, and a personal link
-  lets them manage their slots from another device. A link shared by mistake
-  can be replaced with a new one.
-- A **"Mes créneaux"** tab, with a warning when two of their slots overlap.
+- One **overview** of the whole event: a table of stands × hours, coloured
+  red / orange / green, shown as a list grouped by hour on phones, and
+  "Il reste encore N places !" at the top. A filter shows only the slots
+  still to fill.
+- Each stand's description under its name, cut after two lines; "Voir plus"
+  opens the whole text. The sign-up form shows it too.
+- Sign up in a few seconds with just a name; a phone number is optional, and
+  no e-mail is asked or stored. There is no account: the browser remembers
+  them, and a personal link lets them manage their slots from another device.
+  A link shared by mistake can be replaced with a new one.
+- **"Mes créneaux"**: the same table with only their own slots, an "Annuler"
+  button on each, and a warning when two of them are at the same time.
 
 ## Quick start
 
@@ -81,7 +85,7 @@ create events. It is read from the environment only, so it never shows up in
 `ps` output. It is also asked for when an organiser duplicates an event.
 
 **E-mails.** The app e-mails organisers: the admin link when an event is
-created or duplicated, then, unless they turn it off, one message per sign-up
+created or duplicated, or when they ask for it again, then, unless they turn it off, one message per sign-up
 or cancellation. Volunteers never receive e-mails. Configure an SMTP server
 with these variables (environment only):
 
@@ -113,8 +117,8 @@ limit; an invalid value stops the server:
 
 | Environment variable | Default | Limit |
 |---|---|---|
-| `BENEVOLE_MAIL_CREATED_PER_ADDRESS_PER_DAY` | `3` | "Event created" mails to one address, per day |
-| `BENEVOLE_MAIL_CREATED_PER_HOUR` | `30` | "Event created" mails to all addresses, per hour |
+| `BENEVOLE_MAIL_CREATED_PER_ADDRESS_PER_DAY` | `3` | Mails with an event's links (creation, duplication, resend) to one address, per day |
+| `BENEVOLE_MAIL_CREATED_PER_HOUR` | `30` | Mails with an event's links to all addresses, per hour |
 | `BENEVOLE_MAIL_SIGNUPS_PER_EVENT_PER_HOUR` | `20` | Sign-up notifications for one event, per hour; past it the organiser gets one "notifications en pause" message |
 | `BENEVOLE_MAIL_PER_HOUR` | `300` | All mails, per hour |
 
@@ -217,12 +221,17 @@ sqlite3 /var/lib/benevole/benevole.db ".backup '/var/backups/benevole-$(date +%F
 ## Under the hood
 
 ```
-cmd/benevole/      entry point: flags, graceful shutdown
-internal/model/    domain types, fill status, planning view
+cmd/benevole/      entry point: configuration, server, CLI subcommands
+internal/model/    domain types and rules, fill status, planning view
 internal/slotgen/  splits a time range into slots
 internal/store/    SQLite access, embedded migrations, sign-up transaction
-internal/web/      handlers, middleware, embedded templates and static files (htmx)
+internal/mail/     SMTP sender and background queue
+internal/web/      handlers, middleware, CSV and PDF exports,
+                   embedded templates and static files (htmx)
 ```
+
+[`docs/SPEC.md`](docs/SPEC.md) describes in detail what the app does and how
+the code is organised.
 
 - **No overbooking.** Each sign-up checks capacity and inserts the row in a
   single `BEGIN IMMEDIATE` transaction. A test runs 20 concurrent sign-ups for

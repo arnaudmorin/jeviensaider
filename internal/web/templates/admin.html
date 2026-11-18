@@ -32,7 +32,12 @@
     </div>
   </div>
   <p class="hint">Le lien admin est secret : gardez-le en favori, partagez-le seulement avec les organisateurs.</p>
-  {{if .Event.AdminEmail}}<p class="hint">E-mails de l'organisateur envoyés à {{.Event.AdminEmail}}{{if not .Event.NotifySignups}} (inscriptions non notifiées){{end}}.</p>{{end}}
+  {{if .Event.AdminEmail}}
+  <form method="post" action="{{$a}}/resend" class="hint">
+    E-mails de l'organisateur envoyés à {{.Event.AdminEmail}}{{if not .Event.NotifySignups}} (inscriptions non notifiées){{end}}.
+    {{if .MailEnabled}}<button type="submit" class="linklike">Renvoyer les liens par e-mail</button>{{end}}
+  </form>
+  {{end}}
   {{with .ExpiresOn}}<p class="hint">L'événement et ses inscriptions seront supprimés automatiquement le {{date .}}, {{$.Retention}} jours après l'événement.</p>{{end}}
 </section>
 

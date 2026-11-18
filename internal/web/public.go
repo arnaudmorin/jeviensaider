@@ -46,7 +46,7 @@ func (s *Server) createEvent(w http.ResponseWriter, r *http.Request) {
 		s.serverError(w, r, err)
 		return
 	}
-	sent := s.notifyCreated(r, &ev)
+	sent := s.sendLinks(r, &ev, false)
 	msg := "Événement créé ! Ce lien d'administration est votre seule clé pour le gérer : ajoutez-le à vos favoris et ne le partagez qu'avec les organisateurs."
 	if s.cfg.MailEnabled && sent {
 		msg = "Événement créé ! Ce lien d'administration est votre seule clé pour le gérer : il vient de vous être envoyé à " + ev.AdminEmail + ". Ne le partagez qu'avec les organisateurs."

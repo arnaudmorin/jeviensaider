@@ -132,10 +132,13 @@ Derived notions (computed, not stored):
   creation password when one is configured).
 - Delete the event.
 - Shows when the event will be deleted automatically.
+- Sends the event's links to the organiser again, when e-mail is set up.
 
 ### 4.5 E-mails (to organisers only)
 
-- On creation and duplication: the admin and public links.
+- On creation and duplication: the admin and public links. The organiser can
+  have them sent again from the admin page ("Renvoyer les liens par e-mail"),
+  to the current organiser address; this counts in the same limits.
 - On each sign-up and cancellation, if the organiser asked: who, which slot,
   phone and comment, and what is still missing.
 - Sent in the background through SMTP (STARTTLS required by default, or
@@ -187,7 +190,8 @@ silently falls back to a default.
   and 500 slots per event; bounded memory for every in-memory counter.
 - **E-mail abuse**: with SMTP on, the server refuses to start without a
   creation password (unless `BENEVOLE_OPEN_CREATION=true`). Limits, all
-  configurable: 3 creation mails per address per day, 30 per hour in total,
+  configurable: 3 mails with an event's links (creation, duplication or
+  resend) per address per day, 30 per hour in total,
   20 sign-up notifications per event per hour (then one "paused" notice),
   300 mails per hour overall. No CR/LF in headers.
 - **Privacy**: public pages show "Prénom N." only; phones are visible to the
