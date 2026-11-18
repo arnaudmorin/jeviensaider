@@ -10,9 +10,38 @@ import (
 	"time"
 )
 
-func securityHeaders(next http.Handler) http.Handler {
+// maxBodyBytes caps request bodies. Every form of the app is a few KB.
+const maxBodyBytes = 64 << 10
+
+// limitBody rejects oversized requests and caps what handlers can read, so a
+// large (multipart) POST cannot make the server buffer megabytes.
+func (s *Server) limitBody(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.ContentLength > maxBodyBytes {
+			s.renderError(w, r, http.StatusRequestEntityTooLarge, "Requête trop volumineuse.")
+			return
+		}
+		r.Body = http.MaxBytesReader(w, r.Body, maxBodyBytes)
+		next.ServeHTTP(w, r)
+	})
+}
+
+// isHTTPS reports whether the client reached us over HTTPS, directly or
+// through a trusted reverse proxy, or whether the public URL is HTTPS.
+func (s *Server) isHTTPS(r *http.Request) bool {
+	if r.TLS != nil || strings.HasPrefix(s.cfg.BaseURL, "https://") {
+		return true
+	}
+	return s.cfg.TrustProxy && strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https")
+}
+
+func (s *Server) securityHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		h := w.Header()
+		if s.isHTTPS(r) {
+			h.Set("Strict-Transport-Security", "max-age=31536000")
+			w = &secureCookies{ResponseWriter: w}
+		}
 		h.Set("Content-Security-Policy",
 			"default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; "+
 				"frame-ancestors 'none'; form-action 'self'; base-uri 'none'")
@@ -50,6 +79,35 @@ func (s *Server) csrf(next http.Handler) http.Handler {
 	})
 }
 
+// maxBuckets bounds the memory used by the rate limiter.
+const maxBuckets = 50000
+
+// secureCookies adds the Secure attribute to every cookie of an HTTPS
+// response, so the volunteer token is never sent over plain HTTP.
+type secureCookies struct {
+	http.ResponseWriter
+	done bool
+}
+
+func (s *secureCookies) fix() {
+	if s.done {
+		return
+	}
+	s.done = true
+	cookies := s.Header()["Set-Cookie"]
+	for i, c := range cookies {
+		if !strings.Contains(strings.ToLower(c), "; secure") {
+			cookies[i] = c + "; Secure"
+		}
+	}
+}
+
+func (s *secureCookies) WriteHeader(code int) { s.fix(); s.ResponseWriter.WriteHeader(code) }
+
+func (s *secureCookies) Write(b []byte) (int, error) { s.fix(); return s.ResponseWriter.Write(b) }
+
+func (s *secureCookies) Unwrap() http.ResponseWriter { return s.ResponseWriter }
+
 // limiter is a per-IP token bucket.
 type limiter struct {
 	mu      sync.Mutex
@@ -86,6 +144,18 @@ func (l *limiter) allow(key string, now time.Time) bool {
 	}
 	b, ok := l.buckets[key]
 	if !ok {
+		if len(l.buckets) >= maxBuckets {
+			// Drop buckets that have refilled: forgetting them changes nothing.
+			refill := time.Duration(l.burst / l.rate * float64(time.Second))
+			for k, b := range l.buckets {
+				if now.Sub(b.last) > refill {
+					delete(l.buckets, k)
+				}
+			}
+			if len(l.buckets) >= maxBuckets {
+				return false // flooded by many addresses: refuse new ones
+			}
+		}
 		b = &bucket{tokens: l.burst, last: now}
 		l.buckets[key] = b
 	}
@@ -112,17 +182,33 @@ func (s *Server) rateLimit(next http.Handler) http.Handler {
 	})
 }
 
+// clientIP returns the rate-limiting key of the client: its IP address, or
+// its /64 network for IPv6 (one subscriber usually owns a whole /64).
+//
+// Behind a trusted proxy, the client is the LAST X-Forwarded-For entry: that
+// is the one the proxy appended. Earlier entries come from the client and
+// can be forged.
 func (s *Server) clientIP(r *http.Request) string {
-	if s.cfg.TrustProxy {
-		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-			return strings.TrimSpace(strings.Split(xff, ",")[0])
-		}
-	}
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
-		return r.RemoteAddr
+		host = r.RemoteAddr
 	}
-	return host
+	if s.cfg.TrustProxy {
+		if xff := r.Header.Values("X-Forwarded-For"); len(xff) > 0 {
+			parts := strings.Split(xff[len(xff)-1], ",")
+			if last := strings.TrimSpace(parts[len(parts)-1]); last != "" {
+				host = last
+			}
+		}
+	}
+	ip := net.ParseIP(host)
+	if ip == nil {
+		return host
+	}
+	if ip.To4() == nil {
+		return ip.Mask(net.CIDRMask(64, 128)).String() + "/64"
+	}
+	return ip.String()
 }
 
 type statusRecorder struct {

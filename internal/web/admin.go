@@ -179,7 +179,12 @@ func (s *Server) adminCreateStand(w http.ResponseWriter, r *http.Request, ev *mo
 		adminFail(w, r, ev, 0, err.Error())
 		return
 	}
-	if s.storeError(w, r, s.store.CreateStand(r.Context(), st)) {
+	err = s.store.CreateStand(r.Context(), st)
+	if errors.Is(err, store.ErrTooManyStands) {
+		adminFail(w, r, ev, 0, capitalize(err.Error())+".")
+		return
+	}
+	if s.storeError(w, r, err) {
 		return
 	}
 	setFlash(w, "success", fmt.Sprintf("Stand « %s » ajouté. Ajoutez maintenant ses créneaux.", st.Name))
@@ -256,7 +261,12 @@ func (s *Server) adminGenerateSlots(w http.ResponseWriter, r *http.Request, ev *
 		fail(capitalize(err.Error()) + ".")
 		return
 	}
-	if s.storeError(w, r, s.store.CreateSlots(r.Context(), ev.ID, standID, slots)) {
+	err = s.store.CreateSlots(r.Context(), ev.ID, standID, slots)
+	if errors.Is(err, store.ErrTooManySlots) {
+		fail(capitalize(err.Error()) + ".")
+		return
+	}
+	if s.storeError(w, r, err) {
 		return
 	}
 	setFlash(w, "success", fmt.Sprintf("%d créneau(x) ajouté(s).", len(slots)))

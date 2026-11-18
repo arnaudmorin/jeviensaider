@@ -29,6 +29,15 @@ var (
 	ErrSlotFull      = errors.New("ce créneau est déjà complet")
 	ErrAlreadySigned = errors.New("vous êtes déjà inscrit·e sur ce créneau")
 	ErrEventNotOpen  = errors.New("les inscriptions ne sont pas ouvertes pour cet événement")
+	ErrTooManyStands = fmt.Errorf("un événement ne peut pas avoir plus de %d stands", MaxStands)
+	ErrTooManySlots  = fmt.Errorf("un événement ne peut pas avoir plus de %d créneaux", MaxSlots)
+)
+
+// Per-event limits. They keep the planning page to a reasonable size: without
+// them, one event could make every view of its page render megabytes.
+const (
+	MaxStands = 50
+	MaxSlots  = 500
 )
 
 // Store wraps the SQLite database.

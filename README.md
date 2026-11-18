@@ -159,7 +159,15 @@ internal/web/      handlers, middleware, embedded templates and static files (ht
 - **Protection.**
   - Cross-site POSTs are rejected using the `Sec-Fetch-Site` and `Origin`
     headers.
-  - POSTs are rate-limited per IP.
+  - POSTs are rate-limited per IP (per /64 for IPv6). Behind a proxy, only
+    the last `X-Forwarded-For` entry, the one the proxy adds, is trusted.
+  - Request bodies are capped at 64 KB, and an event has at most 50 stands
+    and 500 slots, so no single request or event can exhaust the server.
+  - Over HTTPS, cookies are `Secure` and HSTS is sent. Pages that can show
+    personal data are never cached, including by htmx's history cache.
+  - Signing up under a different name from the one the browser remembers
+    creates a new volunteer, so a shared personal link or a family computer
+    never exposes or renames someone else's sign-ups.
   - The sign-up form has a honeypot field to catch bots.
   - A strict CSP is sent.
   - The CSV export guards against formula injection.

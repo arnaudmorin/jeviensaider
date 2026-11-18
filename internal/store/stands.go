@@ -48,15 +48,24 @@ func (s *Store) GetStand(ctx context.Context, eventID, id int64) (*model.Stand, 
 
 // CreateStand appends a stand at the end of the event's list.
 func (s *Store) CreateStand(ctx context.Context, st *model.Stand) error {
-	res, err := s.db.ExecContext(ctx,
-		`INSERT INTO stands (event_id, name, description, color, position)
-		 VALUES (?, ?, ?, ?, (SELECT COALESCE(MAX(position), 0) + 1 FROM stands WHERE event_id = ?))`,
-		st.EventID, st.Name, st.Description, st.Color, st.EventID)
-	if err != nil {
+	return s.withTx(ctx, func(tx *sql.Tx) error {
+		var n int
+		if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM stands WHERE event_id = ?`, st.EventID).Scan(&n); err != nil {
+			return err
+		}
+		if n >= MaxStands {
+			return ErrTooManyStands
+		}
+		res, err := tx.ExecContext(ctx,
+			`INSERT INTO stands (event_id, name, description, color, position)
+			 VALUES (?, ?, ?, ?, (SELECT COALESCE(MAX(position), 0) + 1 FROM stands WHERE event_id = ?))`,
+			st.EventID, st.Name, st.Description, st.Color, st.EventID)
+		if err != nil {
+			return err
+		}
+		st.ID, err = res.LastInsertId()
 		return err
-	}
-	st.ID, err = res.LastInsertId()
-	return err
+	})
 }
 
 func (s *Store) UpdateStand(ctx context.Context, st *model.Stand) error {

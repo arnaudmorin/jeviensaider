@@ -68,6 +68,9 @@ func (s *Server) createEvent(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) withEvent(h func(http.ResponseWriter, *http.Request, *model.Event)) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		// Event pages can show the visitor's personal link and contact
+		// details: never let a browser or proxy cache them.
+		w.Header().Set("Cache-Control", "no-store")
 		ev, err := s.store.EventBySlug(r.Context(), r.PathValue("slug"))
 		if errors.Is(err, store.ErrNotFound) {
 			s.renderError(w, r, http.StatusNotFound, "Cet événement n'existe pas (ou plus). Vérifiez le lien.")

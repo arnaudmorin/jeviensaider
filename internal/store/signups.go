@@ -80,6 +80,12 @@ func (s *Store) SignUp(ctx context.Context, req SignupRequest) (*SignupResult, e
 			if err != nil && err != ErrNotFound {
 				return err
 			}
+			// The browser remembers someone else (a shared device, or a
+			// personal link someone shared): sign up a new volunteer rather
+			// than renaming that person and exposing their sign-ups.
+			if vol != nil && req.Name != "" && !sameName(vol.Name, req.Name) {
+				vol = nil
+			}
 		}
 		if vol == nil {
 			vol = &model.Volunteer{EventID: req.EventID, Name: req.Name, Email: req.Email, Phone: req.Phone, EditToken: Token()}
@@ -94,6 +100,7 @@ func (s *Store) SignUp(ctx context.Context, req SignupRequest) (*SignupResult, e
 			}
 			res.NewVolunteer = true
 		} else if req.Name != "" && (req.Name != vol.Name || req.Email != vol.Email || req.Phone != vol.Phone) {
+			// Same person (same name): keep their details up to date.
 			vol.Name, vol.Email, vol.Phone = req.Name, req.Email, req.Phone
 			if _, err := tx.ExecContext(ctx, `UPDATE volunteers SET name = ?, email = ?, phone = ? WHERE id = ?`,
 				vol.Name, vol.Email, vol.Phone, vol.ID); err != nil {
@@ -198,4 +205,9 @@ func (s *Store) CountVolunteers(ctx context.Context, eventID int64) (int, error)
 	err := s.db.QueryRowContext(ctx,
 		`SELECT COUNT(DISTINCT su.volunteer_id) FROM signups su JOIN volunteers v ON v.id = su.volunteer_id WHERE v.event_id = ?`, eventID).Scan(&n)
 	return n, err
+}
+
+// sameName compares two names ignoring case and spacing.
+func sameName(a, b string) bool {
+	return strings.EqualFold(strings.Join(strings.Fields(a), " "), strings.Join(strings.Fields(b), " "))
 }

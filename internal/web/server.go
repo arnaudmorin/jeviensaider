@@ -100,7 +100,8 @@ func (s *Server) Handler() http.Handler {
 	var h http.Handler = mux
 	h = s.rateLimit(h)
 	h = s.csrf(h)
-	h = securityHeaders(h)
+	h = s.limitBody(h)
+	h = s.securityHeaders(h)
 	h = s.logRequests(h)
 	h = s.recoverPanics(h)
 	return h

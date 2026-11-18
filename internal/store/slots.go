@@ -62,6 +62,14 @@ func (s *Store) CreateSlots(ctx context.Context, eventID, standID int64, slots [
 		if n == 0 {
 			return ErrNotFound
 		}
+		var total int
+		if err := tx.QueryRowContext(ctx,
+			`SELECT COUNT(*) FROM slots sl JOIN stands st ON st.id = sl.stand_id WHERE st.event_id = ?`, eventID).Scan(&total); err != nil {
+			return err
+		}
+		if total+len(slots) > MaxSlots {
+			return ErrTooManySlots
+		}
 		for _, sl := range slots {
 			if _, err := tx.ExecContext(ctx,
 				`INSERT INTO slots (stand_id, starts_at, ends_at, min_people, max_people) VALUES (?, ?, ?, ?, ?)`,
