@@ -17,13 +17,18 @@
     <label>Message pour les bénévoles (facultatif)
       <textarea name="description" rows="2" maxlength="2000">{{.Form.Description}}</textarea>
     </label>
+    <label>Votre e-mail (organisateur)
+      <input type="email" name="admin_email" value="{{.Form.AdminEmail}}" required maxlength="120" autocomplete="email">
+      <span class="hint">{{if .MailEnabled}}Vous y recevrez le lien d'administration.{{else}}L'envoi d'e-mails n'est pas encore configuré sur ce serveur : gardez bien le lien affiché après la création.{{end}} Il n'est jamais montré aux parents.</span>
+    </label>
+    <label class="check"><input type="checkbox" name="notify" value="1" {{if .Form.NotifySignups}}checked{{end}}> M'envoyer un e-mail à chaque inscription ou désinscription</label>
     {{if .NeedPassword}}
     <label>Mot de passe de création
       <input type="password" name="password" required autocomplete="current-password">
     </label>
     {{end}}
     <button type="submit" class="btn block">Créer l'événement</button>
-    <p class="hint">Vous recevrez un lien d'administration secret pour gérer l'événement.</p>
+    <p class="hint">Vous obtiendrez un lien d'administration secret pour gérer l'événement.</p>
   </form>
 </div>
 {{end}}

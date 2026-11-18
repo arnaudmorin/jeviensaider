@@ -27,7 +27,11 @@ type Config struct {
 	// activity, shown on the admin page (0: kept forever). The deletion itself
 	// is run by the caller with store.Cleanup.
 	RetentionDays int
-	Logger        *slog.Logger
+	// Mailer queues e-mails to organisers (nil: none are sent). MailEnabled
+	// says whether they really leave the server (an SMTP server is set up).
+	Mailer      Mailer
+	MailEnabled bool
+	Logger      *slog.Logger
 }
 
 // Server holds the dependencies of the HTTP handlers.

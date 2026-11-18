@@ -133,7 +133,13 @@ func (s *Server) adminUpdateEvent(w http.ResponseWriter, r *http.Request, ev *mo
 		adminFail(w, r, ev, 0, err.Error())
 		return
 	}
-	ev.Title, ev.Date = title, date
+	email := clean(r.FormValue("admin_email"), 120, false)
+	if err := checkAdminEmail(email); err != nil {
+		adminFail(w, r, ev, 0, err.Error())
+		return
+	}
+	ev.Title, ev.Date, ev.AdminEmail = title, date, email
+	ev.NotifySignups = r.FormValue("notify") == "1"
 	ev.Location = clean(r.FormValue("location"), 120, false)
 	ev.Description = clean(r.FormValue("description"), 2000, true)
 	if s.storeError(w, r, s.store.UpdateEvent(r.Context(), ev)) {
@@ -388,6 +394,7 @@ func (s *Server) adminDuplicate(w http.ResponseWriter, r *http.Request, ev *mode
 	if s.storeError(w, r, err) {
 		return
 	}
+	s.notifyCreated(r, dup)
 	setFlash(w, "success", "Nouvel événement créé à partir de « "+ev.Title+" ». Voici son lien d'administration : conservez-le !")
 	redirect(w, r, adminURL(dup))
 }

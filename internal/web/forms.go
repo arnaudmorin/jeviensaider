@@ -161,6 +161,17 @@ func validEmail(s string) bool {
 	return err == nil && addr.Address == s
 }
 
+// checkAdminEmail validates the organiser's e-mail, which is mandatory.
+func checkAdminEmail(email string) error {
+	if email == "" {
+		return errors.New("Indiquez votre e-mail : il recevra le lien d'administration de l'événement.")
+	}
+	if !validEmail(email) {
+		return errors.New("L'adresse e-mail de l'organisateur ne semble pas valide.")
+	}
+	return nil
+}
+
 // validate checks a volunteer form: only the name is required.
 func (f volunteerForm) validate() error {
 	if f.Name == "" {

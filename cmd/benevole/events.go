@@ -169,6 +169,7 @@ func (c *eventsCmd) show(ctx context.Context, st *store.Store, args []string) er
 	fmt.Fprintf(w, "Date\t%s\n", orDash(e.Date))
 	fmt.Fprintf(w, "Location\t%s\n", orDash(e.Location))
 	fmt.Fprintf(w, "Status\t%s\n", e.Status)
+	fmt.Fprintf(w, "Organiser\t%s\n", orDash(e.AdminEmail))
 	fmt.Fprintf(w, "Created\t%s\n", e.CreatedAt.Local().Format("2006-01-02 15:04"))
 	fmt.Fprintf(w, "Content\t%d stands, %d slots, %d volunteers, %d sign-ups\n", e.Stands, e.Slots, e.Volunteers, e.Signups)
 	fmt.Fprintf(w, "Last day\t%s\n", e.LastDay.Format(model.DateLayout))

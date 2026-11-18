@@ -131,10 +131,10 @@ func TestSignupFlow(t *testing.T) {
 
 	// Cancel: only own sign-ups.
 	other := rows[2] // Paul's
-	if err := s.CancelSignup(ctx, r.Volunteer.ID, other.ID); err != ErrNotFound {
+	if _, err := s.CancelSignup(ctx, r.Volunteer.ID, other.ID); err != ErrNotFound {
 		t.Errorf("cancel someone else's: want ErrNotFound, got %v", err)
 	}
-	if err := s.CancelSignup(ctx, r.Volunteer.ID, rows[0].ID); err != nil {
+	if slot, err := s.CancelSignup(ctx, r.Volunteer.ID, rows[0].ID); err != nil || slot != rows[0].SlotID {
 		t.Error(err)
 	}
 

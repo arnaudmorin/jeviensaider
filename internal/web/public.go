@@ -18,6 +18,7 @@ import (
 type homePage struct {
 	Common
 	NeedPassword bool
+	MailEnabled  bool
 	Error        string
 	Form         model.Event
 }
@@ -26,21 +27,25 @@ func (s *Server) home(w http.ResponseWriter, r *http.Request) {
 	s.render(w, r, http.StatusOK, "home", homePage{
 		Common:       s.common(w, r, "Je viens aider"),
 		NeedPassword: s.cfg.CreatePassword != "",
+		MailEnabled:  s.cfg.MailEnabled,
+		Form:         model.Event{NotifySignups: true},
 	})
 }
 
 func (s *Server) createEvent(w http.ResponseWriter, r *http.Request) {
 	ev := model.Event{
-		Title:       clean(r.FormValue("title"), 120, false),
-		Location:    clean(r.FormValue("location"), 120, false),
-		Description: clean(r.FormValue("description"), 2000, true),
+		Title:         clean(r.FormValue("title"), 120, false),
+		Location:      clean(r.FormValue("location"), 120, false),
+		Description:   clean(r.FormValue("description"), 2000, true),
+		AdminEmail:    clean(r.FormValue("admin_email"), 120, false),
+		NotifySignups: r.FormValue("notify") == "1",
 	}
 	date, dateErr := s.parseDate(r.FormValue("date"))
 	ev.Date = date
 
 	fail := func(msg string) {
 		s.render(w, r, http.StatusBadRequest, "home", homePage{
-			Common: Common{Title: "Je viens aider"}, NeedPassword: s.cfg.CreatePassword != "", Error: msg, Form: ev,
+			Common: Common{Title: "Je viens aider"}, NeedPassword: s.cfg.CreatePassword != "", MailEnabled: s.cfg.MailEnabled, Error: msg, Form: ev,
 		})
 	}
 	if s.cfg.CreatePassword != "" &&
@@ -56,11 +61,20 @@ func (s *Server) createEvent(w http.ResponseWriter, r *http.Request) {
 		fail(dateErr.Error())
 		return
 	}
+	if err := checkAdminEmail(ev.AdminEmail); err != nil {
+		fail(err.Error())
+		return
+	}
 	if err := s.store.CreateEvent(r.Context(), &ev); err != nil {
 		s.serverError(w, r, err)
 		return
 	}
-	setFlash(w, "success", "Événement créé ! Ce lien d'administration est votre seule clé pour le gérer : ajoutez-le à vos favoris et ne le partagez qu'avec les organisateurs.")
+	s.notifyCreated(r, &ev)
+	msg := "Événement créé ! Ce lien d'administration est votre seule clé pour le gérer : ajoutez-le à vos favoris et ne le partagez qu'avec les organisateurs."
+	if s.cfg.MailEnabled {
+		msg = "Événement créé ! Ce lien d'administration est votre seule clé pour le gérer : il vient de vous être envoyé à " + ev.AdminEmail + ". Ne le partagez qu'avec les organisateurs."
+	}
+	setFlash(w, "success", msg)
 	redirect(w, r, "/a/"+ev.AdminToken)
 }
 
@@ -317,6 +331,7 @@ func (s *Server) signupSubmit(w http.ResponseWriter, r *http.Request, ev *model.
 	}
 
 	setVolunteerCookie(w, ev, res.Volunteer)
+	s.notifySignup(r.Context(), r, ev, res.Volunteer, id, form.Comment, false)
 	slot, _ := s.store.GetSlot(r.Context(), ev.ID, id)
 	if res.NewVolunteer {
 		redirect(w, r, meURL(ev, res.Volunteer)+"?welcome=1")
@@ -369,9 +384,11 @@ func (s *Server) meCancel(w http.ResponseWriter, r *http.Request, ev *model.Even
 		redirect(w, r, meURL(ev, vol))
 		return
 	}
-	if s.storeError(w, r, s.store.CancelSignup(r.Context(), vol.ID, id)) {
+	slotID, err := s.store.CancelSignup(r.Context(), vol.ID, id)
+	if s.storeError(w, r, err) {
 		return
 	}
+	s.notifySignup(r.Context(), r, ev, vol, slotID, "", true)
 	setFlash(w, "info", "Votre inscription a été annulée.")
 	redirect(w, r, meURL(ev, vol))
 }

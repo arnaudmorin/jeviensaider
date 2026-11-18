@@ -16,6 +16,9 @@ in a single SQLite file.
 
 **For organisers**
 - Create an event and get a **secret admin link**, with no account to create.
+  The organiser's e-mail is required: the link is also sent there.
+- Get an **e-mail for each sign-up or cancellation** (who, which slot, what
+  is still missing), which can be turned off per event.
 - Add stands, then generate their slots in one step: start, end, slot length
   and number of people.
 - Follow progress on a dashboard that shows who is signed up, with their
@@ -73,6 +76,26 @@ as downloadable artifacts. They can also be built locally with
 On a public server, set `BENEVOLE_CREATE_PASSWORD` so that only the APE can
 create events. It is read from the environment only, so it never shows up in
 `ps` output.
+
+**E-mails.** The app e-mails organisers: the admin link when an event is
+created or duplicated, then, unless they turn it off, one message per sign-up
+or cancellation. Volunteers never receive e-mails. Configure an SMTP server
+with these variables (environment only):
+
+| Environment variable | Default | Purpose |
+|---|---|---|
+| `BENEVOLE_SMTP_HOST` | *(none)* | SMTP server; empty disables sending (messages are only logged, without their content) |
+| `BENEVOLE_SMTP_PORT` | `587` | `587` (STARTTLS) or `465` (TLS) |
+| `BENEVOLE_SMTP_TLS` | `starttls`, or `tls` on 465 | `starttls`, `tls`, or `none` for a local relay without authentication |
+| `BENEVOLE_SMTP_USERNAME` / `BENEVOLE_SMTP_PASSWORD` | *(none)* | Credentials, if the server requires them |
+| `BENEVOLE_SMTP_FROM` | `Je viens aider <noreply@…>` | Sender, by default on the domain of `BENEVOLE_BASE_URL` |
+
+With SMTP enabled, `BENEVOLE_BASE_URL` is required: links in e-mails are
+built from it, never from the request. The connection is always encrypted
+(STARTTLS is required, not optional) unless `none` is chosen, and a password
+is never sent over an unencrypted connection. Messages are sent in the
+background and retried for about 15 minutes if the server is unavailable.
+Settings are checked at startup.
 
 **Keeping events forever.** By default, events and their volunteers'
 contact details are deleted 60 days after the event, which suits a public
@@ -187,6 +210,11 @@ internal/web/      handlers, middleware, embedded templates and static files (ht
   together with its stands, slots and volunteers. An event's last day is the
   latest of its date, its last slot and its creation date, so an event that
   is still being prepared is never deleted.
+- **E-mails.** Links come from `BENEVOLE_BASE_URL`, so a forged `Host`
+  header cannot turn them into links to another site. Headers are encoded
+  and line breaks refused, so names cannot inject headers. Anyone who can
+  create an event can make the app send one message to any address: on a
+  public server, set `BENEVOLE_CREATE_PASSWORD`.
 - **Privacy.** Public pages show only "Prénom N.". E-mails and phone numbers
   are visible to the organisers only, and pages are marked `noindex`.
 

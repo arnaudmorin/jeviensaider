@@ -12,12 +12,12 @@ import (
 	"benevole-ape/internal/model"
 )
 
-const eventCols = `id, slug, title, description, location, date, admin_token, status, created_at`
+const eventCols = `id, slug, title, description, location, date, admin_token, status, created_at, admin_email, notify_signups`
 
 func scanEvent(row interface{ Scan(...any) error }) (*model.Event, error) {
 	var e model.Event
 	var created string
-	if err := row.Scan(&e.ID, &e.Slug, &e.Title, &e.Description, &e.Location, &e.Date, &e.AdminToken, &e.Status, &created); err != nil {
+	if err := row.Scan(&e.ID, &e.Slug, &e.Title, &e.Description, &e.Location, &e.Date, &e.AdminToken, &e.Status, &created, &e.AdminEmail, &e.NotifySignups); err != nil {
 		return nil, notFound(err)
 	}
 	e.CreatedAt = parseTime(created)
@@ -60,8 +60,8 @@ func (s *Store) CreateEvent(ctx context.Context, e *model.Event) error {
 		e.Status = model.StatusDraft
 	}
 	res, err := s.db.ExecContext(ctx,
-		`INSERT INTO events (slug, title, description, location, date, admin_token, status) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		e.Slug, e.Title, e.Description, e.Location, e.Date, e.AdminToken, e.Status)
+		`INSERT INTO events (slug, title, description, location, date, admin_token, status, admin_email, notify_signups) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		e.Slug, e.Title, e.Description, e.Location, e.Date, e.AdminToken, e.Status, e.AdminEmail, e.NotifySignups)
 	if err != nil {
 		return err
 	}
@@ -81,11 +81,12 @@ func (s *Store) EventByAdminToken(ctx context.Context, token string) (*model.Eve
 	return scanEvent(s.db.QueryRowContext(ctx, `SELECT `+eventCols+` FROM events WHERE admin_token = ?`, token))
 }
 
-// UpdateEvent saves the editable fields of e (title, description, location, date, status).
+// UpdateEvent saves the editable fields of e (title, description, location,
+// date, status, organiser e-mail and notification setting).
 func (s *Store) UpdateEvent(ctx context.Context, e *model.Event) error {
 	return affectedOne(s.db.ExecContext(ctx,
-		`UPDATE events SET title = ?, description = ?, location = ?, date = ?, status = ? WHERE id = ?`,
-		e.Title, e.Description, e.Location, e.Date, e.Status, e.ID))
+		`UPDATE events SET title = ?, description = ?, location = ?, date = ?, status = ?, admin_email = ?, notify_signups = ? WHERE id = ?`,
+		e.Title, e.Description, e.Location, e.Date, e.Status, e.AdminEmail, e.NotifySignups, e.ID))
 }
 
 func (s *Store) DeleteEvent(ctx context.Context, id int64) error {
@@ -108,6 +109,7 @@ func (s *Store) DuplicateEvent(ctx context.Context, src *model.Event, title, dat
 	dst := &model.Event{
 		Title: title, Date: date, Description: src.Description, Location: src.Location,
 		Slug: Slugify(title) + "-" + shortID(), AdminToken: Token(), Status: model.StatusDraft,
+		AdminEmail: src.AdminEmail, NotifySignups: src.NotifySignups,
 	}
 	var shift time.Duration
 	if a, b := src.ParsedDate(), dst.ParsedDate(); !a.IsZero() && !b.IsZero() {
@@ -115,8 +117,8 @@ func (s *Store) DuplicateEvent(ctx context.Context, src *model.Event, title, dat
 	}
 	err := s.withTx(ctx, func(tx *sql.Tx) error {
 		res, err := tx.ExecContext(ctx,
-			`INSERT INTO events (slug, title, description, location, date, admin_token, status) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-			dst.Slug, dst.Title, dst.Description, dst.Location, dst.Date, dst.AdminToken, dst.Status)
+			`INSERT INTO events (slug, title, description, location, date, admin_token, status, admin_email, notify_signups) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			dst.Slug, dst.Title, dst.Description, dst.Location, dst.Date, dst.AdminToken, dst.Status, dst.AdminEmail, dst.NotifySignups)
 		if err != nil {
 			return err
 		}

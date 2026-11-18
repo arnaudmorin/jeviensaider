@@ -69,7 +69,7 @@ func TestSpoofedForwardedForIsLimited(t *testing.T) {
 	c := e.client()
 	limited := false
 	for i := 0; i < 5; i++ {
-		r := e.do(c, "POST", "/events", url.Values{"title": {"x"}},
+		r := e.do(c, "POST", "/events", url.Values{"admin_email": {"orga@example.org"}, "title": {"x"}},
 			map[string]string{"X-Forwarded-For": "10.0." + strconv.Itoa(i) + ".1, 127.0.0.1"})
 		limited = limited || r.code == http.StatusTooManyRequests
 	}
@@ -98,7 +98,7 @@ func TestLimiterIsBounded(t *testing.T) {
 
 func TestHTTPSHeaders(t *testing.T) {
 	e := newEnv(t, Config{BaseURL: "https://example.org"})
-	r := e.post(e.client(), "/events", url.Values{"title": {"Fête"}})
+	r := e.post(e.client(), "/events", url.Values{"admin_email": {"orga@example.org"}, "title": {"Fête"}})
 	expect(t, r, http.StatusSeeOther)
 	if !strings.HasPrefix(r.header.Get("Strict-Transport-Security"), "max-age=") {
 		t.Error("missing HSTS")
@@ -116,7 +116,7 @@ func TestHTTPSHeaders(t *testing.T) {
 	// Plain HTTP without an https BaseURL: no HSTS, no Secure (it would
 	// break the app).
 	e = newEnv(t, Config{})
-	r = e.post(e.client(), "/events", url.Values{"title": {"Fête"}})
+	r = e.post(e.client(), "/events", url.Values{"admin_email": {"orga@example.org"}, "title": {"Fête"}})
 	if r.header.Get("Strict-Transport-Security") != "" || strings.Contains(strings.Join(r.header.Values("Set-Cookie"), "\n"), "Secure") {
 		t.Error("HSTS or Secure sent over plain HTTP")
 	}
@@ -137,7 +137,7 @@ func TestPersonalPagesNotCached(t *testing.T) {
 func TestTooManyStandsMessage(t *testing.T) {
 	e := newEnv(t, Config{})
 	admin := e.client()
-	r := e.post(admin, "/events", url.Values{"title": {"Big"}})
+	r := e.post(admin, "/events", url.Values{"admin_email": {"orga@example.org"}, "title": {"Big"}})
 	adminPath := r.location
 	for i := 0; i < 50; i++ {
 		expect(t, e.post(admin, adminPath+"/stands", url.Values{"name": {"S" + strconv.Itoa(i)}}), http.StatusSeeOther)
@@ -200,9 +200,9 @@ func TestValidEmail(t *testing.T) {
 func TestDateLimits(t *testing.T) {
 	e := newEnv(t, Config{RetentionDays: 60}) // clock fixed at 2026-05-01
 	c := e.client()
-	expect(t, e.post(c, "/events", url.Values{"title": {"Far"}, "date": {"9999-12-31"}}), http.StatusBadRequest, "date hors limites")
-	expect(t, e.post(c, "/events", url.Values{"title": {"Old"}, "date": {"2025-04-30"}}), http.StatusBadRequest, "date hors limites")
-	expect(t, e.post(c, "/events", url.Values{"title": {"Soon"}, "date": {"2028-05-01"}}), http.StatusSeeOther)
+	expect(t, e.post(c, "/events", url.Values{"admin_email": {"orga@example.org"}, "title": {"Far"}, "date": {"9999-12-31"}}), http.StatusBadRequest, "date hors limites")
+	expect(t, e.post(c, "/events", url.Values{"admin_email": {"orga@example.org"}, "title": {"Old"}, "date": {"2025-04-30"}}), http.StatusBadRequest, "date hors limites")
+	expect(t, e.post(c, "/events", url.Values{"admin_email": {"orga@example.org"}, "title": {"Soon"}, "date": {"2028-05-01"}}), http.StatusSeeOther)
 
 	admin := e.client()
 	adminPath, _, _ := setupEvent(t, e, admin)
@@ -270,10 +270,10 @@ func TestDurationFR(t *testing.T) {
 func TestDateLimitsKeepForever(t *testing.T) {
 	e := newEnv(t, Config{RetentionDays: 0}) // clock fixed at 2026-05-01
 	c := e.client()
-	expect(t, e.post(c, "/events", url.Values{"title": {"Old"}, "date": {"2019-06-15"}}), http.StatusSeeOther)
-	expect(t, e.post(c, "/events", url.Values{"title": {"Far"}, "date": {"9999-12-31"}}), http.StatusBadRequest, "date hors limites")
+	expect(t, e.post(c, "/events", url.Values{"admin_email": {"orga@example.org"}, "title": {"Old"}, "date": {"2019-06-15"}}), http.StatusSeeOther)
+	expect(t, e.post(c, "/events", url.Values{"admin_email": {"orga@example.org"}, "title": {"Far"}, "date": {"9999-12-31"}}), http.StatusBadRequest, "date hors limites")
 
 	// A long retention also widens the past window (here 3 years).
 	e = newEnv(t, Config{RetentionDays: 3 * 365})
-	expect(t, e.post(e.client(), "/events", url.Values{"title": {"Old"}, "date": {"2024-01-15"}}), http.StatusSeeOther)
+	expect(t, e.post(e.client(), "/events", url.Values{"admin_email": {"orga@example.org"}, "title": {"Old"}, "date": {"2024-01-15"}}), http.StatusSeeOther)
 }

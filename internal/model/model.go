@@ -33,6 +33,10 @@ type Event struct {
 	AdminToken  string
 	Status      string
 	CreatedAt   time.Time
+	// AdminEmail receives the admin link at creation and, when
+	// NotifySignups is set, a message for each sign-up or cancellation.
+	AdminEmail    string
+	NotifySignups bool
 }
 
 // ParsedDate returns the event date, or zero time if unset/invalid.

@@ -12,6 +12,7 @@
     {{end}}
   </form>
 </section>
+{{if not .Event.AdminEmail}}<div class="callout warning">Ajoutez l'e-mail de l'organisateur dans « Modifier l'événement » (en bas de page) pour recevoir les inscriptions par e-mail.</div>{{end}}
 {{if .Event.IsDraft}}<div class="callout info">Brouillon : les parents ne voient pas encore le planning. Ajoutez vos stands puis cliquez sur « Ouvert ».</div>{{end}}
 
 <section class="card links">
@@ -31,6 +32,7 @@
     </div>
   </div>
   <p class="hint">Le lien admin est secret : gardez-le en favori, partagez-le seulement avec les organisateurs.</p>
+  {{if .Event.AdminEmail}}<p class="hint">E-mails de l'organisateur envoyés à {{.Event.AdminEmail}}{{if not .Event.NotifySignups}} (inscriptions non notifiées){{end}}.</p>{{end}}
   {{with .ExpiresOn}}<p class="hint">L'événement et ses inscriptions seront supprimés automatiquement le {{date .}}, {{$.Retention}} jours après l'événement.</p>{{end}}
 </section>
 
@@ -160,6 +162,8 @@
         <label>Lieu <input name="location" value="{{.Event.Location}}" maxlength="120"></label>
       </div>
       <label>Message pour les bénévoles <textarea name="description" rows="3" maxlength="2000">{{.Event.Description}}</textarea></label>
+      <label>E-mail de l'organisateur <input type="email" name="admin_email" value="{{.Event.AdminEmail}}" required maxlength="120" autocomplete="email"></label>
+      <label class="check"><input type="checkbox" name="notify" value="1" {{if .Event.NotifySignups}}checked{{end}}> M'envoyer un e-mail à chaque inscription ou désinscription</label>
       <div><button class="btn" type="submit">Enregistrer</button></div>
     </form>
   </details>

@@ -55,7 +55,7 @@ type EventSummary struct {
 
 // ListEventSummaries returns every event, most recent last day first.
 func (s *Store) ListEventSummaries(ctx context.Context) ([]EventSummary, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT e.id, e.slug, e.title, e.description, e.location, e.date, e.admin_token, e.status, e.created_at,
+	rows, err := s.db.QueryContext(ctx, `SELECT e.id, e.slug, e.title, e.description, e.location, e.date, e.admin_token, e.status, e.created_at, e.admin_email, e.notify_signups,
 		(SELECT count(*) FROM stands st WHERE st.event_id = e.id),
 		(SELECT count(*) FROM slots sl JOIN stands st ON st.id = sl.stand_id WHERE st.event_id = e.id),
 		(SELECT count(*) FROM volunteers v WHERE v.event_id = e.id),
@@ -70,7 +70,7 @@ func (s *Store) ListEventSummaries(ctx context.Context) ([]EventSummary, error) 
 	for rows.Next() {
 		var e EventSummary
 		var created, last string
-		if err := rows.Scan(&e.ID, &e.Slug, &e.Title, &e.Description, &e.Location, &e.Date, &e.AdminToken, &e.Status, &created,
+		if err := rows.Scan(&e.ID, &e.Slug, &e.Title, &e.Description, &e.Location, &e.Date, &e.AdminToken, &e.Status, &created, &e.AdminEmail, &e.NotifySignups,
 			&e.Stands, &e.Slots, &e.Volunteers, &e.Signups, &last); err != nil {
 			return nil, err
 		}

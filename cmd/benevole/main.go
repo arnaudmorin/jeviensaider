@@ -12,9 +12,11 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
+	"benevole-ape/internal/mail"
 	"benevole-ape/internal/store"
 	"benevole-ape/internal/web"
 )
@@ -57,6 +59,21 @@ func main() {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	slog.SetDefault(logger)
 
+	smtpCfg, err := smtpFromEnv(strings.TrimRight(*baseURL, "/"))
+	if err != nil {
+		logger.Error("configuration", "err", err)
+		os.Exit(2)
+	}
+	var sender mail.Sender = mail.Log{Logger: logger}
+	if smtpCfg != nil {
+		s, _ := mail.NewSMTP(*smtpCfg) // already validated
+		sender = s
+		logger.Info("e-mails enabled", "smtp", smtpCfg.Host, "port", smtpCfg.Port, "tls", smtpCfg.TLS, "from", smtpCfg.From)
+	} else {
+		logger.Warn("e-mails disabled: set BENEVOLE_SMTP_HOST to send them (they are only logged)")
+	}
+	mailQueue := mail.NewQueue(sender, logger)
+
 	st, err := store.Open(*dbPath)
 	if err != nil {
 		logger.Error("open database", "path", *dbPath, "err", err)
@@ -69,6 +86,8 @@ func main() {
 		CreatePassword: createPassword,
 		TrustProxy:     *trustProxy,
 		RetentionDays:  *retention,
+		Mailer:         mailQueue,
+		MailEnabled:    smtpCfg != nil,
 		Logger:         logger,
 	})
 	if err != nil {
@@ -110,6 +129,7 @@ func main() {
 	if err := httpSrv.Shutdown(shutdownCtx); err != nil {
 		logger.Error("shutdown", "err", err)
 	}
+	mailQueue.Close(shutdownCtx) // send what is queued, within the same 10 s
 }
 
 // checkHealth calls /healthz on the local listen address. It lets minimal

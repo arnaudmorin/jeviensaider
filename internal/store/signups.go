@@ -168,8 +168,11 @@ func volunteerSlots(ctx context.Context, q querier, volunteerID int64) ([]model.
 }
 
 // CancelSignup removes one of the volunteer's own sign-ups.
-func (s *Store) CancelSignup(ctx context.Context, volunteerID, signupID int64) error {
-	return affectedOne(s.db.ExecContext(ctx, `DELETE FROM signups WHERE id = ? AND volunteer_id = ?`, signupID, volunteerID))
+// CancelSignup removes one of the volunteer's sign-ups and returns its slot.
+func (s *Store) CancelSignup(ctx context.Context, volunteerID, signupID int64) (slotID int64, err error) {
+	err = s.db.QueryRowContext(ctx,
+		`DELETE FROM signups WHERE id = ? AND volunteer_id = ? RETURNING slot_id`, signupID, volunteerID).Scan(&slotID)
+	return slotID, notFound(err)
 }
 
 // AdminDeleteSignup removes any sign-up of the event.

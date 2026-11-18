@@ -104,7 +104,7 @@ var slotLinkRe = regexp.MustCompile(`/slots/(\d+)/signup`)
 // max 2) and returns admin path, public path and slot ids.
 func setupEvent(t *testing.T, e *env, admin *http.Client) (adminPath, publicPath string, slots []string) {
 	t.Helper()
-	r := e.post(admin, "/events", url.Values{"title": {"Fête de l'école"}, "date": {"2026-06-20"}, "location": {"Cour"}})
+	r := e.post(admin, "/events", url.Values{"admin_email": {"orga@example.org"}, "title": {"Fête de l'école"}, "date": {"2026-06-20"}, "location": {"Cour"}})
 	expect(t, r, http.StatusSeeOther)
 	adminPath = r.location
 	if !strings.HasPrefix(adminPath, "/a/") {
@@ -276,7 +276,7 @@ func TestCrossEventIDs(t *testing.T) {
 func TestCSRF(t *testing.T) {
 	e := newEnv(t, Config{})
 	c := e.client()
-	form := url.Values{"title": {"Evil"}}
+	form := url.Values{"title": {"Evil"}, "admin_email": {"orga@example.org"}}
 	expect(t, e.do(c, "POST", "/events", form, map[string]string{"Sec-Fetch-Site": "cross-site"}), 403)
 	expect(t, e.do(c, "POST", "/events", form, map[string]string{"Origin": "https://evil.example"}), 403)
 	expect(t, e.do(c, "POST", "/events", form, map[string]string{"Sec-Fetch-Site": "same-origin"}), http.StatusSeeOther)
@@ -288,8 +288,8 @@ func TestCreatePassword(t *testing.T) {
 	e := newEnv(t, Config{CreatePassword: "secret"})
 	c := e.client()
 	expect(t, e.get(c, "/"), 200, "Mot de passe de création")
-	expect(t, e.post(c, "/events", url.Values{"title": {"X"}, "password": {"bad"}}), 400, "incorrect")
-	expect(t, e.post(c, "/events", url.Values{"title": {"X"}, "password": {"secret"}}), http.StatusSeeOther)
+	expect(t, e.post(c, "/events", url.Values{"admin_email": {"orga@example.org"}, "title": {"X"}, "password": {"bad"}}), 400, "incorrect")
+	expect(t, e.post(c, "/events", url.Values{"admin_email": {"orga@example.org"}, "title": {"X"}, "password": {"secret"}}), http.StatusSeeOther)
 }
 
 func TestRateLimit(t *testing.T) {
@@ -297,7 +297,7 @@ func TestRateLimit(t *testing.T) {
 	c := e.client()
 	codes := []int{}
 	for i := 0; i < 4; i++ {
-		codes = append(codes, e.post(c, "/events", url.Values{"title": {"X"}}).code)
+		codes = append(codes, e.post(c, "/events", url.Values{"admin_email": {"orga@example.org"}, "title": {"X"}}).code)
 	}
 	if codes[0] != http.StatusSeeOther || codes[3] != http.StatusTooManyRequests {
 		t.Errorf("unexpected codes %v", codes)
