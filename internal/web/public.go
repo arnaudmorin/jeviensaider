@@ -24,7 +24,7 @@ type homePage struct {
 
 func (s *Server) home(w http.ResponseWriter, r *http.Request) {
 	s.render(w, r, http.StatusOK, "home", homePage{
-		Common:       s.common(w, r, "Bénévoles APE"),
+		Common:       s.common(w, r, "Je viens aider"),
 		NeedPassword: s.cfg.CreatePassword != "",
 	})
 }
@@ -40,7 +40,7 @@ func (s *Server) createEvent(w http.ResponseWriter, r *http.Request) {
 
 	fail := func(msg string) {
 		s.render(w, r, http.StatusBadRequest, "home", homePage{
-			Common: Common{Title: "Bénévoles APE"}, NeedPassword: s.cfg.CreatePassword != "", Error: msg, Form: ev,
+			Common: Common{Title: "Je viens aider"}, NeedPassword: s.cfg.CreatePassword != "", Error: msg, Form: ev,
 		})
 	}
 	if s.cfg.CreatePassword != "" &&

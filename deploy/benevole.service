@@ -9,7 +9,7 @@
 #   BENEVOLE_CREATE_PASSWORD=un-mot-de-passe-pour-creer-des-evenements
 
 [Unit]
-Description=Bénévoles APE (inscription des bénévoles)
+Description=Je viens aider (inscription des bénévoles)
 After=network.target
 
 [Service]
