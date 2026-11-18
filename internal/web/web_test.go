@@ -328,3 +328,17 @@ func TestMisc(t *testing.T) {
 		t.Errorf("redact me: %s", got)
 	}
 }
+
+func TestRetentionNotice(t *testing.T) {
+	e := newEnv(t, Config{RetentionDays: 60})
+	admin := e.client()
+	adminPath, _, _ := setupEvent(t, e, admin)
+	expect(t, e.get(admin, adminPath), 200, "supprimés automatiquement le", "60 jours après l'événement")
+
+	e = newEnv(t, Config{})
+	admin = e.client()
+	adminPath, _, _ = setupEvent(t, e, admin)
+	if r := e.get(admin, adminPath); strings.Contains(r.body, "supprimés automatiquement") {
+		t.Error("retention notice shown although retention is disabled")
+	}
+}

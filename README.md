@@ -25,7 +25,8 @@ in a single SQLite file.
 - Export to CSV; the file opens directly in French Excel.
 - Print the planning, one A4 page per stand.
 - Duplicate an event to reuse it next year.
-- Erase personal data after the event (GDPR).
+- Erase personal data after the event (GDPR). Whole events are also deleted
+  automatically 60 days after they end, and the admin page shows the date.
 
 **For parents**
 - An **overview grid** (stands × hours, coloured red / orange / green),
@@ -64,6 +65,7 @@ as downloadable artifacts. They can also be built locally with
 | `-db` | `BENEVOLE_DB` | `benevole.db` | SQLite file, created if missing |
 | `-base-url` | `BENEVOLE_BASE_URL` | *(from request)* | Public URL used in shareable links, e.g. `https://jeviensaider.fr` |
 | `-trust-proxy` | `BENEVOLE_TRUST_PROXY` | `false` | Trust `X-Forwarded-*` headers when behind Caddy or nginx |
+| `-retention-days` | `BENEVOLE_RETENTION_DAYS` | `60` | Delete events this many days after they end; `0` keeps them forever |
 | — | `BENEVOLE_CREATE_PASSWORD` | *(none)* | Password required to create an event |
 
 On a public server, set `BENEVOLE_CREATE_PASSWORD` so that only the APE can
@@ -135,6 +137,11 @@ internal/web/      handlers, middleware, embedded templates and static files (ht
   - The sign-up form has a honeypot field to catch bots.
   - A strict CSP is sent.
   - The CSV export guards against formula injection.
+- **Automatic cleanup.** At startup and then every hour, the app deletes
+  every event whose last day is more than `BENEVOLE_RETENTION_DAYS` days ago,
+  together with its stands, slots and volunteers. An event's last day is the
+  latest of its date, its last slot and its creation date, so an event that
+  is still being prepared is never deleted.
 - **Privacy.** Public pages show only "Prénom N.". E-mails and phone numbers
   are visible to the organisers only, and pages are marked `noindex`.
 

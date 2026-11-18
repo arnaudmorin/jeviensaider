@@ -63,6 +63,8 @@ type adminPage struct {
 	Gen        map[int64]genDefaults
 	NextColor  string
 	Statuses   []string
+	ExpiresOn  string // "YYYY-MM-DD", empty if events are kept forever
+	Retention  int
 }
 
 func (s *Server) adminPage(w http.ResponseWriter, r *http.Request, ev *model.Event) {
@@ -75,6 +77,15 @@ func (s *Server) adminPage(w http.ResponseWriter, r *http.Request, ev *model.Eve
 	if err != nil {
 		s.serverError(w, r, err)
 		return
+	}
+	var expires string
+	if s.cfg.RetentionDays > 0 {
+		last, err := s.store.EventLastDay(r.Context(), ev.ID)
+		if err != nil {
+			s.serverError(w, r, err)
+			return
+		}
+		expires = store.ExpiresOn(last, s.cfg.RetentionDays).Format(model.DateLayout)
 	}
 	date := ev.Date
 	if date == "" {
@@ -106,6 +117,8 @@ func (s *Server) adminPage(w http.ResponseWriter, r *http.Request, ev *model.Eve
 		Gen:        gen,
 		NextColor:  palette[len(p.Stands)%len(palette)],
 		Statuses:   []string{model.StatusDraft, model.StatusOpen, model.StatusClosed},
+		ExpiresOn:  expires,
+		Retention:  s.cfg.RetentionDays,
 	})
 }
 

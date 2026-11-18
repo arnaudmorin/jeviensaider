@@ -23,7 +23,11 @@ type Config struct {
 	TrustProxy bool
 	// PostsPerMinute is the per-IP rate limit on POST requests (0: default 60).
 	PostsPerMinute int
-	Logger         *slog.Logger
+	// RetentionDays is how long events are kept after their last day of
+	// activity, shown on the admin page (0: kept forever). The deletion itself
+	// is run by the caller with store.Cleanup.
+	RetentionDays int
+	Logger        *slog.Logger
 }
 
 // Server holds the dependencies of the HTTP handlers.

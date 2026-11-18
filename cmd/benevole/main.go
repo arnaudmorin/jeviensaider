@@ -28,10 +28,15 @@ func env(key, def string) string {
 
 func main() {
 	trustDefault, _ := strconv.ParseBool(env("BENEVOLE_TRUST_PROXY", "false"))
+	retentionDefault, err := strconv.Atoi(env("BENEVOLE_RETENTION_DAYS", "60"))
+	if err != nil {
+		retentionDefault = 60
+	}
 	addr := flag.String("addr", env("BENEVOLE_ADDR", ":8080"), "listen address (env BENEVOLE_ADDR)")
 	dbPath := flag.String("db", env("BENEVOLE_DB", "benevole.db"), "SQLite database file (env BENEVOLE_DB)")
 	baseURL := flag.String("base-url", env("BENEVOLE_BASE_URL", ""), "public URL, e.g. https://benevoles.example.org (env BENEVOLE_BASE_URL)")
 	trustProxy := flag.Bool("trust-proxy", trustDefault, "trust X-Forwarded-* headers from a reverse proxy (env BENEVOLE_TRUST_PROXY)")
+	retention := flag.Int("retention-days", retentionDefault, "delete events this many days after their last day of activity, 0 to keep them forever (env BENEVOLE_RETENTION_DAYS)")
 	healthcheck := flag.Bool("healthcheck", false, "query /healthz on the listen address and exit 0 if healthy (for container health checks)")
 	flag.Parse()
 	if *healthcheck {
@@ -55,6 +60,7 @@ func main() {
 		BaseURL:        *baseURL,
 		CreatePassword: createPassword,
 		TrustProxy:     *trustProxy,
+		RetentionDays:  *retention,
 		Logger:         logger,
 	})
 	if err != nil {
@@ -75,8 +81,12 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
+	if *retention > 0 {
+		go cleanupLoop(ctx, st, *retention, logger)
+	}
+
 	go func() {
-		logger.Info("listening", "addr", *addr, "db", *dbPath, "create_password", createPassword != "")
+		logger.Info("listening", "addr", *addr, "db", *dbPath, "create_password", createPassword != "", "retention_days", *retention)
 		if err := httpSrv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			logger.Error("listen", "err", err)
 			stop()
@@ -115,4 +125,24 @@ func checkHealth(addr string) int {
 		return 1
 	}
 	return 0
+}
+
+// cleanupLoop deletes expired events at startup, then every hour.
+func cleanupLoop(ctx context.Context, st *store.Store, days int, logger *slog.Logger) {
+	ticker := time.NewTicker(time.Hour)
+	defer ticker.Stop()
+	for {
+		n, err := st.Cleanup(ctx, days, time.Now())
+		switch {
+		case err != nil && ctx.Err() == nil:
+			logger.Error("cleanup", "err", err)
+		case n > 0:
+			logger.Info("cleanup: deleted expired events", "count", n, "retention_days", days)
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+		}
+	}
 }
