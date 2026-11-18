@@ -72,6 +72,32 @@ On a public server, set `BENEVOLE_CREATE_PASSWORD` so that only the APE can
 create events. It is read from the environment only, so it never shows up in
 `ps` output.
 
+## Super-admin command line
+
+The same binary includes a tool to manage every event directly in the
+database, for example to delete one before it expires. Anyone who can run it
+on the server can see and delete all events, so there is no password.
+
+```sh
+benevole events list                  # all events, with counts and expiry date
+benevole events show <event>          # details, public and admin links
+benevole events delete <event>...     # delete events and all their data (asks first; -y to skip)
+```
+
+`<event>` is a slug (as in `/e/<slug>`) or an ID from `list`. The tool reads
+`BENEVOLE_DB`, `BENEVOLE_BASE_URL` and `BENEVOLE_RETENTION_DAYS` like the
+server, or the `-db`, `-base-url` and `-retention-days` flags. It is safe to
+use while the server is running.
+
+With Docker:
+
+```sh
+docker compose exec app benevole events list
+docker compose exec app benevole events delete fete-de-l-ecole-ab12cd34
+```
+
+`show` prints the admin link, which is handy when an organiser has lost it.
+
 ## Docker
 
 ```sh
