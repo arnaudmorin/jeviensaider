@@ -211,7 +211,10 @@ func TestFullFlow(t *testing.T) {
 		t.Error("an e-mail posted by a volunteer was stored")
 	}
 	r = e.get(admin, adminPath+"/export.csv")
-	expect(t, r, 200, "Stand;Date;Début;Fin;Nom", "Pêche aux canards;20/06/2026;14:00;15:00;Marie Dupont;;07 11 22 33 44", "(place libre)")
+	expect(t, r, 200, "Stand;Date;Début;Fin;Nom;Téléphone;Commentaire", "Pêche aux canards;20/06/2026;14:00;15:00;Marie Dupont;07 11 22 33 44", "(place libre)")
+	if strings.Contains(r.body, "E-mail") {
+		t.Error("the CSV still has an e-mail column")
+	}
 	if !strings.HasPrefix(r.body, "\ufeff") || r.header.Get("Content-Type") != "text/csv; charset=utf-8" {
 		t.Error("CSV must start with a BOM and have the right content type")
 	}

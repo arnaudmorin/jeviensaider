@@ -123,24 +123,14 @@ func (s *Server) parseDateTime(date, hhmm string) (time.Time, error) {
 // volunteerForm is what a volunteer types in the sign-up form.
 type volunteerForm struct {
 	Name    string
-	Email   string
 	Phone   string
 	Comment string
 }
 
-// readPublicVolunteerForm reads what a volunteer can type: a name, an
-// optional phone and comment. Volunteers are not asked for an e-mail.
-func readPublicVolunteerForm(r *http.Request) volunteerForm {
-	f := readVolunteerForm(r)
-	f.Email = ""
-	return f
-}
-
-// readVolunteerForm also reads an e-mail (organisers adding someone by hand).
+// readVolunteerForm reads a sign-up: a name, an optional phone and comment.
 func readVolunteerForm(r *http.Request) volunteerForm {
 	return volunteerForm{
 		Name:    clean(r.FormValue("name"), 80, false),
-		Email:   clean(r.FormValue("email"), 120, false),
 		Phone:   clean(r.FormValue("phone"), 30, false),
 		Comment: clean(r.FormValue("comment"), 300, false),
 	}
@@ -176,9 +166,6 @@ func checkAdminEmail(email string) error {
 func (f volunteerForm) validate() error {
 	if f.Name == "" {
 		return errors.New("Merci d'indiquer votre nom.")
-	}
-	if f.Email != "" && !validEmail(f.Email) {
-		return errors.New("L'adresse e-mail ne semble pas valide.")
 	}
 	if f.Phone != "" && !phoneRe.MatchString(f.Phone) {
 		return errors.New("Le numéro de téléphone ne semble pas valide.")

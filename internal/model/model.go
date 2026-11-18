@@ -114,7 +114,6 @@ type Volunteer struct {
 	ID        int64
 	EventID   int64
 	Name      string
-	Email     string
 	Phone     string
 	EditToken string
 	CreatedAt time.Time
@@ -132,7 +131,6 @@ type Signup struct {
 type SignupRow struct {
 	Signup
 	Name  string
-	Email string
 	Phone string
 }
 

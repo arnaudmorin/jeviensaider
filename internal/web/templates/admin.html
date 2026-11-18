@@ -82,7 +82,7 @@
         {{range .Signups}}
           <li>
             <span>{{.Name}}</span>
-            <span class="contact">{{with .Phone}}<a href="tel:{{.}}">{{.}}</a>{{end}}{{if and .Phone .Email}} · {{end}}{{with .Email}}<a href="mailto:{{.}}">{{.}}</a>{{end}}</span>
+            <span class="contact">{{with .Phone}}<a href="tel:{{.}}">{{.}}</a>{{end}}</span>
             {{with .Comment}}<em>« {{.}} »</em>{{end}}
             <form method="post" action="{{$a}}/signups/{{.ID}}/delete" data-confirm="Retirer {{.Name}} de ce créneau ?" class="inline">
               <button type="submit" class="linklike danger">retirer</button>
@@ -183,10 +183,9 @@
           {{end}}{{end}}
         </select>
       </label>
-      <div class="row3">
+      <div class="row2">
         <label>Nom <input name="name" required maxlength="80"></label>
-        <label>E-mail <input type="email" name="email" maxlength="120"></label>
-        <label>Téléphone <input type="tel" name="phone" maxlength="30"></label>
+        <label>Téléphone (facultatif) <input type="tel" name="phone" maxlength="30"></label>
       </div>
       <div><button class="btn" type="submit">Inscrire</button></div>
     </form>
@@ -208,7 +207,7 @@
   <details class="card danger-zone">
     <summary>Effacer les données personnelles</summary>
     <form method="post" action="{{$a}}/purge" class="stack">
-      <p class="hint">Après l'événement : supprime les noms, e-mails et téléphones des {{.Volunteers}} bénévoles. Les stands et créneaux sont conservés.</p>
+      <p class="hint">Après l'événement : supprime les noms et téléphones des {{.Volunteers}} bénévoles. Les stands et créneaux sont conservés.</p>
       <label class="check"><input type="checkbox" name="confirm" value="yes" required> Je confirme</label>
       <div><button class="btn danger" type="submit">Effacer les données</button></div>
     </form>

@@ -1,7 +1,6 @@
 package store
 
 import (
-	"cmp"
 	"context"
 	"database/sql"
 	"strings"
@@ -9,12 +8,12 @@ import (
 	"benevole-ape/internal/model"
 )
 
-const volunteerCols = `id, event_id, name, email, phone, edit_token, created_at`
+const volunteerCols = `id, event_id, name, phone, edit_token, created_at`
 
 func scanVolunteer(row interface{ Scan(...any) error }) (*model.Volunteer, error) {
 	var v model.Volunteer
 	var created string
-	if err := row.Scan(&v.ID, &v.EventID, &v.Name, &v.Email, &v.Phone, &v.EditToken, &created); err != nil {
+	if err := row.Scan(&v.ID, &v.EventID, &v.Name, &v.Phone, &v.EditToken, &created); err != nil {
 		return nil, notFound(err)
 	}
 	v.CreatedAt = parseTime(created)
@@ -30,10 +29,10 @@ func (s *Store) VolunteerByToken(ctx context.Context, eventID int64, token strin
 		`SELECT `+volunteerCols+` FROM volunteers WHERE edit_token = ? AND event_id = ?`, token, eventID))
 }
 
-// UpdateVolunteer saves name and contact details.
+// UpdateVolunteer saves the name and phone number.
 func (s *Store) UpdateVolunteer(ctx context.Context, v *model.Volunteer) error {
 	return affectedOne(s.db.ExecContext(ctx,
-		`UPDATE volunteers SET name = ?, email = ?, phone = ? WHERE id = ?`, v.Name, v.Email, v.Phone, v.ID))
+		`UPDATE volunteers SET name = ?, phone = ? WHERE id = ?`, v.Name, v.Phone, v.ID))
 }
 
 // SignupRequest is what a volunteer submits to take a slot.
@@ -42,7 +41,6 @@ type SignupRequest struct {
 	SlotID    int64
 	EditToken string // existing volunteer, may be empty
 	Name      string
-	Email     string
 	Phone     string
 	Comment   string
 	// Admin sign-ups are allowed whatever the event status (an organiser
@@ -89,10 +87,10 @@ func (s *Store) SignUp(ctx context.Context, req SignupRequest) (*SignupResult, e
 			}
 		}
 		if vol == nil {
-			vol = &model.Volunteer{EventID: req.EventID, Name: req.Name, Email: req.Email, Phone: req.Phone, EditToken: Token()}
+			vol = &model.Volunteer{EventID: req.EventID, Name: req.Name, Phone: req.Phone, EditToken: Token()}
 			r, err := tx.ExecContext(ctx,
-				`INSERT INTO volunteers (event_id, name, email, phone, edit_token) VALUES (?, ?, ?, ?, ?)`,
-				vol.EventID, vol.Name, vol.Email, vol.Phone, vol.EditToken)
+				`INSERT INTO volunteers (event_id, name, phone, edit_token) VALUES (?, ?, ?, ?)`,
+				vol.EventID, vol.Name, vol.Phone, vol.EditToken)
 			if err != nil {
 				return err
 			}
@@ -100,13 +98,11 @@ func (s *Store) SignUp(ctx context.Context, req SignupRequest) (*SignupResult, e
 				return err
 			}
 			res.NewVolunteer = true
-		} else if email := cmp.Or(req.Email, vol.Email); req.Name != "" && (req.Name != vol.Name || email != vol.Email || req.Phone != vol.Phone) {
-			// Same person (same name): keep their details up to date. An
-			// empty e-mail keeps the stored one (volunteers are no longer
-			// asked for it).
-			vol.Name, vol.Email, vol.Phone = req.Name, email, req.Phone
-			if _, err := tx.ExecContext(ctx, `UPDATE volunteers SET name = ?, email = ?, phone = ? WHERE id = ?`,
-				vol.Name, vol.Email, vol.Phone, vol.ID); err != nil {
+		} else if req.Name != "" && (req.Name != vol.Name || req.Phone != vol.Phone) {
+			// Same person (same name): keep their details up to date.
+			vol.Name, vol.Phone = req.Name, req.Phone
+			if _, err := tx.ExecContext(ctx, `UPDATE volunteers SET name = ?, phone = ? WHERE id = ?`,
+				vol.Name, vol.Phone, vol.ID); err != nil {
 				return err
 			}
 		}
@@ -185,7 +181,7 @@ func (s *Store) AdminDeleteSignup(ctx context.Context, eventID, signupID int64) 
 // in sign-up order.
 func (s *Store) ListSignups(ctx context.Context, eventID int64) ([]model.SignupRow, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT su.id, su.slot_id, su.volunteer_id, su.comment, su.created_at, v.name, v.email, v.phone
+		`SELECT su.id, su.slot_id, su.volunteer_id, su.comment, su.created_at, v.name, v.phone
 		 FROM signups su JOIN volunteers v ON v.id = su.volunteer_id
 		 WHERE v.event_id = ? ORDER BY su.created_at, su.id`, eventID)
 	if err != nil {
@@ -196,7 +192,7 @@ func (s *Store) ListSignups(ctx context.Context, eventID int64) ([]model.SignupR
 	for rows.Next() {
 		var r model.SignupRow
 		var created string
-		if err := rows.Scan(&r.ID, &r.SlotID, &r.VolunteerID, &r.Comment, &created, &r.Name, &r.Email, &r.Phone); err != nil {
+		if err := rows.Scan(&r.ID, &r.SlotID, &r.VolunteerID, &r.Comment, &created, &r.Name, &r.Phone); err != nil {
 			return nil, err
 		}
 		r.CreatedAt = parseTime(created)

@@ -100,7 +100,7 @@ func TestSignupFlow(t *testing.T) {
 	s := openTest(t)
 	ev, _, slots := fixture(t, s, 2)
 
-	r, err := s.SignUp(ctx, SignupRequest{EventID: ev.ID, SlotID: slots[0].ID, Name: "Marie Dupont", Email: "m@example.org"})
+	r, err := s.SignUp(ctx, SignupRequest{EventID: ev.ID, SlotID: slots[0].ID, Name: "Marie Dupont"})
 	if err != nil || !r.NewVolunteer {
 		t.Fatalf("first signup: %+v %v", r, err)
 	}
@@ -248,7 +248,7 @@ func TestScopingAndCascade(t *testing.T) {
 func TestPurge(t *testing.T) {
 	s := openTest(t)
 	ev, _, slots := fixture(t, s, 0)
-	r, _ := s.SignUp(ctx, SignupRequest{EventID: ev.ID, SlotID: slots[0].ID, Name: "Marie", Email: "m@example.org"})
+	r, _ := s.SignUp(ctx, SignupRequest{EventID: ev.ID, SlotID: slots[0].ID, Name: "Marie"})
 	n, err := s.PurgeVolunteers(ctx, ev.ID)
 	if err != nil || n != 1 {
 		t.Fatalf("purge: %d %v", n, err)

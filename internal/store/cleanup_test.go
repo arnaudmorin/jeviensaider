@@ -28,7 +28,7 @@ func TestCleanup(t *testing.T) {
 	// Dated 2026-06-20, slots on the same day, one volunteer.
 	fete, _, slots := fixture(t, s, 0)
 	backdate(fete.ID)
-	if _, err := s.SignUp(ctx, SignupRequest{EventID: fete.ID, SlotID: slots[0].ID, Name: "Marie Dupont", Email: "m@example.org"}); err != nil {
+	if _, err := s.SignUp(ctx, SignupRequest{EventID: fete.ID, SlotID: slots[0].ID, Name: "Marie Dupont"}); err != nil {
 		t.Fatal(err)
 	}
 

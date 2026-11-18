@@ -38,7 +38,7 @@ in a single SQLite file.
 - **One tab per stand**, with a badge showing how many people are still
   missing.
 - Sign up with just a name; a phone number is optional, and no e-mail is
-  asked. There is no account: the browser remembers them, and a personal link
+  asked or stored. There is no account: the browser remembers them, and a personal link
   lets them manage their slots from another device.
 - A **"Mes créneaux"** tab, with a warning when two of their slots overlap.
 
@@ -215,8 +215,9 @@ internal/web/      handlers, middleware, embedded templates and static files (ht
   and line breaks refused, so names cannot inject headers. Anyone who can
   create an event can make the app send one message to any address: on a
   public server, set `BENEVOLE_CREATE_PASSWORD`.
-- **Privacy.** Public pages show only "Prénom N.". E-mails and phone numbers
-  are visible to the organisers only, and pages are marked `noindex`.
+- **Privacy.** Volunteers give only a name and, optionally, a phone number;
+  no e-mail is stored. Public pages show only "Prénom N.", phone numbers are
+  visible to the organisers only, and pages are marked `noindex`.
 
 ## Continuous integration
 

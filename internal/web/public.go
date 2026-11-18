@@ -262,7 +262,7 @@ func (s *Server) signupForm(w http.ResponseWriter, r *http.Request, ev *model.Ev
 	data := signupPage{Common: s.common(w, r, "Inscription"), Event: ev, EventURL: eventURL(ev), Me: me}
 	if me != nil {
 		myID = me.ID
-		data.Form = volunteerForm{Name: me.Name, Email: me.Email, Phone: me.Phone}
+		data.Form = volunteerForm{Name: me.Name, Phone: me.Phone}
 	}
 	sv, overlaps, err := s.loadSlotView(r.Context(), ev, id, myID)
 	if s.storeError(w, r, err) {
@@ -292,7 +292,7 @@ func (s *Server) signupSubmit(w http.ResponseWriter, r *http.Request, ev *model.
 		return
 	}
 	me := s.cookieVolunteer(r, ev)
-	form := readPublicVolunteerForm(r)
+	form := readVolunteerForm(r)
 
 	fail := func(status int, msg string) {
 		var myID int64
@@ -316,7 +316,7 @@ func (s *Server) signupSubmit(w http.ResponseWriter, r *http.Request, ev *model.
 		return
 	}
 	req := store.SignupRequest{
-		EventID: ev.ID, SlotID: id, Name: form.Name, Email: form.Email, Phone: form.Phone, Comment: form.Comment,
+		EventID: ev.ID, SlotID: id, Name: form.Name, Phone: form.Phone, Comment: form.Comment,
 	}
 	if me != nil {
 		req.EditToken = me.EditToken
@@ -359,13 +359,13 @@ func capitalize(s string) string {
 // ---- volunteer self-service ----
 
 func (s *Server) meUpdate(w http.ResponseWriter, r *http.Request, ev *model.Event, vol *model.Volunteer) {
-	form := readPublicVolunteerForm(r)
+	form := readVolunteerForm(r)
 	if err := form.validate(); err != nil {
 		setFlash(w, "error", err.Error())
 		redirect(w, r, meURL(ev, vol))
 		return
 	}
-	vol.Name, vol.Phone = form.Name, form.Phone // the e-mail, if any, is kept
+	vol.Name, vol.Phone = form.Name, form.Phone
 	if s.storeError(w, r, s.store.UpdateVolunteer(r.Context(), vol)) {
 		return
 	}

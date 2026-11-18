@@ -342,7 +342,7 @@ func (s *Server) adminAddSignup(w http.ResponseWriter, r *http.Request, ev *mode
 		return
 	}
 	_, err = s.store.SignUp(r.Context(), store.SignupRequest{
-		EventID: ev.ID, SlotID: slotID, Name: form.Name, Email: form.Email, Phone: form.Phone,
+		EventID: ev.ID, SlotID: slotID, Name: form.Name, Phone: form.Phone,
 		Comment: form.Comment, Admin: true,
 	})
 	if errors.Is(err, store.ErrSlotFull) || errors.Is(err, store.ErrNotFound) {
