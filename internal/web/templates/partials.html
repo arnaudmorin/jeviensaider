@@ -10,11 +10,16 @@
    hx-get="{{$r.EventURL}}/slots/{{$s.ID}}/signup" hx-target="#modal" hx-swap="innerHTML"
    title="S'inscrire : {{$s.Stand.Name}}, {{span $s.StartsAt $s.EndsAt}}">
 {{else}}
-<div class="cell st-{{$s.Status}}{{if $s.Mine}} mine{{end}}" title="{{label $s.Status}}">
+<div class="cell st-{{$s.Status}}{{if $s.Mine}} mine{{if $s.Clash}} clash{{end}}{{end}}" title="{{if $s.Clash}}En même temps qu'un autre de vos créneaux{{else}}{{label $s.Status}}{{end}}">
 {{end}}
   {{if .ShowStand}}<span class="cell-stand">{{$s.Stand.Name}}</span>{{end}}
-  <span class="cell-count">{{$s.Count}}/{{$s.MinPeople}}</span>{{if $s.Mine}}<span class="cell-me">Vous</span>{{end}}
+  <span class="cell-count">{{$s.Count}}/{{$s.MinPeople}}</span>{{if $s.Mine}}<span class="cell-me">Vous{{if $s.Clash}} ⚠{{end}}</span>{{end}}
   {{if $s.Signups}}<span class="cell-names">{{range $i, $p := $s.Signups}}{{if $i}}, {{end}}{{pub $p.Name}}{{end}}</span>{{end}}
+  {{if and $s.Mine (eq $r.Tab "me") $r.Event.IsOpen}}{{range $s.Signups}}{{if eq .VolunteerID $r.Me.ID}}
+  <form method="post" action="{{$r.MeURL}}/signups/{{.ID}}/delete" data-confirm="Annuler votre inscription : {{$s.Stand.Name}}, {{span $s.StartsAt $s.EndsAt}} ?" class="cell-cancel">
+    <button class="btn text small danger" type="submit">Annuler</button>
+  </form>
+  {{end}}{{end}}{{end}}
 {{if $open}}</a>{{else}}</div>{{end}}
 {{end}}
 {{end}}

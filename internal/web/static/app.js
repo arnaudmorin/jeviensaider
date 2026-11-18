@@ -2,6 +2,21 @@
 (function () {
   "use strict";
 
+  // Stand descriptions in the overview are cut after two lines: mark the cut
+  // ones, so that their "Voir plus" link shows.
+  function markClamped(root) {
+    root.querySelectorAll(".stand-desc:not(.checked)").forEach(function (d) {
+      d.classList.add("checked");
+      if (d.scrollHeight > d.clientHeight + 1) d.classList.add("clamped");
+    });
+  }
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", function () { markClamped(document); });
+  } else {
+    markClamped(document);
+  }
+  document.addEventListener("htmx:afterSettle", function (e) { markClamped(e.detail.elt || document); });
+
   // Sign-up form loaded by htmx into #modal: open it as a modal dialog.
   document.addEventListener("htmx:afterSwap", function (e) {
     if (e.detail.target && e.detail.target.id === "modal") {

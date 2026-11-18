@@ -158,16 +158,6 @@ func BuildPlanning(stands []Stand, slots []Slot, signups []SignupRow, myVoluntee
 	return p
 }
 
-// Stand returns the stand view with the given id, or nil.
-func (p *Planning) Stand(id int64) *StandView {
-	for _, s := range p.Stands {
-		if s.ID == id {
-			return s
-		}
-	}
-	return nil
-}
-
 // Slot returns the slot view with the given id, or nil.
 func (p *Planning) Slot(id int64) *SlotView {
 	for _, st := range p.Stands {
@@ -180,22 +170,22 @@ func (p *Planning) Slot(id int64) *SlotView {
 	return nil
 }
 
-// Mine is the planning restricted to the stands where the current volunteer
-// has signed up: their personal overview.
+// Mine is the planning restricted to the current volunteer's slots (and
+// their stands): their personal overview.
 func (p *Planning) Mine() *Planning {
 	var stands []Stand
 	var slots []Slot
 	var signups []SignupRow
 	for _, st := range p.Stands {
-		mine := false
+		added := false
 		for _, v := range st.Slots {
-			mine = mine || v.Mine
-		}
-		if !mine {
-			continue
-		}
-		stands = append(stands, st.Stand)
-		for _, v := range st.Slots {
+			if !v.Mine {
+				continue
+			}
+			if !added {
+				stands = append(stands, st.Stand)
+				added = true
+			}
 			slots = append(slots, v.Slot)
 			signups = append(signups, v.Signups...)
 		}

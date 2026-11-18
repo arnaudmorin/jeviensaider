@@ -226,10 +226,15 @@ func TestOverlapWarningAndMyPlanning(t *testing.T) {
 	expect(t, r, http.StatusSeeOther)
 	meLink := strings.TrimSuffix(r.location, "?welcome=1")
 
-	// A single sign-up: no personal grid yet.
-	if strings.Contains(e.get(marie, meLink).body, "Mon planning") {
-		t.Error("personal grid shown with a single sign-up")
+	// "Mes créneaux" shows the overview table, restricted to my stands.
+	r = e.get(marie, meLink)
+	expect(t, r, 200, "Mon planning", "1 créneau · 1 h · 1 stand", `<table class="grid">`, `<span class="cell-me">Vous</span>`)
+	// Only my slots: the stand's 15h and 16h slots are not shown, and mine
+	// can be cancelled from the table.
+	if mine := r.body[strings.Index(r.body, "Mon planning"):]; strings.Contains(mine, "15h<small>") || strings.Contains(mine, "16h<small>") {
+		t.Error("slots I am not signed up for are in my planning")
 	}
+	expect(t, r, 200, `class="cell-cancel"`, "Annuler votre inscription : Pêche aux canards, 14h – 15h ?")
 	// The next slot does not overlap: no warning.
 	if strings.Contains(e.get(marie, publicPath+"/slots/"+slots[1]+"/signup").body, "même horaire") {
 		t.Error("warning shown for a non-overlapping slot")
@@ -256,7 +261,19 @@ func TestOverlapWarningAndMyPlanning(t *testing.T) {
 
 	// Warn, never block: the sign-up goes through, and the grid flags it.
 	expect(t, e.post(marie, publicPath+"/slots/"+buvetteSlot+"/signup", form), http.StatusSeeOther)
-	expect(t, e.get(marie, meLink), 200, "3 créneaux", "2 stands", "créneaux en même temps", "mg-me clash")
+	r = e.get(marie, meLink)
+	expect(t, r, 200, "3 créneaux", "2 stands", "créneaux en même temps", "mine clash", "Vous ⚠")
+	// Only my stands: a third stand where I am not signed up is not shown.
+	expect(t, e.post(admin, adminPath+"/stands", url.Values{"name": {"Tombola"}}), http.StatusSeeOther)
+	ids = regexp.MustCompile(`id="stand-(\d+)"`).FindAllStringSubmatch(e.get(admin, adminPath).body, -1)
+	expect(t, e.post(admin, adminPath+"/stands/"+ids[len(ids)-1][1]+"/slots", url.Values{
+		"date": {"2026-06-20"}, "from": {"10:00"}, "to": {"11:00"}, "step": {"0"}, "min": {"1"},
+	}), http.StatusSeeOther)
+	r = e.get(marie, meLink)
+	if mine := r.body[strings.Index(r.body, "Mon planning"):]; strings.Contains(mine, "Tombola") {
+		t.Error("a stand without my sign-up is in my planning")
+	}
+	expect(t, e.get(marie, publicPath), 200, "Tombola")
 }
 
 func TestDurationFR(t *testing.T) {
@@ -303,4 +320,65 @@ func TestRecoverPanics(t *testing.T) {
 		}
 	}()
 	abort.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest("GET", "/", nil))
+}
+
+// Names, comments and stand texts are shown on many pages, in text and in
+// attributes: none of the classic injections may come out unescaped.
+func TestNoScriptInjection(t *testing.T) {
+	payloads := []string{
+		`<script>alert(1)</script>`,
+		`"><img src=x onerror=alert(1)>`,
+		`' onmouseover='alert(1)' x='`,
+		`</textarea><svg onload=alert(1)>`,
+		`javascript:alert(1)`,
+	}
+	// What must never appear in a page as is.
+	raw := []string{`<script>alert`, `<img src=x`, `<svg onload`, `onmouseover='alert`, `href="javascript:`, `src="javascript:`}
+
+	e := newEnv(t, Config{})
+	admin := e.client()
+	adminPath, pub, slots := setupEvent(t, e, admin)
+	standID := regexp.MustCompile(`id="stand-(\d+)"`).FindStringSubmatch(e.get(admin, adminPath).body)[1]
+
+	// The organiser's stand name and description.
+	evil := strings.Join(payloads, " ")
+	expect(t, e.post(admin, adminPath+"/stands/"+standID, url.Values{"name": {payloads[1]}, "description": {evil}}), http.StatusSeeOther)
+	expect(t, e.post(admin, adminPath+"/event", url.Values{"title": {payloads[0]}, "location": {payloads[2]}, "description": {evil}, "admin_email": {"orga@example.org"}}), http.StatusSeeOther)
+
+	// Volunteers whose name, phone and comment are attacks.
+	var meLinks []string
+	for i, p := range payloads {
+		v := e.client()
+		r := e.post(v, pub+"/slots/"+slots[i%len(slots)]+"/signup", url.Values{"name": {p + " " + p}, "comment": {p}})
+		expect(t, r, http.StatusSeeOther)
+		meLinks = append(meLinks, strings.TrimSuffix(r.location, "?welcome=1"))
+	}
+
+	htmx := map[string]string{"HX-Request": "true"}
+	pages := map[string]resp{
+		"event":         e.get(e.client(), pub),
+		"event todo":    e.get(e.client(), pub+"?todo=1"),
+		"me":            e.get(e.client(), meLinks[0]),
+		"signup page":   e.get(e.client(), pub+"/slots/"+slots[0]+"/signup"),
+		"signup dialog": e.do(e.client(), "GET", pub+"/slots/"+slots[0]+"/signup", nil, htmx),
+		"stand page":    e.get(e.client(), pub+"/stands/"+standID),
+		"stand dialog":  e.do(e.client(), "GET", pub+"/stands/"+standID, nil, htmx),
+		"admin":         e.get(admin, adminPath),
+		"print":         e.get(admin, adminPath+"/print"),
+		"signup error":  e.post(e.client(), pub+"/slots/"+slots[0]+"/signup", url.Values{"name": {payloads[0]}, "phone": {payloads[1]}}),
+	}
+	for name, r := range pages {
+		if r.code != 200 && name != "signup error" {
+			t.Errorf("%s: status %d", name, r.code)
+		}
+		for _, bad := range raw {
+			if strings.Contains(r.body, bad) {
+				i := strings.Index(r.body, bad)
+				t.Errorf("%s: unescaped %q in …%s…", name, bad, r.body[max(0, i-80):min(len(r.body), i+80)])
+			}
+		}
+	}
+	// The texts are really there, escaped (not dropped).
+	expect(t, pages["admin"], 200, `&lt;script&gt;alert(1)&lt;/script&gt;`, `&#34;&gt;&lt;img src=x onerror=alert(1)&gt;`)
+	expect(t, pages["stand dialog"], 200, `&lt;svg onload=alert(1)&gt;`)
 }

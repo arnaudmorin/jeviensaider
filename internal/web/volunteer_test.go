@@ -71,3 +71,40 @@ func TestVolunteerSelfService(t *testing.T) {
 	}
 	expect(t, e.get(e.client(), me), 200, "Marie Durand")
 }
+
+// Stand descriptions are on the overview (under the name, no stand tab
+// any more) and in full on the sign-up form.
+func TestStandDescriptions(t *testing.T) {
+	e := newEnv(t, Config{})
+	admin := e.client()
+	adminPath, pub, slots := setupEvent(t, e, admin)
+	standID := regexp.MustCompile(`id="stand-(\d+)"`).FindStringSubmatch(e.get(admin, adminPath).body)[1]
+	desc := "Les enfants pêchent des canards ; un lot pour chacun."
+	expect(t, e.post(admin, adminPath+"/stands/"+standID, url.Values{"name": {"Pêche aux canards"}, "description": {desc}, "color": {"#2aa3b5"}}), http.StatusSeeOther)
+
+	r := e.get(e.client(), pub)
+	expect(t, r, 200, `<span class="stand-desc">Les enfants pêchent des canards ; un lot pour chacun.</span>`,
+		`<a class="stand-more" href="`+pub+`/stands/`+standID+`"`)
+	if strings.Contains(r.body, "?stand=") || strings.Contains(r.body, "tabs-stands") {
+		t.Error("stand tabs still shown")
+	}
+	// Old links to a stand tab still show the overview.
+	expect(t, e.get(e.client(), pub+"?stand="+standID), 200, "stand-desc")
+	expect(t, e.get(e.client(), pub+"/slots/"+slots[0]+"/signup"), 200, `<p class="desc signup-desc">Les enfants pêchent des canards ; un lot pour chacun.</p>`)
+	// "Voir plus": the stand's description in a dialog (htmx) or a page.
+	r = e.do(e.client(), "GET", pub+"/stands/"+standID, nil, map[string]string{"HX-Request": "true"})
+	expect(t, r, 200, "<dialog", "Pêche aux canards", desc, "data-close autofocus>Fermer</button>")
+	if strings.Contains(r.body, "<form") || strings.Contains(r.body, "<html") {
+		t.Error("stand dialog has a form or a whole page")
+	}
+	expect(t, e.get(e.client(), pub+"/stands/"+standID), 200, "<html", "Retour au planning", desc)
+	expect(t, e.get(e.client(), pub+"/stands/999999"), 404, "Stand introuvable")
+	expect(t, e.post(admin, adminPath+"/status", url.Values{"status": {"draft"}}), http.StatusSeeOther)
+	expect(t, e.get(e.client(), pub+"/stands/"+standID), 404, "pas encore ouvertes")
+	expect(t, e.post(admin, adminPath+"/status", url.Values{"status": {"open"}}), http.StatusSeeOther)
+
+	// The views bar only appears for a known volunteer.
+	if strings.Contains(r.body, "Vue d&#39;ensemble") || strings.Contains(r.body, "Vue d'ensemble") {
+		t.Error("views bar shown to an unknown visitor")
+	}
+}

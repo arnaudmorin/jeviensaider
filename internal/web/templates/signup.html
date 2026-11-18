@@ -1,5 +1,5 @@
 {{define "content"}}
-<p><a href="{{tabURL .EventURL .Slot.StandID false}}">← Retour au planning</a></p>
+<p><a href="{{.EventURL}}">← Retour au planning</a></p>
 <div class="card narrow">{{template "signup_form" .}}</div>
 {{end}}
 
@@ -16,6 +16,7 @@
   {{day $s.StartsAt}} · {{span $s.StartsAt $s.EndsAt}} · {{$s.Count}}/{{$s.MinPeople}}
   {{if $s.Signups}}<br>Avec {{range $i, $p := $s.Signups}}{{if $i}}, {{end}}{{pub $p.Name}}{{end}}{{end}}
 </p>
+{{with $s.Stand.Description}}<p class="desc signup-desc">{{.}}</p>{{end}}
 
 {{with .Error}}<div class="callout error" role="alert">{{.}}</div>{{end}}
 

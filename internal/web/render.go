@@ -10,7 +10,6 @@ import (
 	"html/template"
 	"io/fs"
 	"net/http"
-	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -24,7 +23,7 @@ var templateFS embed.FS
 //go:embed static
 var staticFS embed.FS
 
-var pageNames = []string{"home", "event", "signup", "admin", "print", "error"}
+var pageNames = []string{"home", "event", "signup", "stand", "admin", "print", "error"}
 
 func (s *Server) loadTemplates() error {
 	sum := sha256.New()
@@ -225,19 +224,12 @@ func eventStatusLabel(status string) string {
 	return status
 }
 
-// tabURL builds the event page URL for a tab (stand 0 = overview).
-func tabURL(base string, stand int64, todo bool) string {
-	q := url.Values{}
-	if stand != 0 {
-		q.Set("stand", strconv.FormatInt(stand, 10))
-	}
+// todoURL is the event page, showing only the slots still to fill if todo.
+func todoURL(base string, todo bool) string {
 	if todo {
-		q.Set("todo", "1")
+		return base + "?todo=1"
 	}
-	if len(q) == 0 {
-		return base
-	}
-	return base + "?" + q.Encode()
+	return base
 }
 
 func templateFuncs() template.FuncMap {
@@ -250,16 +242,7 @@ func templateFuncs() template.FuncMap {
 		"pub":     model.DisplayName,
 		"label":   statusLabel,
 		"evlabel": eventStatusLabel,
-		"tabURL": func(base string, stand any, todo bool) string {
-			var id int64
-			switch v := stand.(type) {
-			case int:
-				id = int64(v)
-			case int64:
-				id = v
-			}
-			return tabURL(base, id, todo)
-		},
+		"todoURL": todoURL,
 		"timeVal": func(t time.Time) string { return t.Format("15:04") },
 		"dateVal": func(t time.Time) string { return t.Format(model.DateLayout) },
 		"add":     func(a, b int) int { return a + b },
@@ -298,14 +281,6 @@ func templateFuncs() template.FuncMap {
 				m[k] = kv[i+1]
 			}
 			return m, nil
-		},
-		"overlaps": func(list []*model.SlotView, s *model.SlotView) bool {
-			for _, o := range list {
-				if o.ID != s.ID && o.Overlaps(s.Slot) {
-					return true
-				}
-			}
-			return false
 		},
 		"css": func(s string) template.CSS {
 			if validColor(s) {

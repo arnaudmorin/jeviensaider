@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -202,13 +203,13 @@ func TestFullFlow(t *testing.T) {
 		t.Fatal("public page leaks personal data")
 	}
 
-	// Second sign-up by Marie (cookie): flash + back to stand tab.
+	// Second sign-up by Marie (cookie): flash + back to the planning.
 	r = e.post(marie, pub+"/slots/"+slots[1]+"/signup", url.Values{"name": {"Marie Dupont"}, "phone": {"07 11 22 33 44"}})
 	expect(t, r, http.StatusSeeOther)
-	if !strings.Contains(r.location, "stand=") {
-		t.Fatalf("expected stand tab redirect, got %q", r.location)
+	if r.location != pub {
+		t.Fatalf("expected a redirect to the planning, got %q", r.location)
 	}
-	expect(t, e.get(marie, r.location), 200, "C&#39;est noté", "(vous)")
+	expect(t, e.get(marie, r.location), 200, "C&#39;est noté", `<span class="cell-me">Vous</span>`)
 
 	// Duplicate on same slot is refused.
 	expect(t, e.post(marie, pub+"/slots/"+slots[0]+"/signup", url.Values{"name": {"Marie Dupont"}, "phone": {"07 11 22 33 44"}}), 409, "déjà inscrit")
@@ -240,15 +241,21 @@ func TestFullFlow(t *testing.T) {
 
 	// Marie cancels her second slot from her personal page.
 	r = e.get(marie, mePath)
-	m := regexp.MustCompile(`action="(`+regexp.QuoteMeta(mePath)+`/signups/\d+/delete)"`).FindAllStringSubmatch(r.body, -1)
+	// Each cell is in the table and in the phone timeline: count distinct forms.
+	var m []string
+	for _, f := range regexp.MustCompile(`action="(`+regexp.QuoteMeta(mePath)+`/signups/\d+/delete)"`).FindAllStringSubmatch(r.body, -1) {
+		if !slices.Contains(m, f[1]) {
+			m = append(m, f[1])
+		}
+	}
 	if len(m) != 2 {
 		t.Fatalf("want 2 cancel forms, got %d", len(m))
 	}
-	expect(t, e.post(marie, m[1][1], nil), http.StatusSeeOther)
+	expect(t, e.post(marie, m[1], nil), http.StatusSeeOther)
 	expect(t, e.get(marie, mePath), 200, "Votre inscription a été annulée")
 
 	// Someone else cannot cancel Marie's sign-up through their own link.
-	expect(t, e.post(e.client(), strings.Replace(m[0][1], mePath, pub+"/me/not-a-token", 1), nil), 404)
+	expect(t, e.post(e.client(), strings.Replace(m[0], mePath, pub+"/me/not-a-token", 1), nil), 404)
 
 	// Closing the event blocks sign-ups.
 	expect(t, e.post(admin, adminPath+"/status", url.Values{"status": {"closed"}}), http.StatusSeeOther)

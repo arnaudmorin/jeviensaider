@@ -1,6 +1,6 @@
 {{define "content"}}
 <section class="event-head">
-  <h1>{{.Event.Title}}</h1>
+  <h1><a href="{{.EventURL}}" title="Retour à la vue d&#39;ensemble">{{.Event.Title}}</a></h1>
   <p class="meta">{{with .Event.Date}}{{date .}}{{end}}{{if and .Event.Date .Event.Location}} · {{end}}{{with .Event.Location}}{{.}}{{end}}</p>
   {{with .Event.Description}}<p class="desc">{{.}}</p>{{end}}
 
@@ -19,110 +19,28 @@
 
 {{if not .Event.IsDraft}}
 <div id="planning">
-  <nav class="tabs" aria-label="Stands" hx-boost="true" hx-target="#planning" hx-select="#planning" hx-swap="outerHTML">
+  {{if .Me}}
+  <nav class="tabs" aria-label="Vues" hx-boost="true" hx-target="#planning" hx-select="#planning" hx-swap="outerHTML">
     <div class="tabs-views">
-      <a class="tab{{if eq .Tab "grid"}} active{{end}}" href="{{tabURL .EventURL 0 .TodoOnly}}" {{if eq .Tab "grid"}}aria-current="page"{{end}}>Vue d'ensemble</a>
-      {{if .Me}}
+      <a class="tab{{if eq .Tab "grid"}} active{{end}}" href="{{todoURL .EventURL .TodoOnly}}" {{if eq .Tab "grid"}}aria-current="page"{{end}}>Vue d'ensemble</a>
       <a class="tab me{{if eq .Tab "me"}} active{{end}}" href="{{.MeURL}}" {{if eq .Tab "me"}}aria-current="page"{{end}}>
         Mes créneaux<span class="count mine">{{len .P.MySlots}}</span>
       </a>
-      {{end}}
     </div>
-    {{if .P.Stands}}
-    <div class="tabs-stands">
-      {{range .P.Stands}}
-      {{$on := and (eq $.Tab "stand") (eq $.Stand.ID .ID)}}
-      <a class="tab{{if $on}} active{{end}}" href="{{tabURL $.EventURL .ID $.TodoOnly}}" style="--stand: {{css .Color}}" {{if $on}}aria-current="page"{{end}}>
-        <span class="dot"></span>{{.Name}}{{if .Missing}}<span class="count" title="places à pourvoir">{{.Missing}}</span>{{else if .Slots}}<span class="count done" title="complet">✓</span>{{end}}
-      </a>
-      {{end}}
-    </div>
-    {{end}}
   </nav>
+  {{end}}
 
   {{if ne .Tab "me"}}
   <div class="toolbar" hx-boost="true" hx-target="#planning" hx-select="#planning" hx-swap="outerHTML">
-    {{$standID := 0}}{{if eq .Tab "stand"}}{{$standID = .Stand.ID}}{{end}}
-    <a class="chip{{if .TodoOnly}} on{{end}}" href="{{tabURL .EventURL $standID (not .TodoOnly)}}" role="switch" aria-checked="{{.TodoOnly}}">
+    <a class="chip{{if .TodoOnly}} on{{end}}" href="{{todoURL .EventURL (not .TodoOnly)}}" role="switch" aria-checked="{{.TodoOnly}}">
       {{if .TodoOnly}}✓ {{end}}Créneaux à compléter
     </a>
   </div>
   {{end}}
 
   {{if eq .Tab "grid"}}
-    {{if not .P.Columns}}
-      <p class="empty">Aucun créneau n'a encore été proposé.</p>
-    {{else}}
-      <div class="grid-wrap">
-        <table class="grid">
-          <thead>
-            <tr>
-              <th scope="col"></th>
-              {{range .P.Columns}}
-              <th scope="col">{{if $.P.MultiDay}}<small>{{day .StartsAt}}</small><br>{{end}}{{hm .StartsAt}}<small> – {{hm .EndsAt}}</small></th>
-              {{end}}
-            </tr>
-          </thead>
-          <tbody>
-            {{range .P.Rows}}
-            <tr>
-              <th scope="row" style="--stand: {{css .Stand.Color}}">
-                <a href="{{tabURL $.EventURL .Stand.ID $.TodoOnly}}" hx-boost="true" hx-target="#planning" hx-select="#planning" hx-swap="outerHTML"><span class="dot"></span>{{.Stand.Name}}</a>
-              </th>
-              {{range .Cells}}
-              <td>{{range .}}{{template "cell" (dict "R" $ "S" . "ShowStand" false)}}{{end}}</td>
-              {{end}}
-            </tr>
-            {{end}}
-          </tbody>
-        </table>
-      </div>
+    {{template "planning" (dict "R" $ "P" .P)}}
 
-      <div class="timeline">
-        {{range .P.Groups}}
-        <section class="tgroup">
-          <h3>{{if $.P.MultiDay}}{{day .StartsAt}}, {{end}}{{span .StartsAt .EndsAt}}</h3>
-          <div class="tcells">
-            {{range .Slots}}{{template "cell" (dict "R" $ "S" . "ShowStand" true)}}{{end}}
-          </div>
-        </section>
-        {{end}}
-      </div>
-    {{end}}
-
-  {{else if eq .Tab "stand"}}{{with .Stand}}
-    <section class="stand-tab">
-      {{with .Description}}<p class="desc">{{.}}</p>{{end}}
-      {{if .Slots}}
-      <div class="slots">
-        {{range .Slots}}{{if or (not $.TodoOnly) .Missing}}
-        <article class="slot{{if .Mine}} mine{{end}}">
-          <div class="slot-top">
-            <h3>{{if $.P.MultiDay}}<small>{{day .StartsAt}}</small>{{end}}{{span .StartsAt .EndsAt}}</h3>
-            <span class="status st-{{.Status}}" title="{{label .Status}}">{{.Count}}/{{.MinPeople}}</span>
-          </div>
-          {{if .Signups}}
-          <p class="slot-names">{{range $i, $p := .Signups}}{{if $i}}, {{end}}{{pub $p.Name}}{{if and $.Me (eq $p.VolunteerID $.Me.ID)}} (vous){{end}}{{end}}</p>
-          {{else}}
-          <p class="slot-names muted">Personne pour l'instant</p>
-          {{end}}
-          <div class="slot-actions">
-          {{if .Mine}}
-            <a class="btn text small" href="{{$.MeURL}}">Gérer</a>
-          {{else if and $.Event.IsOpen (not .Full)}}
-            <a class="btn tonal small" href="{{$.EventURL}}/slots/{{.ID}}/signup" hx-get="{{$.EventURL}}/slots/{{.ID}}/signup" hx-target="#modal">S'inscrire</a>
-          {{else if .Full}}
-            <span class="muted">Complet</span>
-          {{end}}
-          </div>
-        </article>
-        {{end}}{{end}}
-      </div>
-      {{else}}
-      <p class="empty">Pas encore de créneau pour ce stand.</p>
-      {{end}}
-    </section>
-  {{end}}
 
   {{else if eq .Tab "me"}}
     <section class="me-tab">
@@ -133,61 +51,15 @@
       </div>
       {{end}}
 
-      {{with .MyP}}{{if gt (len .MySlots) 1}}
+      {{with .MyP}}{{if .MySlots}}
       <section class="myplan" aria-labelledby="myplan-title">
         <h2 id="myplan-title" class="myplan-title">Mon planning</h2>
-        <p class="meta">{{len .MySlots}} créneaux · {{dur .MyDuration}} · {{len .Stands}} {{plural (len .Stands) "stand" "stands"}}{{range .MySlots}}{{if .Clash}} · <span class="warn">⚠ créneaux en même temps</span>{{break}}{{end}}{{end}}</p>
-        <div class="table-wrap">
-          <table class="mygrid">
-            <thead>
-              <tr>
-                <th scope="col"></th>
-                {{range .Columns}}<th scope="col">{{if $.MyP.MultiDay}}<small>{{day .StartsAt}}</small><br>{{end}}{{hm .StartsAt}}</th>{{end}}
-              </tr>
-            </thead>
-            <tbody>
-              {{range .Rows}}
-              <tr>
-                <th scope="row" style="--stand: {{css .Stand.Color}}"><span class="dot"></span>{{.Stand.Name}}</th>
-                {{range .Cells}}
-                <td>{{range .}}
-                  {{if .Mine}}
-                  <span class="mg mg-me{{if .Clash}} clash{{end}}" style="--stand: {{css .Stand.Color}}" title="Vous : {{.Stand.Name}}, {{span .StartsAt .EndsAt}}{{if .Clash}} (en même temps qu'un autre créneau){{end}}">{{if .Clash}}⚠{{else}}✓{{end}}</span>
-                  {{else if and $.Event.IsOpen (not .Full)}}
-                  <a class="mg mg-free" href="{{$.EventURL}}/slots/{{.ID}}/signup" hx-get="{{$.EventURL}}/slots/{{.ID}}/signup" hx-target="#modal" title="Place libre : {{.Stand.Name}}, {{span .StartsAt .EndsAt}}" aria-label="S'inscrire : {{.Stand.Name}}, {{span .StartsAt .EndsAt}}">+</a>
-                  {{else}}
-                  <span class="mg mg-other" title="{{.Stand.Name}}, {{span .StartsAt .EndsAt}} : complet">·</span>
-                  {{end}}
-                {{end}}</td>
-                {{end}}
-              </tr>
-              {{end}}
-            </tbody>
-          </table>
-        </div>
-        <p class="legend"><span class="mg mg-me sample">✓</span> vous · <span class="mg mg-me clash sample">⚠</span> en même temps · <span class="mg mg-free sample">+</span> place libre</p>
+        <p class="meta">{{len .MySlots}} {{plural (len .MySlots) "créneau" "créneaux"}} · {{dur .MyDuration}} · {{len .Stands}} {{plural (len .Stands) "stand" "stands"}}{{range .MySlots}}{{if .Clash}} · <span class="warn">⚠ créneaux en même temps</span>{{break}}{{end}}{{end}}</p>
+        {{template "planning" (dict "R" $ "P" .)}}
       </section>
       {{end}}{{end}}
 
-      {{if .P.MySlots}}
-      <ul class="list">
-        {{range .P.MySlots}}
-        <li>
-          <div>
-            {{.Stand.Name}}
-            <div class="sub">{{if $.P.MultiDay}}{{day .StartsAt}}, {{end}}{{span .StartsAt .EndsAt}}{{if overlaps $.P.MySlots .}} · <span class="warn">chevauche un autre créneau</span>{{end}}</div>
-          </div>
-          {{if $.Event.IsOpen}}
-          {{range .Signups}}{{if eq .VolunteerID $.Me.ID}}
-          <form method="post" action="{{$.MeURL}}/signups/{{.ID}}/delete" data-confirm="Annuler votre inscription sur ce créneau ?">
-            <button class="btn text small danger" type="submit">Annuler</button>
-          </form>
-          {{end}}{{end}}
-          {{end}}
-        </li>
-        {{end}}
-      </ul>
-      {{else}}
+      {{if not .P.MySlots}}
       <p class="empty">Vous n'êtes inscrit·e sur aucun créneau. <a href="{{.EventURL}}">Voir le planning</a></p>
       {{end}}
 
@@ -217,5 +89,51 @@
     </section>
   {{end}}
 </div>
+{{end}}
+{{end}}
+
+{{/* The planning table (wide screens) and timeline (phones).
+     Args: R = eventPage, P = *model.Planning */}}
+{{define "planning"}}{{$r := .R}}{{$p := .P}}
+{{if not $p.Columns}}
+  <p class="empty">Aucun créneau n'a encore été proposé.</p>
+{{else}}
+  <div class="grid-wrap">
+    <table class="grid">
+      <thead>
+        <tr>
+          <th scope="col"></th>
+          {{range $p.Columns}}
+          <th scope="col">{{if $p.MultiDay}}<small>{{day .StartsAt}}</small><br>{{end}}{{hm .StartsAt}}<small> – {{hm .EndsAt}}</small></th>
+          {{end}}
+        </tr>
+      </thead>
+      <tbody>
+        {{range $p.Rows}}
+        <tr>
+          <th scope="row" style="--stand: {{css .Stand.Color}}">
+            <span class="stand-name"><span class="dot"></span>{{.Stand.Name}}</span>
+            {{if .Stand.Description}}<span class="stand-desc">{{.Stand.Description}}</span>
+            <a class="stand-more" href="{{$r.EventURL}}/stands/{{.Stand.ID}}" hx-get="{{$r.EventURL}}/stands/{{.Stand.ID}}" hx-target="#modal">Voir plus</a>{{end}}
+          </th>
+          {{range .Cells}}
+          <td>{{range .}}{{template "cell" (dict "R" $r "S" . "ShowStand" false)}}{{end}}</td>
+          {{end}}
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="timeline">
+    {{range $p.Groups}}
+    <section class="tgroup">
+      <h3>{{if $p.MultiDay}}{{day .StartsAt}}, {{end}}{{span .StartsAt .EndsAt}}</h3>
+      <div class="tcells">
+        {{range .Slots}}{{template "cell" (dict "R" $r "S" . "ShowStand" true)}}{{end}}
+      </div>
+    </section>
+    {{end}}
+  </div>
 {{end}}
 {{end}}

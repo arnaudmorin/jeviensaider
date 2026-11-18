@@ -46,7 +46,7 @@ func TestMinePlanning(t *testing.T) {
 	if len(m.Stands) != 2 || m.Stands[0].ID != 1 || m.Stands[1].ID != 2 {
 		t.Fatalf("Mine stands: %+v", m.Stands)
 	}
-	if len(m.Columns) != 3 || len(m.MySlots) != 3 { // 14h, 15h, 16h-17h30 (Tombola left out)
+	if len(m.Columns) != 2 || len(m.MySlots) != 3 || len(m.Stands[1].Slots) != 1 { // 14h and 15h only: not Buvette 16h, not Tombola
 		t.Errorf("Mine: %d columns, %d slots", len(m.Columns), len(m.MySlots))
 	}
 

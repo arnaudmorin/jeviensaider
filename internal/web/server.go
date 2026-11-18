@@ -81,6 +81,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /e/{slug}", s.withEvent(s.eventPage))
 	mux.HandleFunc("GET /e/{slug}/slots/{id}/signup", s.withEvent(s.signupForm))
 	mux.HandleFunc("POST /e/{slug}/slots/{id}/signup", s.withEvent(s.signupSubmit))
+	mux.HandleFunc("GET /e/{slug}/stands/{id}", s.withEvent(s.standInfo))
 	mux.HandleFunc("POST /e/{slug}/forget", s.withEvent(s.forget))
 	mux.HandleFunc("GET /e/{slug}/me/{token}", s.withVolunteer(s.mePage))
 	mux.HandleFunc("POST /e/{slug}/me/{token}", s.withVolunteer(s.meUpdate))

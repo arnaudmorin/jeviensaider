@@ -182,8 +182,7 @@ type eventPage struct {
 	Common
 	Event    *model.Event
 	P        *model.Planning
-	Tab      string // grid, stand, me
-	Stand    *model.StandView
+	Tab      string // grid, me
 	TodoOnly bool
 	EventURL string
 	Me       *model.Volunteer
@@ -225,10 +224,6 @@ func (s *Server) showEvent(w http.ResponseWriter, r *http.Request, ev *model.Eve
 	if meTab {
 		data.Tab = "me"
 		data.MyP = p.Mine()
-	} else if id, err := strconv.ParseInt(r.URL.Query().Get("stand"), 10, 64); err == nil {
-		if st := p.Stand(id); st != nil {
-			data.Tab, data.Stand = "stand", st
-		}
 	}
 	s.render(w, r, http.StatusOK, "event", data)
 }
@@ -359,7 +354,7 @@ func (s *Server) signupSubmit(w http.ResponseWriter, r *http.Request, ev *model.
 			hm(res.Overlapping[0].StartsAt), hm(res.Overlapping[0].EndsAt))
 	}
 	setFlash(w, kind, msg)
-	redirect(w, r, tabURL(eventURL(ev), slot.StandID, false))
+	redirect(w, r, eventURL(ev))
 }
 
 func capitalize(s string) string {
@@ -368,6 +363,40 @@ func capitalize(s string) string {
 	}
 	r := []rune(s)
 	return strings.ToUpper(string(r[0])) + string(r[1:])
+}
+
+// ---- stand details ----
+
+type standPage struct {
+	Common
+	EventURL string
+	Stand    *model.Stand
+}
+
+// standInfo shows a stand's full description ("Voir plus" in the overview),
+// as a dialog with htmx or as a page.
+func (s *Server) standInfo(w http.ResponseWriter, r *http.Request, ev *model.Event) {
+	id, ok := pathID(r, "id")
+	if ev.IsDraft() {
+		s.renderError(w, r, http.StatusNotFound, msgNotOpenYet)
+		return
+	}
+	stands, err := s.store.ListStands(r.Context(), ev.ID)
+	if s.storeError(w, r, err) {
+		return
+	}
+	for i := range stands {
+		if ok && stands[i].ID == id {
+			data := standPage{Common: s.common(w, r, stands[i].Name), EventURL: eventURL(ev), Stand: &stands[i]}
+			if isHTMX(r) {
+				s.renderTemplate(w, r, http.StatusOK, "stand", "stand_dialog", data)
+			} else {
+				s.render(w, r, http.StatusOK, "stand", data)
+			}
+			return
+		}
+	}
+	s.renderError(w, r, http.StatusNotFound, "Stand introuvable.")
 }
 
 // ---- volunteer self-service ----

@@ -133,14 +133,14 @@ input[type="color"] { width: 48px; padding: 2px; cursor: pointer; }
 
 /* ---------- event page ---------- */
 .event-head { margin-bottom: 8px; }
+.event-head h1 a { color: inherit; }
+.event-head h1 a:hover { text-decoration: none; color: var(--primary); }
 .event-head .meta, .page-head .meta { color: var(--muted); margin-bottom: 8px; }
 .summary p { color: var(--muted); font-size: .9rem; }
 
-/* Navigation: the two views, then every stand as a button. Stands wrap onto
-   several lines, so all of them stay visible (no hidden horizontal scroll). */
+/* Navigation between the overview and "Mes créneaux". */
 .tabs { padding-bottom: 14px; border-bottom: 1px solid var(--border); }
-.tabs-views { display: flex; gap: 8px; margin-bottom: 10px; }
-.tabs-stands { display: flex; flex-wrap: wrap; gap: 8px; }
+.tabs-views { display: flex; gap: 8px; }
 .tab {
   display: inline-flex; align-items: center; min-height: 36px; padding: 4px 12px; max-width: 100%;
   border: 1px solid var(--border); border-radius: 18px; background: var(--bg);
@@ -148,15 +148,13 @@ input[type="color"] { width: 48px; padding: 2px; cursor: pointer; }
 }
 .tab:hover { background: var(--surface-2); text-decoration: none; }
 .tab .dot { margin-right: 7px; }
-.tab.me { margin-left: auto; }
 /* Active: tonal background and a thicker border, readable whatever the
    stand's colour (which stays on its dot). */
 .tab.active {
   background: var(--primary-tonal); border-color: var(--primary); color: var(--primary-on-tonal);
   box-shadow: inset 0 0 0 1px var(--primary);
 }
-.tabs .count { margin-left: 6px; padding: 0 6px; min-width: 20px; border-radius: 10px; font-size: .75rem; text-align: center; background: var(--empty-bg); color: var(--empty-fg); }
-.tabs .count.done { background: var(--ok-bg); color: var(--ok-fg); }
+.tabs .count { margin-left: 6px; padding: 0 6px; min-width: 20px; border-radius: 10px; font-size: .75rem; text-align: center; }
 .tabs .count.mine { background: var(--primary-tonal); color: var(--primary-on-tonal); }
 
 .toolbar { display: flex; justify-content: flex-end; margin: 16px 0; }
@@ -172,8 +170,20 @@ input[type="color"] { width: 48px; padding: 2px; cursor: pointer; }
 .grid { border-collapse: separate; border-spacing: 6px; width: 100%; margin: -6px; }
 .grid thead th { font-weight: 500; font-size: .85rem; color: var(--muted); text-align: left; padding: 0 4px 4px; white-space: nowrap; }
 .grid thead th small { font-weight: 400; }
-.grid tbody th { text-align: left; font-weight: 500; white-space: nowrap; padding-right: 12px; position: sticky; left: 0; background: #fff; z-index: 1; }
-.grid tbody th a { color: var(--text); display: flex; align-items: center; }
+.grid tbody th {
+  text-align: left; vertical-align: top; padding: 8px 12px 0 0; min-width: 150px; max-width: 260px;
+  position: sticky; left: 0; background: #fff; z-index: 1;
+}
+.stand-name { display: flex; align-items: center; font-weight: 500; }
+/* A stand's description, cut after two lines ("…"); app.js marks the cut
+   ones, which get a "Voir plus" link to the whole text. */
+.stand-desc {
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden;
+  margin: 2px 0 0 18px; font-size: .8rem; font-weight: 400; line-height: 1.35; color: var(--muted); white-space: pre-line;
+}
+/* "Voir plus" opens the stand's description; only shown when it is cut. */
+.stand-more { display: none; margin: 2px 0 0 18px; font-size: .75rem; font-weight: 500; }
+.stand-desc.clamped + .stand-more { display: inline-block; }
 .grid td { min-width: 110px; vertical-align: top; padding: 0; }
 
 .cell {
@@ -183,6 +193,10 @@ input[type="color"] { width: 48px; padding: 2px; cursor: pointer; }
 .cell + .cell { margin-top: 6px; }
 a.cell:hover { text-decoration: none; box-shadow: 0 1px 3px rgba(60, 64, 67, .3), 0 4px 8px rgba(60, 64, 67, .15); }
 .cell.mine { box-shadow: inset 0 0 0 2px var(--primary); }
+.cell.mine.clash { box-shadow: inset 0 0 0 2px var(--danger); }
+.cell.clash .cell-me { color: var(--danger); }
+.cell-cancel { margin: 4px -8px -4px 0; text-align: right; }
+.cell-cancel .btn { height: 28px; padding: 0 8px; }
 .cell-count { font-size: 1rem; font-weight: 500; }
 .cell-me { margin-left: 6px; font-size: .75rem; font-weight: 500; color: var(--primary); }
 .cell-names { display: block; font-size: .75rem; color: var(--muted); line-height: 1.35; }
@@ -199,24 +213,10 @@ a.cell:hover { text-decoration: none; box-shadow: 0 1px 3px rgba(60, 64, 67, .3)
   .timeline { display: none; }
 }
 
-/* stand tab */
-.stand-tab .desc { margin-top: 4px; }
-.slots { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
-.slot { border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; }
-.slot.mine { border-color: var(--primary); box-shadow: inset 0 0 0 1px var(--primary); }
-.slot-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-.slot-top h3 { margin: 0; font-size: 1.05rem; }
-.slot-top h3 small { display: block; color: var(--muted); font-weight: 400; font-size: .8rem; }
-.slot-names { margin: 0; font-size: .9rem; flex: 1; }
-.slot-actions { display: flex; justify-content: flex-end; margin-top: 4px; }
-
 /* my slots */
-.list { list-style: none; padding: 0; margin: 0 0 16px; border: 1px solid var(--border); border-radius: var(--radius); }
-.list li { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 16px; }
-.list li + li { border-top: 1px solid var(--border); }
-.list .sub { color: var(--muted); font-size: .9rem; }
 .copy-row { display: flex; gap: 8px; align-items: center; }
 .copy-row input { flex: 1; min-width: 0; font-size: .85rem; color: var(--muted); background: var(--surface-2); }
+.me-tab { margin-top: 16px; }
 .me-tab .card { margin-top: 16px; }
 
 /* sign-up dialog */
@@ -232,6 +232,9 @@ a.cell:hover { text-decoration: none; box-shadow: 0 1px 3px rgba(60, 64, 67, .3)
 .modal .close:hover { background: var(--surface-2); }
 .signup-title { display: flex; align-items: center; padding-right: 40px; margin-bottom: 2px; }
 .signup-sub { color: var(--muted); margin-bottom: 16px; }
+.signup-desc { margin: -6px 0 16px; font-size: .9rem; }
+.stand-full { margin: 8px 0 0; color: var(--text); }
+.modal-actions { display: flex; justify-content: flex-end; margin-top: 20px; }
 
 /* ---------- admin ---------- */
 .page-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 12px 24px; margin-bottom: 16px; }
@@ -291,22 +294,7 @@ form.inline { display: inline; margin: 0; }
 .tools .card { margin-bottom: 8px; }
 .error-page { text-align: center; margin-top: 32px; }
 
-/* "Mon planning": personal mini grid in "Mes créneaux" */
-.myplan { margin: 20px 0 24px; }
+/* "Mon planning": the overview table, restricted to my stands */
+.myplan { margin: 4px 0 24px; }
 .myplan-title { font-size: 1.1rem; font-weight: 500; margin: 0 0 2px; }
-.myplan .meta { margin: 0 0 12px; }
-.mygrid { border-collapse: separate; border-spacing: 4px; margin: -4px; }
-.mygrid thead th { font-weight: 500; font-size: .8rem; color: var(--muted); text-align: center; white-space: nowrap; padding: 0 2px 2px; }
-.mygrid tbody th { text-align: left; font-weight: 500; white-space: nowrap; padding-right: 10px; position: sticky; left: 0; background: var(--bg); z-index: 1; }
-.mygrid td { padding: 0; min-width: 44px; }
-.mg { display: flex; align-items: center; justify-content: center; height: 34px; min-width: 44px; border-radius: 6px; font-size: .9rem; }
-.mg + .mg { margin-top: 4px; }
-.mg-me { background: var(--stand, var(--primary)); color: #fff; font-weight: 600; }
-.mg-me.clash { box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--danger); }
-.mg-free { border: 1px dashed var(--border); color: var(--muted); }
-.mg-free:hover { border-color: var(--primary); color: var(--primary); text-decoration: none; }
-.mg-other { background: var(--surface-2); color: var(--muted); }
-.legend { font-size: .8rem; color: var(--muted); display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; margin: 10px 0 0; }
-.mg.sample { display: inline-flex; height: 20px; min-width: 24px; font-size: .75rem; border-radius: 4px; }
-.mg-me.sample:not(.clash) { background: var(--primary); }
-.mg-me.clash.sample { background: var(--muted); }
+.myplan .meta { color: var(--muted); margin: 0 0 12px; }

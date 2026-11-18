@@ -71,7 +71,7 @@ func TestBuildPlanning(t *testing.T) {
 	if p.Needed != 7 || p.Count != 2 || p.Missing != 5 {
 		t.Errorf("totals: needed %d count %d missing %d", p.Needed, p.Count, p.Missing)
 	}
-	peche := p.Stand(1)
+	peche := p.Stands[0] // stand 1
 	if peche.Slots[0].ID != 10 || peche.Slots[0].Status != FillPartial || !peche.Slots[0].Mine {
 		t.Errorf("unexpected first slot: %+v", peche.Slots[0])
 	}
