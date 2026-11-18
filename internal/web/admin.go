@@ -1,6 +1,7 @@
 package web
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"net/http"
@@ -396,57 +397,21 @@ func (s *Server) adminDeleteEvent(w http.ResponseWriter, r *http.Request, ev *mo
 	redirect(w, r, "/")
 }
 
-// ---- print view ----
+// ---- planning PDF ----
 
-type printPage struct {
-	Event    *model.Event
-	MultiDay bool
-	Stands   []printStand
-}
-
-// printStand is one printed page: a stand and the lines of its table.
-type printStand struct {
-	*model.StandView
-	Rows []printRow
-}
-
-// printRow is a line of a stand's printed table: a volunteer, or an empty
-// line where a missing person can be written by hand.
-type printRow struct {
-	Slot    *model.SlotView
-	Signup  *model.SignupRow // nil for an empty line
-	Rowspan int              // on a slot's first line: how many lines its time cell covers
-}
-
-// printRows lists, for each slot, its volunteers then one empty line per
-// missing person (at least one line per slot).
-func printRows(st *model.StandView) []printRow {
-	var rows []printRow
-	for _, sl := range st.Slots {
-		n := max(sl.Count+sl.Missing, 1)
-		for i := range n {
-			row := printRow{Slot: sl}
-			if i == 0 {
-				row.Rowspan = n
-			}
-			if i < len(sl.Signups) {
-				row.Signup = &sl.Signups[i]
-			}
-			rows = append(rows, row)
-		}
-	}
-	return rows
-}
-
-func (s *Server) adminPrint(w http.ResponseWriter, r *http.Request, ev *model.Event) {
+// adminPDF sends the planning as a PDF to print: one page per stand.
+func (s *Server) adminPDF(w http.ResponseWriter, r *http.Request, ev *model.Event) {
 	p, err := s.planning(r.Context(), ev, 0)
 	if err != nil {
 		s.serverError(w, r, err)
 		return
 	}
-	page := printPage{Event: ev, MultiDay: p.MultiDay}
-	for _, st := range p.Stands {
-		page.Stands = append(page.Stands, printStand{StandView: st, Rows: printRows(st)})
+	var buf bytes.Buffer
+	if err := writePlanningPDF(&buf, ev, p, s.now()); err != nil {
+		s.serverError(w, r, err)
+		return
 	}
-	s.renderTemplate(w, r, http.StatusOK, "print", "print", page)
+	w.Header().Set("Content-Type", "application/pdf")
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="planning-%s.pdf"`, store.Slugify(ev.Title)))
+	buf.WriteTo(w)
 }

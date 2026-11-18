@@ -206,7 +206,7 @@ func TestRecoverPanics(t *testing.T) {
 	s := &Server{log: slog.New(slog.NewTextHandler(&logs, nil))}
 	h := s.recoverPanics(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { panic("boom") }))
 	w := httptest.NewRecorder()
-	h.ServeHTTP(w, httptest.NewRequest("GET", "/a/SECRETTOKEN/print", nil))
+	h.ServeHTTP(w, httptest.NewRequest("GET", "/a/SECRETTOKEN/planning.pdf", nil))
 	if w.Code != http.StatusInternalServerError {
 		t.Errorf("status %d", w.Code)
 	}
@@ -266,7 +266,6 @@ func TestNoScriptInjection(t *testing.T) {
 		"stand page":    e.get(e.client(), pub+"/stands/"+standID),
 		"stand dialog":  e.do(e.client(), "GET", pub+"/stands/"+standID, nil, htmx),
 		"admin":         e.get(admin, adminPath),
-		"print":         e.get(admin, adminPath+"/print"),
 		"signup error":  e.post(e.client(), pub+"/slots/"+slots[0]+"/signup", url.Values{"name": {payloads[0]}, "phone": {payloads[1]}}),
 	}
 	for name, r := range pages {

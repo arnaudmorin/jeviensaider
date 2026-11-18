@@ -26,7 +26,9 @@ in a single SQLite file.
 - Open and close sign-ups.
 - Add a volunteer by hand.
 - Export to CSV; the file opens directly in French Excel.
-- Print the planning, one A4 page per stand.
+- Download the planning as a PDF to print and post on the day: one A4 page
+  per stand, with empty lines to write in the missing names. Lines shrink to
+  keep a stand on one page; a very long stand continues on the next pages.
 - Duplicate an event to reuse it next year.
 - Erase personal data after the event (GDPR). Whole events are also deleted
   automatically 60 days after they end, and the admin page shows the date.

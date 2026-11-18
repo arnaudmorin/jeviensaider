@@ -111,7 +111,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /a/{token}/signups", s.withAdmin(s.adminAddSignup))
 	mux.HandleFunc("POST /a/{token}/signups/{id}/delete", s.withAdmin(s.adminDeleteSignup))
 	mux.HandleFunc("GET /a/{token}/export.csv", s.withAdmin(s.adminExportCSV))
-	mux.HandleFunc("GET /a/{token}/print", s.withAdmin(s.adminPrint))
+	mux.HandleFunc("GET /a/{token}/planning.pdf", s.withAdmin(s.adminPDF))
 	mux.HandleFunc("POST /a/{token}/purge", s.withAdmin(s.adminPurge))
 	mux.HandleFunc("POST /a/{token}/duplicate", s.withAdmin(s.adminDuplicate))
 	mux.HandleFunc("POST /a/{token}/delete", s.withAdmin(s.adminDeleteEvent))

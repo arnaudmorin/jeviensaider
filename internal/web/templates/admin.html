@@ -40,7 +40,7 @@
   <p><strong>{{.P.Count}}/{{.P.Needed}}</strong> places couvertes · {{.Volunteers}} {{plural .Volunteers "bénévole" "bénévoles"}}{{if .P.Missing}} · <span class="missing">{{.P.Missing}} {{plural .P.Missing "manquante" "manquantes"}}</span>{{end}}</p>
   <div>
     <a class="btn text small" href="{{$a}}/export.csv">Exporter CSV</a>
-    <a class="btn text small" href="{{$a}}/print" target="_blank" rel="noopener">Imprimer</a>
+    <a class="btn text small" href="{{$a}}/planning.pdf">Exporter PDF</a>
   </div>
 </div>
 {{template "progress" .P}}

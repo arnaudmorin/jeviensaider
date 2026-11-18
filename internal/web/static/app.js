@@ -68,7 +68,6 @@
     }
 
     if (t.closest("[data-back]")) { history.back(); return; }
-    if (t.closest("[data-print]")) { window.print(); return; }
   });
 
   // Confirmation for destructive forms: <form data-confirm="Sûr ?">.

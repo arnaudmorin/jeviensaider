@@ -23,11 +23,11 @@ var templateFS embed.FS
 //go:embed static
 var staticFS embed.FS
 
-var pageNames = []string{"home", "event", "signup", "stand", "admin", "print", "error"}
+var pageNames = []string{"home", "event", "signup", "stand", "admin", "error"}
 
 func (s *Server) loadTemplates() error {
 	sum := sha256.New()
-	for _, f := range []string{"static/app.css", "static/print.css", "static/app.js", "static/htmx.min.js"} {
+	for _, f := range []string{"static/app.css", "static/app.js", "static/htmx.min.js"} {
 		b, err := staticFS.ReadFile(f)
 		if err != nil {
 			return err

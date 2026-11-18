@@ -122,7 +122,11 @@ Derived notions (computed, not stored):
   the status, capacity still applies), remove a sign-up.
 - CSV export (`;`, UTF-8 BOM for Excel, one line per sign-up and one per
   missing person, formula injection neutralised).
-- Printable planning (one page per stand).
+- Planning as a PDF to print (`/a/<token>/planning.pdf`): one A4 page per
+  stand, with a line per volunteer and an empty line per missing person.
+  Lines and text shrink (down to a readable minimum) to keep a stand on one
+  page; a longer stand continues on more pages, without cutting a slot when
+  it fits on one page.
 - Erase personal data (keeps stands and slots).
 - Duplicate the event (stands and slots, shifted to a new date; asks for the
   creation password when one is configured).
@@ -223,6 +227,7 @@ internal/web/        HTTP handlers, middleware, templates, static files
   notify.go          organiser e-mails
   mailbudget.go      e-mail limits
   export.go          CSV export
+  pdf.go             planning PDF (layout, then drawing with gopdf)
   templates/, static/
 deploy/              systemd unit, Caddy and nginx examples
 ```

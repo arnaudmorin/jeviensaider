@@ -269,7 +269,11 @@ func TestOrganiserViews(t *testing.T) {
 	if !strings.HasPrefix(r.body, "\ufeff") || r.header.Get("Content-Type") != "text/csv; charset=utf-8" {
 		t.Error("CSV must start with a BOM and have the right content type")
 	}
-	expect(t, e.get(admin, adminPath+"/print"), 200, "Pêche aux canards", "Marie Dupont", `class="page"`, `rowspan="2"`)
+	r = e.get(admin, adminPath+"/planning.pdf")
+	expect(t, r, 200, "%PDF-")
+	if r.header.Get("Content-Type") != "application/pdf" || !strings.Contains(r.header.Get("Content-Disposition"), `filename="planning-fete-de-l-ecole.pdf"`) {
+		t.Errorf("PDF headers: %v", r.header)
+	}
 }
 
 func TestCancelFromPersonalPage(t *testing.T) {
@@ -316,7 +320,7 @@ func TestAdminTokenGating(t *testing.T) {
 	e := newEnv(t, Config{})
 	c := e.client()
 	adminPath, _, _ := setupEvent(t, e, c)
-	for _, p := range []string{"/a/nope", "/a/nope/export.csv", "/a/nope/print"} {
+	for _, p := range []string{"/a/nope", "/a/nope/export.csv", "/a/nope/planning.pdf"} {
 		expect(t, e.get(c, p), 404)
 	}
 	expect(t, e.post(c, "/a/nope/stands", url.Values{"name": {"X"}}), 404)
