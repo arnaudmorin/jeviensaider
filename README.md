@@ -1,4 +1,4 @@
-# Je viens aider
+# <img src="internal/web/static/logo.svg" alt="" width="40" height="40" align="top"> Je viens aider
 
 [![build](https://github.com/arnaudmorin/jeviensaider/actions/workflows/build.yml/badge.svg?branch=master)](https://github.com/arnaudmorin/jeviensaider/actions/workflows/build.yml)
 

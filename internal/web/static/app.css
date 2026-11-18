@@ -5,10 +5,10 @@
   --text: #202124;
   --muted: #5f6368;
   --border: #dadce0;
-  --primary: #1a73e8;
-  --primary-hover: #1765cc;
-  --primary-tonal: #e8f0fe;
-  --primary-on-tonal: #174ea6;
+  --primary: #c9510c;
+  --primary-hover: #b0460a;
+  --primary-tonal: #fff1e8;
+  --primary-on-tonal: #9a3412;
   --danger: #d93025;
   --radius: 8px;
 
@@ -40,7 +40,8 @@ main.container { padding-top: 1.5rem; padding-bottom: 3rem; }
 
 .topbar { border-bottom: 1px solid var(--border); }
 .topbar .container { display: flex; align-items: center; height: 56px; }
-.brand { font-size: 1.3rem; color: var(--muted); }
+.brand { font-size: 1.3rem; color: var(--muted); display: inline-flex; align-items: center; gap: .5rem; }
+.brand img { display: block; }
 .brand:hover { text-decoration: none; }
 .brand b { color: var(--text); font-weight: 500; }
 
@@ -53,11 +54,11 @@ main.container { padding-top: 1.5rem; padding-bottom: 3rem; }
 }
 .btn:hover { background: var(--primary-hover); text-decoration: none; box-shadow: 0 1px 2px rgba(60, 64, 67, .3); }
 .btn.text { background: transparent; color: var(--primary); padding: 0 12px; }
-.btn.text:hover { background: rgba(26, 115, 232, .08); box-shadow: none; }
+.btn.text:hover { background: rgba(201, 81, 12, .08); box-shadow: none; }
 .btn.tonal { background: var(--primary-tonal); color: var(--primary-on-tonal); }
 .btn.tonal:hover { background: #d2e3fc; box-shadow: none; }
 .btn.outlined { background: transparent; color: var(--primary); border-color: var(--border); }
-.btn.outlined:hover { background: rgba(26, 115, 232, .04); box-shadow: none; }
+.btn.outlined:hover { background: rgba(201, 81, 12, .04); box-shadow: none; }
 .btn.danger { background: var(--danger); }
 .btn.text.danger, .btn.outlined.danger { background: transparent; color: var(--danger); }
 .btn.text.danger:hover { background: rgba(217, 48, 37, .08); }

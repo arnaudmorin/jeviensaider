@@ -4,14 +4,16 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#ff7a45">
 <title>{{.Title}}</title>
+<link rel="icon" href="{{asset "logo.svg"}}" type="image/svg+xml">
 <link rel="stylesheet" href="{{asset "app.css"}}">
 <script src="{{asset "htmx.min.js"}}" defer></script>
 <script src="{{asset "app.js"}}" defer></script>
 </head>
 <body>
 <header class="topbar">
-  <div class="container"><a href="/" class="brand">Je viens <b>aider</b></a></div>
+  <div class="container"><a href="/" class="brand"><img src="{{asset "logo.svg"}}" alt="" width="28" height="28"><span>Je viens <b>aider</b></span></a></div>
 </header>
 <main class="container" id="main">
 {{template "flash" .Flash}}
