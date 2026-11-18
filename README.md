@@ -263,8 +263,8 @@ internal/web/      handlers, middleware, embedded templates and static files (ht
 The [GitHub Actions workflow](.github/workflows/build.yml) runs on every push
 or pull request to `master`, and once a week:
 
-- `gofmt`, `go vet`, the tests with the race detector, and
-  [`govulncheck`](https://go.dev/doc/security/vuln/) to catch known
+- `gofmt`, `go vet`, [`staticcheck`](https://staticcheck.dev), the tests with
+  the race detector, and [`govulncheck`](https://go.dev/doc/security/vuln/) to catch known
   vulnerabilities in Go and the dependencies (the weekly run catches newly
   published ones);
 - the three Linux binaries;

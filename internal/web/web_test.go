@@ -151,6 +151,24 @@ func setupEvent(t *testing.T, e *env, admin *http.Client) (adminPath, publicPath
 	return adminPath, publicPath, uniq
 }
 
+// openEventWithSlot creates an event from form (dated 2026-06-20), adds a
+// "Buvette" stand with one 14h–15h slot for 2 people, opens the event, and
+// returns the admin path, the public path and the slot ID.
+func openEventWithSlot(t *testing.T, e *env, admin *http.Client, form url.Values) (adminPath, pub, slot string) {
+	t.Helper()
+	form.Set("date", "2026-06-20")
+	r := e.post(admin, "/events", form)
+	expect(t, r, http.StatusSeeOther)
+	adminPath = r.location
+	expect(t, e.post(admin, adminPath+"/stands", url.Values{"name": {"Buvette"}}), http.StatusSeeOther)
+	standID := regexp.MustCompile(`id="stand-(\d+)"`).FindStringSubmatch(e.get(admin, adminPath).body)[1]
+	expect(t, e.post(admin, adminPath+"/stands/"+standID+"/slots", url.Values{"date": {"2026-06-20"}, "from": {"14:00"}, "to": {"15:00"}, "step": {"60"}, "min": {"2"}}), http.StatusSeeOther)
+	expect(t, e.post(admin, adminPath+"/status", url.Values{"status": {"open"}}), http.StatusSeeOther)
+	pub = regexp.MustCompile(`href="(/e/[^"]+)" target="_blank"`).FindStringSubmatch(e.get(admin, adminPath).body)[1]
+	slot = slotLinkRe.FindStringSubmatch(e.get(e.client(), pub).body)[1]
+	return adminPath, pub, slot
+}
+
 func TestFullFlow(t *testing.T) {
 	e := newEnv(t, Config{})
 	admin := e.client()

@@ -17,10 +17,9 @@ func scanSlot(row interface{ Scan(...any) error }) (model.Slot, error) {
 	return sl, err
 }
 
-func listSlots(ctx context.Context, q querier, eventID int64) ([]model.Slot, error) {
-	rows, err := q.QueryContext(ctx,
-		`SELECT `+slotCols+` FROM slots sl JOIN stands st ON st.id = sl.stand_id
-		 WHERE st.event_id = ? ORDER BY sl.starts_at, sl.ends_at, st.position`, eventID)
+// querySlots runs a query selecting slotCols.
+func querySlots(ctx context.Context, q querier, query string, args ...any) ([]model.Slot, error) {
+	rows, err := q.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -34,6 +33,11 @@ func listSlots(ctx context.Context, q querier, eventID int64) ([]model.Slot, err
 		out = append(out, sl)
 	}
 	return out, rows.Err()
+}
+
+func listSlots(ctx context.Context, q querier, eventID int64) ([]model.Slot, error) {
+	return querySlots(ctx, q, `SELECT `+slotCols+` FROM slots sl JOIN stands st ON st.id = sl.stand_id
+		 WHERE st.event_id = ? ORDER BY sl.starts_at, sl.ends_at, st.position`, eventID)
 }
 
 // ListSlots returns every slot of an event, chronologically.
@@ -89,6 +93,7 @@ func (s *Store) UpdateSlot(ctx context.Context, eventID int64, sl model.Slot) er
 		fmtTime(sl.StartsAt), fmtTime(sl.EndsAt), sl.MinPeople, nullInt(sl.MaxPeople), sl.ID, eventID))
 }
 
+// DeleteSlot deletes a slot of the event with its sign-ups.
 func (s *Store) DeleteSlot(ctx context.Context, eventID, id int64) error {
 	return affectedOne(s.db.ExecContext(ctx,
 		`DELETE FROM slots WHERE id = ? AND stand_id IN (SELECT id FROM stands WHERE event_id = ?)`, id, eventID))

@@ -120,6 +120,12 @@ func (s *Server) parseDateTime(date, hhmm string) (time.Time, error) {
 	return t, nil
 }
 
+// userError is a message for the visitor, shown as is: a full French
+// sentence, capitalised and punctuated (unlike ordinary Go errors).
+type userError string
+
+func (e userError) Error() string { return string(e) }
+
 // volunteerForm is what a volunteer types in the sign-up form.
 type volunteerForm struct {
 	Name    string
@@ -154,10 +160,10 @@ func validEmail(s string) bool {
 // checkAdminEmail validates the organiser's e-mail, which is mandatory.
 func checkAdminEmail(email string) error {
 	if email == "" {
-		return errors.New("Indiquez votre e-mail : il recevra le lien d'administration de l'événement.")
+		return userError("Indiquez votre e-mail : il recevra le lien d'administration de l'événement.")
 	}
 	if !validEmail(email) {
-		return errors.New("L'adresse e-mail de l'organisateur ne semble pas valide.")
+		return userError("L'adresse e-mail de l'organisateur ne semble pas valide.")
 	}
 	return nil
 }
@@ -165,10 +171,10 @@ func checkAdminEmail(email string) error {
 // validate checks a volunteer form: only the name is required.
 func (f volunteerForm) validate() error {
 	if f.Name == "" {
-		return errors.New("Merci d'indiquer votre nom.")
+		return userError("Merci d'indiquer votre nom.")
 	}
 	if f.Phone != "" && !phoneRe.MatchString(f.Phone) {
-		return errors.New("Le numéro de téléphone ne semble pas valide.")
+		return userError("Le numéro de téléphone ne semble pas valide.")
 	}
 	return nil
 }

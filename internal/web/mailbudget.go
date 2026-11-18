@@ -77,16 +77,18 @@ func (c *windowCounter) allow(key string, max int, now time.Time) bool {
 	return n >= 1 && n <= max
 }
 
-// mailBudget holds the counters of the limits above.
+// mailBudget holds the limits and their counters.
 type mailBudget struct {
+	limits    MailLimits
 	createdTo *windowCounter // per recipient, per day
 	created   *windowCounter // all "created" mails, per hour
 	signups   *windowCounter // per event, per hour
 	all       *windowCounter // all mails, per hour
 }
 
-func newMailBudget() *mailBudget {
+func newMailBudget(limits MailLimits) *mailBudget {
 	return &mailBudget{
+		limits:    limits,
 		createdTo: newWindowCounter(24 * time.Hour),
 		created:   newWindowCounter(time.Hour),
 		signups:   newWindowCounter(time.Hour),

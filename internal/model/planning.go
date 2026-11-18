@@ -168,6 +168,18 @@ func (p *Planning) Stand(id int64) *StandView {
 	return nil
 }
 
+// Slot returns the slot view with the given id, or nil.
+func (p *Planning) Slot(id int64) *SlotView {
+	for _, st := range p.Stands {
+		for _, v := range st.Slots {
+			if v.ID == id {
+				return v
+			}
+		}
+	}
+	return nil
+}
+
 // Mine is the planning restricted to the stands where the current volunteer
 // has signed up: their personal overview.
 func (p *Planning) Mine() *Planning {

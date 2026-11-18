@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -181,7 +182,7 @@ func (c *eventsCmd) show(ctx context.Context, st *store.Store, args []string) er
 
 func (c *eventsCmd) delete(ctx context.Context, st *store.Store, args []string) error {
 	if len(args) == 0 {
-		return fmt.Errorf("usage: benevole events delete [-y] <event>...")
+		return errors.New("usage: benevole events delete [-y] <event> [<event> ...]")
 	}
 	events, err := st.ListEventSummaries(ctx)
 	if err != nil {

@@ -76,3 +76,28 @@ func TestEventLimits(t *testing.T) {
 		t.Fatalf("slots: %d, want %d", len(all), MaxSlots)
 	}
 }
+
+func TestRenewVolunteerToken(t *testing.T) {
+	s := openTest(t)
+	ev, _, slots := fixture(t, s, 0)
+	res, err := s.SignUp(ctx, SignupRequest{EventID: ev.ID, SlotID: slots[0].ID, Name: "Marie"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	v := res.Volunteer
+	old := v.EditToken
+	if err := s.RenewVolunteerToken(ctx, v); err != nil || v.EditToken == old || len(v.EditToken) < 40 {
+		t.Fatalf("renew: %v, token %q", err, v.EditToken)
+	}
+	if _, err := s.VolunteerByToken(ctx, ev.ID, old); !errors.Is(err, ErrNotFound) {
+		t.Errorf("old token still works: %v", err)
+	}
+	got, err := s.VolunteerByToken(ctx, ev.ID, v.EditToken)
+	if err != nil || got.ID != v.ID {
+		t.Errorf("new token: %+v %v", got, err)
+	}
+	v.ID = 999999
+	if err := s.RenewVolunteerToken(ctx, v); !errors.Is(err, ErrNotFound) {
+		t.Errorf("unknown volunteer: %v", err)
+	}
+}

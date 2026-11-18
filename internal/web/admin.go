@@ -176,7 +176,7 @@ func readStand(r *http.Request, ev *model.Event) (*model.Stand, error) {
 		Color:       r.FormValue("color"),
 	}
 	if st.Name == "" {
-		return nil, errors.New("Le nom du stand est obligatoire.")
+		return nil, userError("Le nom du stand est obligatoire.")
 	}
 	if !validColor(st.Color) {
 		st.Color = defaultColor

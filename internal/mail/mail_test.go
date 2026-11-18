@@ -407,3 +407,29 @@ func TestPermanentAndLocalAddr(t *testing.T) {
 		}
 	}
 }
+
+func TestLogSenderNeverLogsTheBody(t *testing.T) {
+	var logs strings.Builder
+	l := Log{Logger: slog.New(slog.NewTextHandler(&logs, nil))}
+	if err := l.Send(context.Background(), Message{To: "orga@example.org", Subject: "Créé", Body: "https://x/a/SECRETTOKEN"}); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(logs.String(), "orga@example.org") || strings.Contains(logs.String(), "SECRETTOKEN") {
+		t.Errorf("log: %s", logs.String())
+	}
+}
+
+func TestSendRejectsBadRecipientPermanently(t *testing.T) {
+	s, err := NewSMTP(Config{Host: "127.0.0.1", Port: 1, From: "a@b.fr", TLS: TLSNone})
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = s.Send(context.Background(), Message{To: "not an address", Subject: "s", Body: "b"})
+	if err == nil || !Permanent(err) || !strings.Contains(err.Error(), "not an address") {
+		t.Errorf("bad recipient: %v (permanent %v)", err, Permanent(err))
+	}
+	var pe permanentError
+	if !errors.As(err, &pe) || errors.Unwrap(err) == nil {
+		t.Error("permanent error does not unwrap")
+	}
+}

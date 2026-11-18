@@ -45,7 +45,6 @@ type Server struct {
 	assetVersion string
 	limiter      *limiter
 	mails        *mailBudget
-	limits       MailLimits
 }
 
 // New builds a Server and parses its templates.
@@ -57,11 +56,12 @@ func New(st *store.Store, cfg Config) (*Server, error) {
 		cfg.PostsPerMinute = 60
 	}
 	cfg.BaseURL = strings.TrimRight(cfg.BaseURL, "/")
-	s := &Server{store: st, cfg: cfg, log: cfg.Logger, limiter: newLimiter(cfg.PostsPerMinute), mails: newMailBudget()}
-	s.limits = DefaultMailLimits()
+	s := &Server{store: st, cfg: cfg, log: cfg.Logger, limiter: newLimiter(cfg.PostsPerMinute)}
+	limits := DefaultMailLimits()
 	if cfg.MailLimits != nil {
-		s.limits = *cfg.MailLimits
+		limits = *cfg.MailLimits
 	}
+	s.mails = newMailBudget(limits)
 	if err := s.loadTemplates(); err != nil {
 		return nil, err
 	}

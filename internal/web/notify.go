@@ -92,8 +92,8 @@ func (s *Server) sendMail(m mail.Message) bool {
 	if s.cfg.Mailer == nil || m.To == "" || m.Body == "" {
 		return false
 	}
-	if !s.mails.all.allow("", s.limits.PerHour, now()) {
-		s.log.Warn("mail not sent: hourly limit of the site reached", "limit", s.limits.PerHour, "to", m.To, "subject", m.Subject)
+	if !s.mails.all.allow("", s.mails.limits.PerHour, now()) {
+		s.log.Warn("mail not sent: hourly limit of the site reached", "limit", s.mails.limits.PerHour, "to", m.To, "subject", m.Subject)
 		return false
 	}
 	s.cfg.Mailer.Enqueue(m)
@@ -108,12 +108,12 @@ func (s *Server) notifyCreated(r *http.Request, ev *model.Event) bool {
 		return false
 	}
 	t := now()
-	if !s.mails.createdTo.allow(strings.ToLower(ev.AdminEmail), s.limits.CreatedPerAddressPerDay, t) {
-		s.log.Warn("creation mail not sent: too many for this address today", "limit", s.limits.CreatedPerAddressPerDay, "to", ev.AdminEmail)
+	if !s.mails.createdTo.allow(strings.ToLower(ev.AdminEmail), s.mails.limits.CreatedPerAddressPerDay, t) {
+		s.log.Warn("creation mail not sent: too many for this address today", "limit", s.mails.limits.CreatedPerAddressPerDay, "to", ev.AdminEmail)
 		return false
 	}
-	if !s.mails.created.allow("", s.limits.CreatedPerHour, t) {
-		s.log.Warn("creation mail not sent: too many events created this hour", "limit", s.limits.CreatedPerHour, "to", ev.AdminEmail)
+	if !s.mails.created.allow("", s.mails.limits.CreatedPerHour, t) {
+		s.log.Warn("creation mail not sent: too many events created this hour", "limit", s.mails.limits.CreatedPerHour, "to", ev.AdminEmail)
 		return false
 	}
 	return s.sendMail(mail.Message{
@@ -138,22 +138,15 @@ func (s *Server) notifySignup(ctx context.Context, r *http.Request, ev *model.Ev
 		s.log.Error("notify: load planning", "err", err)
 		return
 	}
-	var sv *model.SlotView
-	for _, st := range p.Stands {
-		for _, v := range st.Slots {
-			if v.ID == slotID {
-				sv = v
-			}
-		}
-	}
+	sv := p.Slot(slotID)
 	if sv == nil {
 		return
 	}
 	n, until := 0, time.Time{}
-	if max := s.limits.SignupsPerEventPerHour; max > 0 {
+	if max := s.mails.limits.SignupsPerEventPerHour; max > 0 {
 		n, until = s.mails.signups.hit(strconv.FormatInt(ev.ID, 10), now())
 	}
-	switch max := s.limits.SignupsPerEventPerHour; {
+	switch max := s.mails.limits.SignupsPerEventPerHour; {
 	case max <= 0:
 	case n == max+1:
 		// Once over the limit (a busy hour, or someone signing up and

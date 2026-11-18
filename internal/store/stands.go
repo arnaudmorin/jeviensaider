@@ -35,17 +35,6 @@ func (s *Store) ListStands(ctx context.Context, eventID int64) ([]model.Stand, e
 	return listStands(ctx, s.db, eventID)
 }
 
-func (s *Store) GetStand(ctx context.Context, eventID, id int64) (*model.Stand, error) {
-	var st model.Stand
-	err := s.db.QueryRowContext(ctx,
-		`SELECT id, event_id, name, description, position, color FROM stands WHERE id = ? AND event_id = ?`, id, eventID).
-		Scan(&st.ID, &st.EventID, &st.Name, &st.Description, &st.Position, &st.Color)
-	if err != nil {
-		return nil, notFound(err)
-	}
-	return &st, nil
-}
-
 // CreateStand appends a stand at the end of the event's list.
 func (s *Store) CreateStand(ctx context.Context, st *model.Stand) error {
 	return s.withTx(ctx, func(tx *sql.Tx) error {
@@ -68,12 +57,14 @@ func (s *Store) CreateStand(ctx context.Context, st *model.Stand) error {
 	})
 }
 
+// UpdateStand saves the name, description and colour of a stand.
 func (s *Store) UpdateStand(ctx context.Context, st *model.Stand) error {
 	return affectedOne(s.db.ExecContext(ctx,
 		`UPDATE stands SET name = ?, description = ?, color = ? WHERE id = ? AND event_id = ?`,
 		st.Name, st.Description, st.Color, st.ID, st.EventID))
 }
 
+// DeleteStand deletes a stand with its slots and sign-ups.
 func (s *Store) DeleteStand(ctx context.Context, eventID, id int64) error {
 	return affectedOne(s.db.ExecContext(ctx, `DELETE FROM stands WHERE id = ? AND event_id = ?`, id, eventID))
 }

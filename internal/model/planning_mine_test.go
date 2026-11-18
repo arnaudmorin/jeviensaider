@@ -35,6 +35,13 @@ func TestMinePlanning(t *testing.T) {
 		t.Errorf("MyDuration = %v", got)
 	}
 
+	if v := p.Slot(20); v == nil || v.Stand.Name != "Buvette" || !v.Mine {
+		t.Errorf("Slot(20) = %+v", v)
+	}
+	if p.Slot(99) != nil {
+		t.Error("Slot(99) found")
+	}
+
 	m := p.Mine()
 	if len(m.Stands) != 2 || m.Stands[0].ID != 1 || m.Stands[1].ID != 2 {
 		t.Fatalf("Mine stands: %+v", m.Stands)

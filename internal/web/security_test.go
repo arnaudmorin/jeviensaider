@@ -1,6 +1,8 @@
 package web
 
 import (
+	"bytes"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -276,4 +278,29 @@ func TestDateLimitsKeepForever(t *testing.T) {
 	// A long retention also widens the past window (here 3 years).
 	e = newEnv(t, Config{RetentionDays: 3 * 365})
 	expect(t, e.post(e.client(), "/events", url.Values{"admin_email": {"orga@example.org"}, "title": {"Old"}, "date": {"2024-01-15"}}), http.StatusSeeOther)
+}
+
+// A panic in a handler gives a 500 page and a log line without the
+// secret token of the URL.
+func TestRecoverPanics(t *testing.T) {
+	var logs bytes.Buffer
+	s := &Server{log: slog.New(slog.NewTextHandler(&logs, nil))}
+	h := s.recoverPanics(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { panic("boom") }))
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, httptest.NewRequest("GET", "/a/SECRETTOKEN/print", nil))
+	if w.Code != http.StatusInternalServerError {
+		t.Errorf("status %d", w.Code)
+	}
+	if !strings.Contains(logs.String(), "boom") || strings.Contains(logs.String(), "SECRETTOKEN") {
+		t.Errorf("log: %s", logs.String())
+	}
+
+	// http.ErrAbortHandler is passed on: it is how a handler aborts a response.
+	abort := s.recoverPanics(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { panic(http.ErrAbortHandler) }))
+	defer func() {
+		if v := recover(); v != http.ErrAbortHandler {
+			t.Errorf("recovered %v", v)
+		}
+	}()
+	abort.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest("GET", "/", nil))
 }

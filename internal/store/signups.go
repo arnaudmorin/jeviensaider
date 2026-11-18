@@ -157,24 +157,10 @@ func (s *Store) SignUp(ctx context.Context, req SignupRequest) (*SignupResult, e
 }
 
 func volunteerSlots(ctx context.Context, q querier, volunteerID int64) ([]model.Slot, error) {
-	rows, err := q.QueryContext(ctx,
+	return querySlots(ctx, q,
 		`SELECT `+slotCols+` FROM slots sl JOIN signups su ON su.slot_id = sl.id WHERE su.volunteer_id = ? ORDER BY sl.starts_at`, volunteerID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var out []model.Slot
-	for rows.Next() {
-		sl, err := scanSlot(rows)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, sl)
-	}
-	return out, rows.Err()
 }
 
-// CancelSignup removes one of the volunteer's own sign-ups.
 // CancelSignup removes one of the volunteer's sign-ups and returns its slot.
 func (s *Store) CancelSignup(ctx context.Context, volunteerID, signupID int64) (slotID int64, err error) {
 	err = s.db.QueryRowContext(ctx,

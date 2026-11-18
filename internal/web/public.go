@@ -83,6 +83,20 @@ func (s *Server) createPasswordOK(r *http.Request) bool {
 		subtle.ConstantTimeCompare([]byte(r.FormValue("password")), []byte(s.cfg.CreatePassword)) == 1
 }
 
+// Messages shown when the event does not accept changes.
+const (
+	msgNotOpenYet = "Les inscriptions ne sont pas encore ouvertes. Revenez bientôt !"
+	msgClosed     = "Les inscriptions sont closes : contactez l'APE pour toute modification."
+)
+
+// volunteerID is v's ID, or 0 for an unknown visitor.
+func volunteerID(v *model.Volunteer) int64 {
+	if v == nil {
+		return 0
+	}
+	return v.ID
+}
+
 // ---- event loading helpers ----
 
 func (s *Server) withEvent(h func(http.ResponseWriter, *http.Request, *model.Event)) http.HandlerFunc {
@@ -105,7 +119,6 @@ func (s *Server) withEvent(h func(http.ResponseWriter, *http.Request, *model.Eve
 
 func (s *Server) withVolunteer(h func(http.ResponseWriter, *http.Request, *model.Event, *model.Volunteer)) http.HandlerFunc {
 	return s.withEvent(func(w http.ResponseWriter, r *http.Request, ev *model.Event) {
-		w.Header().Set("Cache-Control", "no-store")
 		vol, err := s.store.VolunteerByToken(r.Context(), ev.ID, r.PathValue("token"))
 		if errors.Is(err, store.ErrNotFound) {
 			s.renderError(w, r, http.StatusNotFound, "Ce lien personnel n'est pas (ou plus) valide.")
@@ -190,11 +203,7 @@ func (s *Server) mePage(w http.ResponseWriter, r *http.Request, ev *model.Event,
 }
 
 func (s *Server) showEvent(w http.ResponseWriter, r *http.Request, ev *model.Event, me *model.Volunteer, meTab bool) {
-	var myID int64
-	if me != nil {
-		myID = me.ID
-	}
-	p, err := s.planning(r.Context(), ev, myID)
+	p, err := s.planning(r.Context(), ev, volunteerID(me))
 	if err != nil {
 		s.serverError(w, r, err)
 		return
@@ -246,21 +255,18 @@ func (s *Server) loadSlotView(ctx context.Context, ev *model.Event, slotID, myID
 	if err != nil {
 		return nil, nil, err
 	}
-	for _, st := range p.Stands {
-		for _, sl := range st.Slots {
-			if sl.ID == slotID {
-				return sl, p.MyOverlaps(sl), nil
-			}
-		}
+	sv := p.Slot(slotID)
+	if sv == nil {
+		return nil, nil, store.ErrNotFound
 	}
-	return nil, nil, store.ErrNotFound
+	return sv, p.MyOverlaps(sv), nil
 }
 
 func (s *Server) signupForm(w http.ResponseWriter, r *http.Request, ev *model.Event) {
 	id, ok := pathID(r, "id")
 	if ev.IsDraft() {
 		// The planning of a draft is not public yet.
-		s.renderError(w, r, http.StatusNotFound, "Les inscriptions ne sont pas encore ouvertes. Revenez bientôt !")
+		s.renderError(w, r, http.StatusNotFound, msgNotOpenYet)
 		return
 	}
 	if !ok {
@@ -268,13 +274,11 @@ func (s *Server) signupForm(w http.ResponseWriter, r *http.Request, ev *model.Ev
 		return
 	}
 	me := s.cookieVolunteer(r, ev)
-	var myID int64
 	data := signupPage{Common: s.common(w, r, "Inscription"), Event: ev, EventURL: eventURL(ev), Me: me}
 	if me != nil {
-		myID = me.ID
 		data.Form = volunteerForm{Name: me.Name, Phone: me.Phone}
 	}
-	sv, overlaps, err := s.loadSlotView(r.Context(), ev, id, myID)
+	sv, overlaps, err := s.loadSlotView(r.Context(), ev, id, volunteerID(me))
 	if s.storeError(w, r, err) {
 		return
 	}
@@ -293,7 +297,7 @@ func (s *Server) renderSignup(w http.ResponseWriter, r *http.Request, status int
 func (s *Server) signupSubmit(w http.ResponseWriter, r *http.Request, ev *model.Event) {
 	id, ok := pathID(r, "id")
 	if ev.IsDraft() {
-		s.renderError(w, r, http.StatusNotFound, "Les inscriptions ne sont pas encore ouvertes. Revenez bientôt !")
+		s.renderError(w, r, http.StatusNotFound, msgNotOpenYet)
 		return
 	}
 	if !ok {
@@ -309,11 +313,7 @@ func (s *Server) signupSubmit(w http.ResponseWriter, r *http.Request, ev *model.
 	form := readVolunteerForm(r)
 
 	fail := func(status int, msg string) {
-		var myID int64
-		if me != nil {
-			myID = me.ID
-		}
-		sv, overlaps, err := s.loadSlotView(r.Context(), ev, id, myID)
+		sv, overlaps, err := s.loadSlotView(r.Context(), ev, id, volunteerID(me))
 		if s.storeError(w, r, err) {
 			return
 		}
@@ -374,7 +374,7 @@ func capitalize(s string) string {
 
 func (s *Server) meUpdate(w http.ResponseWriter, r *http.Request, ev *model.Event, vol *model.Volunteer) {
 	if !ev.IsOpen() {
-		setFlash(w, "error", "Les inscriptions sont closes : contactez l'APE pour toute modification.")
+		setFlash(w, "error", msgClosed)
 		redirect(w, r, meURL(ev, vol))
 		return
 	}
@@ -399,7 +399,7 @@ func (s *Server) meCancel(w http.ResponseWriter, r *http.Request, ev *model.Even
 		return
 	}
 	if !ev.IsOpen() {
-		setFlash(w, "error", "Les inscriptions sont closes : contactez l'APE pour toute modification.")
+		setFlash(w, "error", msgClosed)
 		redirect(w, r, meURL(ev, vol))
 		return
 	}
