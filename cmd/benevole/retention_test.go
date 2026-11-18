@@ -2,12 +2,156 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"strings"
 	"testing"
 
 	"benevole-ape/internal/model"
 	"benevole-ape/internal/store"
 )
+
+func TestRetentionMaxFromEnv(t *testing.T) {
+	// An empty value is "not set": compose.yaml passes an empty string when
+	// the variable is missing from .env.
+	for v, want := range map[string]int{"": 0, "  ": 0, "90": 90, " 365 ": 365} {
+		t.Setenv("BENEVOLE_RETENTION_MAX_DAYS", v)
+		if got, err := retentionMaxFromEnv(); err != nil || got != want {
+			t.Errorf("%q: got %d, %v; want %d", v, got, err, want)
+		}
+	}
+	// 0 and "off" are refused: a maximum that allows anything is no maximum.
+	for _, v := range []string{"0", "off", "forever", "-1", "abc", "1.5"} {
+		t.Setenv("BENEVOLE_RETENTION_MAX_DAYS", v)
+		if _, err := retentionMaxFromEnv(); err == nil || !strings.Contains(err.Error(), "BENEVOLE_RETENTION_MAX_DAYS") {
+			t.Errorf("%q accepted or the error does not name the variable: %v", v, err)
+		}
+	}
+}
+
+func TestNewRetention(t *testing.T) {
+	for _, c := range []struct {
+		name      string
+		days, max int
+		want      store.Retention
+	}{
+		{"nothing set", 60, 0, store.Retention{DefaultDays: 60, MaxDays: 180}},
+		{"a long default raises the unset maximum", 365, 0, store.Retention{DefaultDays: 365, MaxDays: 365}},
+		{"an explicit maximum", 60, 90, store.Retention{DefaultDays: 60, MaxDays: 90}},
+		{"the maximum equals the default", 60, 60, store.Retention{DefaultDays: 60, MaxDays: 60}},
+		{"deletion off", 0, 0, store.Retention{DefaultDays: 0, MaxDays: 180}},
+		{"deletion off, a maximum is ignored", 0, 30, store.Retention{DefaultDays: 0, MaxDays: 30}},
+	} {
+		got, err := newRetention(c.days, c.max)
+		if err != nil || got != c.want {
+			t.Errorf("%s: newRetention(%d, %d) = %+v, %v; want %+v", c.name, c.days, c.max, got, err, c.want)
+		}
+	}
+	for _, c := range []struct {
+		name      string
+		days, max int
+	}{
+		{"default above an explicit maximum", 90, 30},
+		{"negative default", -1, 0},
+		{"negative maximum", 60, -5},
+	} {
+		if got, err := newRetention(c.days, c.max); err == nil {
+			t.Errorf("%s: newRetention(%d, %d) = %+v, want an error", c.name, c.days, c.max, got)
+		}
+	}
+}
+
+func TestEventsCommandUsesTheRetentionOfEachEvent(t *testing.T) {
+	ctx := context.Background()
+	dbPath := t.TempDir() + "/x.db"
+	st, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	slugs := map[int]string{}
+	for _, days := range []int{0, 10, 400} {
+		ev := &model.Event{Title: "Fête", Date: "2026-06-20", RetentionDays: days}
+		if err := st.CreateEvent(ctx, ev); err != nil {
+			t.Fatal(err)
+		}
+		slugs[days] = ev.Slug
+	}
+	st.Close()
+	raw, err := sql.Open("sqlite", dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := raw.Exec(`UPDATE events SET created_at = '2026-01-01 10:00:00'`); err != nil {
+		t.Fatal(err)
+	}
+	raw.Close()
+
+	t.Setenv("BENEVOLE_DB", dbPath)
+	t.Setenv("BENEVOLE_RETENTION_DAYS", "60")
+	t.Setenv("BENEVOLE_RETENTION_MAX_DAYS", "180")
+	run := func(args ...string) (int, string, string) {
+		var out, errOut strings.Builder
+		code := runEvents(args, strings.NewReader(""), &out, &errOut)
+		return code, out.String(), errOut.String()
+	}
+	line := func(out, slug string) string {
+		for _, l := range strings.Split(out, "\n") {
+			if strings.Contains(l, slug) {
+				return l
+			}
+		}
+		t.Fatalf("no line for %s in:\n%s", slug, out)
+		return ""
+	}
+
+	code, out, errOut := run("list")
+	if code != 0 {
+		t.Fatalf("list: exit %d: %s", code, errOut)
+	}
+	for days, want := range map[int]string{0: "2026-08-20", 10: "2026-07-01", 400: "2026-12-18"} {
+		if l := line(out, slugs[days]); !strings.Contains(l, want) {
+			t.Errorf("event with %d days: want expiry %s in %q", days, want, l)
+		}
+	}
+
+	for days, want := range map[int]string{
+		0:   "60 days (server default)",
+		10:  "10 days",
+		400: "180 days (cut from 400 by the maximum)",
+	} {
+		code, out, errOut := run("show", slugs[days])
+		if code != 0 || !strings.Contains(out, want) {
+			t.Errorf("show, event with %d days: exit %d, want %q in:\n%s%s", days, code, want, out, errOut)
+		}
+	}
+
+	// A flag overrides the environment: the event that chose 400 days now
+	// goes at 70 days.
+	code, out, errOut = run("list", "-retention-max-days", "70")
+	if code != 0 {
+		t.Fatalf("list -retention-max-days: exit %d: %s", code, errOut)
+	}
+	if l := line(out, slugs[400]); !strings.Contains(l, "2026-08-30") {
+		t.Errorf("with a maximum of 70 days: %q", l)
+	}
+}
+
+func TestEventsCommandRejectsConflictingRetention(t *testing.T) {
+	for name, env := range map[string]map[string]string{
+		"a default above the maximum": {"BENEVOLE_RETENTION_DAYS": "90", "BENEVOLE_RETENTION_MAX_DAYS": "30"},
+		"a bad maximum":               {"BENEVOLE_RETENTION_MAX_DAYS": "off"},
+	} {
+		for k, v := range env {
+			t.Setenv(k, v)
+		}
+		var out, errOut strings.Builder
+		code := runEvents([]string{"list"}, strings.NewReader(""), &out, &errOut)
+		if code != 2 || !strings.Contains(errOut.String(), "MAX_DAYS") && !strings.Contains(errOut.String(), "maximum") {
+			t.Errorf("%s: exit %d, stderr %q", name, code, errOut.String())
+		}
+		t.Setenv("BENEVOLE_RETENTION_DAYS", "")
+		t.Setenv("BENEVOLE_RETENTION_MAX_DAYS", "")
+	}
+}
 
 func TestRetentionFromEnv(t *testing.T) {
 	for v, want := range map[string]int{"": 60, "0": 0, "off": 0, " Never ": 0, "forever": 0, "90": 90} {

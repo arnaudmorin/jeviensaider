@@ -32,14 +32,19 @@ func ExpiresOn(lastDay time.Time, retentionDays int) time.Time {
 }
 
 // Cleanup deletes, with all their data, the events whose last day of activity
-// is more than retentionDays days before now. It returns how many were deleted.
-func (s *Store) Cleanup(ctx context.Context, retentionDays int, now time.Time) (int64, error) {
-	if retentionDays <= 0 {
+// is more than their number of days before now. Each event has its own number
+// of days (see Retention.Days). Cleanup returns how many events it deleted.
+//
+// The date of now is passed as a parameter, not read by SQLite, because
+// SQLite uses UTC and the dates of events are local dates.
+func (s *Store) Cleanup(ctx context.Context, r Retention, now time.Time) (int64, error) {
+	if !r.Enabled() {
 		return 0, nil
 	}
-	cutoff := now.AddDate(0, 0, -retentionDays).Format(model.DateLayout)
 	res, err := s.db.ExecContext(ctx,
-		`DELETE FROM events WHERE id IN (SELECT e.id FROM events e WHERE `+lastDayExpr+` < ?)`, cutoff)
+		`DELETE FROM events WHERE id IN (SELECT e.id FROM events e
+			WHERE date(`+lastDayExpr+`, '+' || min(COALESCE(e.retention_days, ?), ?) || ' days') < ?)`,
+		r.DefaultDays, r.Max(), now.Format(model.DateLayout))
 	if err != nil {
 		return 0, err
 	}

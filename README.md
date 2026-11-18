@@ -32,8 +32,10 @@ in a single SQLite file.
   keep a stand on one page; a very long stand continues on the next pages.
 - Duplicate an event to reuse it next year.
 - Erase personal data after the event (GDPR). Whole events are also deleted
-  automatically 60 days after they end, and the admin page shows the date.
-  A private instance can turn this off and keep its events forever.
+  automatically, 60 days after they end by default. The organiser can choose
+  another number of days, up to a maximum that the server sets. The admin
+  page shows the deletion date. A private instance can turn this off and keep
+  its events forever.
 
 **For parents**
 - **"Tous les créneaux"**: the whole event as a table of stands × hours,
@@ -95,7 +97,8 @@ as downloadable artifacts. They can also be built locally with
 | `-db` | `BENEVOLE_DB` | `benevole.db` | SQLite file, created if missing |
 | `-base-url` | `BENEVOLE_BASE_URL` | *(from request)* | Public URL used in shareable links, e.g. `https://jeviensaider.fr` |
 | `-trust-proxy` | `BENEVOLE_TRUST_PROXY` | `false` | Trust `X-Forwarded-*` headers when behind Caddy or nginx |
-| `-retention-days` | `BENEVOLE_RETENTION_DAYS` | `60` | Delete events this many days after they end; `0` or `off` keeps them forever |
+| `-retention-days` | `BENEVOLE_RETENTION_DAYS` | `60` | Delete events this many days after they end, unless the organiser chose another number; `0` or `off` keeps them forever |
+| `-retention-max-days` | `BENEVOLE_RETENTION_MAX_DAYS` | `180` | Longest number of days that an organiser can choose for one event (see below) |
 | — | `BENEVOLE_CREATE_PASSWORD` | *(none)* | Password required to create an event |
 
 On a public server, set `BENEVOLE_CREATE_PASSWORD` so that only the APE can
@@ -160,6 +163,24 @@ events stay editable. Organisers can still delete an event or erase its
 personal data from the admin page. An invalid value stops the server with an
 error rather than falling back to 60 days.
 
+**Choosing how long an event is kept.** The creation form and the "Modifier
+l'événement" form of the admin page have a field for the number of days
+before deletion. The field starts at `BENEVOLE_RETENTION_DAYS` and accepts a
+number from 1 to `BENEVOLE_RETENTION_MAX_DAYS`. The server refuses a higher
+number, and the database refuses 0. So an organiser cannot keep an event
+forever. A duplicate of an event keeps the number of its source. Events that
+existed before this feature store no number, so they follow
+`BENEVOLE_RETENTION_DAYS`.
+
+If you do not set `BENEVOLE_RETENTION_MAX_DAYS`, the maximum is 180 days. If
+`BENEVOLE_RETENTION_DAYS` is longer than 180 days, the maximum is equal to it.
+So a server that already runs with a long retention still starts after an
+upgrade. If you set both values and the default is above the maximum, the
+server stops at startup with an error. The cleanup applies the maximum to every
+event. If you lower it, the events that chose more days are deleted after the
+new maximum. When `BENEVOLE_RETENTION_DAYS` is `0` or `off`, the field is
+hidden and the maximum is not used.
+
 ## Super-admin command line
 
 The same binary includes a tool to manage every event directly in the
@@ -173,9 +194,11 @@ benevole events delete <event>...     # delete events and all their data (asks f
 ```
 
 `<event>` is a slug (as in `/e/<slug>`) or an ID from `list`. The tool reads
-`BENEVOLE_DB`, `BENEVOLE_BASE_URL` and `BENEVOLE_RETENTION_DAYS` like the
-server, or the `-db`, `-base-url` and `-retention-days` flags. It is safe to
-use while the server is running.
+`BENEVOLE_DB`, `BENEVOLE_BASE_URL`, `BENEVOLE_RETENTION_DAYS` and
+`BENEVOLE_RETENTION_MAX_DAYS` like the server, or the `-db`, `-base-url`,
+`-retention-days` and `-retention-max-days` flags. Use the same retention
+values as the server, because they decide the expiry dates that `list` and
+`show` print. The tool is safe to use while the server is running.
 
 With Docker:
 
@@ -274,8 +297,10 @@ the code is organised.
   - A strict CSP is sent.
   - The CSV export guards against formula injection.
 - **Automatic cleanup.** At startup and then every hour, the app deletes
-  every event whose last day is more than `BENEVOLE_RETENTION_DAYS` days ago,
-  together with its stands, slots and volunteers. An event's last day is the
+  every event whose last day is more than its number of days ago, together
+  with its stands, slots and volunteers. This number is the one that the
+  organiser chose, or `BENEVOLE_RETENTION_DAYS` when they chose none. It is
+  never more than `BENEVOLE_RETENTION_MAX_DAYS`. An event's last day is the
   latest of its date, its last slot and its creation date, so an event that
   is still being prepared is never deleted.
 - **E-mails.** Links come from `BENEVOLE_BASE_URL`, so a forged `Host`

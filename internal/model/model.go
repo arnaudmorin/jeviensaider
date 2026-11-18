@@ -46,6 +46,10 @@ type Event struct {
 	// NotifySignups is set, a message for each sign-up or cancellation.
 	AdminEmail    string
 	NotifySignups bool
+	// RetentionDays is how many days after its last day of activity the event
+	// is deleted. 0 means that the organiser chose nothing, so the server
+	// default applies. The server also caps it (see store.Retention).
+	RetentionDays int
 }
 
 // ParsedDate returns the event date, or zero time if unset/invalid.

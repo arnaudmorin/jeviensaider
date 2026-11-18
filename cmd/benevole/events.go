@@ -30,17 +30,24 @@ Commands:
 Flags:
   -db FILE              SQLite database (env BENEVOLE_DB, default benevole.db)
   -base-url URL         public URL used to print links (env BENEVOLE_BASE_URL)
-  -retention-days N     retention used to compute expiry dates, 0 = kept forever (env BENEVOLE_RETENTION_DAYS, default 60)
+  -retention-days N     days before an event is deleted when its organiser chose none, 0 = kept forever
+                        (env BENEVOLE_RETENTION_DAYS, default 60)
+  -retention-max-days N longest period an organiser can choose
+                        (env BENEVOLE_RETENTION_MAX_DAYS, default 180)
   -y                    delete: do not ask for confirmation
+
+Use the same retention values as the server: they decide the expiry dates.
 `
 
 type eventsCmd struct {
-	stdin     *bufio.Reader
-	out       io.Writer
-	db        string
-	baseURL   string
-	retention int
-	yes       bool
+	stdin         *bufio.Reader
+	out           io.Writer
+	db            string
+	baseURL       string
+	retentionDays int
+	retentionMax  int
+	policy        store.Retention
+	yes           bool
 }
 
 // runEvents implements "benevole events ..." and returns the exit code.
@@ -65,10 +72,20 @@ func runEvents(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, err)
 		return 2
 	}
-	fs.IntVar(&c.retention, "retention-days", retention, "")
+	retentionMax, err := retentionMaxFromEnv()
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return 2
+	}
+	fs.IntVar(&c.retentionDays, "retention-days", retention, "")
+	fs.IntVar(&c.retentionMax, "retention-max-days", retentionMax, "")
 	fs.BoolVar(&c.yes, "y", false, "")
 	pos, err := parseInterspersed(fs, rest)
 	if err != nil {
+		return 2
+	}
+	if c.policy, err = newRetention(c.retentionDays, c.retentionMax); err != nil {
+		fmt.Fprintln(stderr, err)
 		return 2
 	}
 	c.baseURL = strings.TrimRight(c.baseURL, "/")
@@ -117,10 +134,25 @@ func parseInterspersed(fs *flag.FlagSet, args []string) ([]string, error) {
 }
 
 func (c *eventsCmd) expires(e store.EventSummary) string {
-	if c.retention <= 0 {
+	days := c.policy.Days(e.RetentionDays)
+	if days <= 0 {
 		return "never"
 	}
-	return store.ExpiresOn(e.LastDay, c.retention).Format(model.DateLayout)
+	return store.ExpiresOn(e.LastDay, days).Format(model.DateLayout)
+}
+
+// retention describes how long an event is kept, for "show".
+func (c *eventsCmd) retention(e store.EventSummary) string {
+	days := c.policy.Days(e.RetentionDays)
+	switch {
+	case days <= 0:
+		return "never"
+	case e.RetentionDays == 0:
+		return fmt.Sprintf("%d days (server default)", days)
+	case days < e.RetentionDays:
+		return fmt.Sprintf("%d days (cut from %d by the maximum)", days, e.RetentionDays)
+	}
+	return fmt.Sprintf("%d days", days)
 }
 
 func (c *eventsCmd) list(ctx context.Context, st *store.Store, args []string) error {
@@ -174,6 +206,7 @@ func (c *eventsCmd) show(ctx context.Context, st *store.Store, args []string) er
 	fmt.Fprintf(w, "Created\t%s\n", e.CreatedAt.Local().Format("2006-01-02 15:04"))
 	fmt.Fprintf(w, "Content\t%d stands, %d slots, %d volunteers, %d sign-ups\n", e.Stands, e.Slots, e.Volunteers, e.Signups)
 	fmt.Fprintf(w, "Last day\t%s\n", e.LastDay.Format(model.DateLayout))
+	fmt.Fprintf(w, "Retention\t%s\n", c.retention(e))
 	fmt.Fprintf(w, "Expires\t%s\n", c.expires(e))
 	fmt.Fprintf(w, "Public link\t%s/e/%s\n", base, e.Slug)
 	fmt.Fprintf(w, "Admin link\t%s/a/%s\n", base, e.AdminToken)

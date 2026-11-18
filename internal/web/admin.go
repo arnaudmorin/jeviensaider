@@ -73,7 +73,9 @@ type adminPage struct {
 	NextColor  string
 	Statuses   []string
 	ExpiresOn  string // "YYYY-MM-DD", empty if events are kept forever
-	Retention  int
+	// Retention holds the days that apply to this event, which can differ
+	// from the days stored with it (the server cuts them at its maximum).
+	Retention retentionField
 	// NeedPassword: duplicating creates an event, so it asks for the
 	// creation password too.
 	NeedPassword bool
@@ -92,13 +94,14 @@ func (s *Server) adminPage(w http.ResponseWriter, r *http.Request, ev *model.Eve
 		return
 	}
 	var expires string
-	if s.cfg.RetentionDays > 0 {
+	days := s.retention.Days(ev.RetentionDays)
+	if days > 0 {
 		last, err := s.store.EventLastDay(r.Context(), ev.ID)
 		if err != nil {
 			s.serverError(w, r, err)
 			return
 		}
-		expires = store.ExpiresOn(last, s.cfg.RetentionDays).Format(model.DateLayout)
+		expires = store.ExpiresOn(last, days).Format(model.DateLayout)
 	}
 	s.render(w, r, http.StatusOK, adminView(adminPage{
 		Common:       s.common(w, r, "Admin · "+ev.Title),
@@ -113,7 +116,7 @@ func (s *Server) adminPage(w http.ResponseWriter, r *http.Request, ev *model.Eve
 		NextColor:    palette[len(p.Stands)%len(palette)],
 		Statuses:     model.Statuses,
 		ExpiresOn:    expires,
-		Retention:    s.cfg.RetentionDays,
+		Retention:    s.retentionField(days),
 		NeedPassword: s.cfg.CreatePassword != "",
 		MailEnabled:  s.cfg.MailEnabled,
 	}))
@@ -159,6 +162,12 @@ func (s *Server) adminUpdateEvent(w http.ResponseWriter, r *http.Request, ev *mo
 	}
 	ev.Title, ev.Date, ev.Location, ev.Description = form.Title, form.Date, form.Location, form.Description
 	ev.AdminEmail, ev.NotifySignups = form.AdminEmail, form.NotifySignups
+	// The form shows the days that apply. Saving it without a change must not
+	// turn "the server default" into a fixed number of days. No value (0)
+	// changes nothing.
+	if form.RetentionDays != 0 && form.RetentionDays != s.retention.Days(ev.RetentionDays) {
+		ev.RetentionDays = form.RetentionDays
+	}
 	if s.storeError(w, r, s.store.UpdateEvent(r.Context(), ev)) {
 		return
 	}

@@ -71,14 +71,15 @@ func serve(cfg *config) int {
 	defer st.Close()
 
 	srv, err := web.New(st, web.Config{
-		BaseURL:        cfg.baseURL,
-		CreatePassword: cfg.createPassword,
-		TrustProxy:     cfg.trustProxy,
-		RetentionDays:  cfg.retentionDays,
-		Mailer:         mailQueue,
-		MailEnabled:    cfg.smtp != nil,
-		MailLimits:     &cfg.mailLimits,
-		Logger:         logger,
+		BaseURL:          cfg.baseURL,
+		CreatePassword:   cfg.createPassword,
+		TrustProxy:       cfg.trustProxy,
+		RetentionDays:    cfg.retention.DefaultDays,
+		MaxRetentionDays: cfg.retention.MaxDays,
+		Mailer:           mailQueue,
+		MailEnabled:      cfg.smtp != nil,
+		MailLimits:       &cfg.mailLimits,
+		Logger:           logger,
 	})
 	if err != nil {
 		logger.Error("init web", "err", err)
@@ -96,13 +97,13 @@ func serve(cfg *config) int {
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	if cfg.retentionDays > 0 {
-		go cleanupLoop(ctx, st, cfg.retentionDays, logger)
+	if cfg.retention.Enabled() {
+		go cleanupLoop(ctx, st, cfg.retention, logger)
 	} else {
 		logger.Info("automatic deletion of events is disabled: events are kept forever")
 	}
 	go func() {
-		logger.Info("listening", "addr", cfg.addr, "db", cfg.dbPath, "create_password", cfg.createPassword != "", "retention_days", cfg.retentionDays)
+		logger.Info("listening", "addr", cfg.addr, "db", cfg.dbPath, "create_password", cfg.createPassword != "", "retention_days", cfg.retention.DefaultDays, "retention_max_days", cfg.retention.Max())
 		if err := httpSrv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			logger.Error("listen", "err", err)
 			stop()
@@ -146,16 +147,16 @@ func checkHealth(addr string) int {
 }
 
 // cleanupLoop deletes expired events at startup, then every hour.
-func cleanupLoop(ctx context.Context, st *store.Store, days int, logger *slog.Logger) {
+func cleanupLoop(ctx context.Context, st *store.Store, r store.Retention, logger *slog.Logger) {
 	ticker := time.NewTicker(time.Hour)
 	defer ticker.Stop()
 	for {
-		n, err := st.Cleanup(ctx, days, time.Now())
+		n, err := st.Cleanup(ctx, r, time.Now())
 		switch {
 		case err != nil && ctx.Err() == nil:
 			logger.Error("cleanup", "err", err)
 		case n > 0:
-			logger.Info("cleanup: deleted expired events", "count", n, "retention_days", days)
+			logger.Info("cleanup: deleted expired events", "count", n, "retention_days", r.DefaultDays, "retention_max_days", r.Max())
 		}
 		select {
 		case <-ctx.Done():

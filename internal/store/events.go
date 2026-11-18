@@ -12,12 +12,12 @@ import (
 	"benevole-ape/internal/model"
 )
 
-const eventCols = `id, slug, title, description, location, date, admin_token, status, created_at, admin_email, notify_signups`
+const eventCols = `id, slug, title, description, location, date, admin_token, status, created_at, admin_email, notify_signups, COALESCE(retention_days, 0)`
 
 func scanEvent(row interface{ Scan(...any) error }) (*model.Event, error) {
 	var e model.Event
 	var created string
-	if err := row.Scan(&e.ID, &e.Slug, &e.Title, &e.Description, &e.Location, &e.Date, &e.AdminToken, &e.Status, &created, &e.AdminEmail, &e.NotifySignups); err != nil {
+	if err := row.Scan(&e.ID, &e.Slug, &e.Title, &e.Description, &e.Location, &e.Date, &e.AdminToken, &e.Status, &created, &e.AdminEmail, &e.NotifySignups, &e.RetentionDays); err != nil {
 		return nil, notFound(err)
 	}
 	e.CreatedAt = parseTime(created)
@@ -66,8 +66,8 @@ func insertEvent(ctx context.Context, q querier, e *model.Event) error {
 		e.Status = model.StatusDraft
 	}
 	res, err := q.ExecContext(ctx,
-		`INSERT INTO events (slug, title, description, location, date, admin_token, status, admin_email, notify_signups) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		e.Slug, e.Title, e.Description, e.Location, e.Date, e.AdminToken, e.Status, e.AdminEmail, e.NotifySignups)
+		`INSERT INTO events (slug, title, description, location, date, admin_token, status, admin_email, notify_signups, retention_days) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		e.Slug, e.Title, e.Description, e.Location, e.Date, e.AdminToken, e.Status, e.AdminEmail, e.NotifySignups, nullInt(e.RetentionDays))
 	if err != nil {
 		return err
 	}
@@ -88,11 +88,11 @@ func (s *Store) EventByAdminToken(ctx context.Context, token string) (*model.Eve
 }
 
 // UpdateEvent saves the editable fields of e (title, description, location,
-// date, status, organiser e-mail and notification setting).
+// date, status, organiser e-mail, notification setting and retention days).
 func (s *Store) UpdateEvent(ctx context.Context, e *model.Event) error {
 	return affectedOne(s.db.ExecContext(ctx,
-		`UPDATE events SET title = ?, description = ?, location = ?, date = ?, status = ?, admin_email = ?, notify_signups = ? WHERE id = ?`,
-		e.Title, e.Description, e.Location, e.Date, e.Status, e.AdminEmail, e.NotifySignups, e.ID))
+		`UPDATE events SET title = ?, description = ?, location = ?, date = ?, status = ?, admin_email = ?, notify_signups = ?, retention_days = ? WHERE id = ?`,
+		e.Title, e.Description, e.Location, e.Date, e.Status, e.AdminEmail, e.NotifySignups, nullInt(e.RetentionDays), e.ID))
 }
 
 func (s *Store) DeleteEvent(ctx context.Context, id int64) error {
@@ -114,7 +114,7 @@ func (s *Store) PurgeVolunteers(ctx context.Context, eventID int64) (int64, erro
 func (s *Store) DuplicateEvent(ctx context.Context, src *model.Event, title, date string) (*model.Event, error) {
 	dst := &model.Event{
 		Title: title, Date: date, Description: src.Description, Location: src.Location,
-		AdminEmail: src.AdminEmail, NotifySignups: src.NotifySignups,
+		AdminEmail: src.AdminEmail, NotifySignups: src.NotifySignups, RetentionDays: src.RetentionDays,
 	}
 	var shift time.Duration
 	if a, b := src.ParsedDate(), dst.ParsedDate(); !a.IsZero() && !b.IsZero() {
@@ -167,7 +167,7 @@ type EventSummary struct {
 
 // ListEventSummaries returns every event, most recent last day first.
 func (s *Store) ListEventSummaries(ctx context.Context) ([]EventSummary, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT e.id, e.slug, e.title, e.description, e.location, e.date, e.admin_token, e.status, e.created_at, e.admin_email, e.notify_signups,
+	rows, err := s.db.QueryContext(ctx, `SELECT e.id, e.slug, e.title, e.description, e.location, e.date, e.admin_token, e.status, e.created_at, e.admin_email, e.notify_signups, COALESCE(e.retention_days, 0),
 		(SELECT count(*) FROM stands st WHERE st.event_id = e.id),
 		(SELECT count(*) FROM slots sl JOIN stands st ON st.id = sl.stand_id WHERE st.event_id = e.id),
 		(SELECT count(*) FROM volunteers v WHERE v.event_id = e.id),
@@ -182,7 +182,7 @@ func (s *Store) ListEventSummaries(ctx context.Context) ([]EventSummary, error) 
 	for rows.Next() {
 		var e EventSummary
 		var created, last string
-		if err := rows.Scan(&e.ID, &e.Slug, &e.Title, &e.Description, &e.Location, &e.Date, &e.AdminToken, &e.Status, &created, &e.AdminEmail, &e.NotifySignups,
+		if err := rows.Scan(&e.ID, &e.Slug, &e.Title, &e.Description, &e.Location, &e.Date, &e.AdminToken, &e.Status, &created, &e.AdminEmail, &e.NotifySignups, &e.RetentionDays,
 			&e.Stands, &e.Slots, &e.Volunteers, &e.Signups, &last); err != nil {
 			return nil, err
 		}

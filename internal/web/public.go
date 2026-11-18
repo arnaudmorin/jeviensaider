@@ -20,6 +20,7 @@ type homePage struct {
 	MailEnabled  bool
 	Error        string
 	Form         model.Event
+	Retention    retentionField
 }
 
 func (s *Server) home(w http.ResponseWriter, r *http.Request) {
@@ -28,17 +29,24 @@ func (s *Server) home(w http.ResponseWriter, r *http.Request) {
 		NeedPassword: s.cfg.CreatePassword != "",
 		MailEnabled:  s.cfg.MailEnabled,
 		Form:         model.Event{NotifySignups: true},
+		Retention:    s.retentionField(s.retention.DefaultDays),
 	}))
 }
 
 func (s *Server) createEvent(w http.ResponseWriter, r *http.Request) {
+	// An empty retention field gives the server default (stored as 0).
 	ev, err := s.readEventForm(r)
 	if !s.createPasswordOK(r) {
 		err = userError("Mot de passe de création incorrect.")
 	}
 	if err != nil {
+		shown := ev.RetentionDays
+		if shown == 0 {
+			shown = s.retention.DefaultDays
+		}
 		s.render(w, r, http.StatusBadRequest, homeView(homePage{
 			Common: Common{Title: "Je viens aider"}, NeedPassword: s.cfg.CreatePassword != "", MailEnabled: s.cfg.MailEnabled, Error: err.Error(), Form: ev,
+			Retention: s.retentionField(shown),
 		}))
 		return
 	}

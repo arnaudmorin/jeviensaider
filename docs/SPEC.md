@@ -142,8 +142,9 @@ Derived notions (computed, not stored):
 - "Les deux liens de l'événement": the secret organiser link and the public
   link (both with "Copier"), and a message ready to share ("Partager le
   message" opens the phone's share sheet, or copies it).
-- Event settings ("Modifier l'événement"), including the organiser e-mail
-  and the notification flag.
+- Event settings ("Modifier l'événement"), including the organiser e-mail,
+  the notification flag and the number of days before the event is deleted
+  (see 4.6).
 - Stands: a summary list (linking to each stand), then each stand: add,
   edit, delete, move up/down.
 - Slots: a generator ("from 14:00 to 17:00, every 1 h, 2 people" → three
@@ -187,10 +188,24 @@ Derived notions (computed, not stored):
 ### 4.6 Automatic deletion
 
 - Every hour, events whose last day (latest of: date, last slot, creation)
-  is more than `BENEVOLE_RETENTION_DAYS` days ago (default 60) are deleted
-  with everything in them. `0`/`off` keeps events forever.
+  is more than their number of days ago are deleted with everything in them.
+  The number is the one the organiser chose, or `BENEVOLE_RETENTION_DAYS`
+  (default 60) when they chose none. `0`/`off` for `BENEVOLE_RETENTION_DAYS`
+  keeps events forever, whatever number an event stores. Then the field is
+  hidden.
+- The organiser sets the number when they create or edit the event. It is a
+  whole number from 1 to `BENEVOLE_RETENTION_MAX_DAYS` (default 180, or
+  `BENEVOLE_RETENTION_DAYS` if that is longer). The server refuses a higher
+  number, and the database refuses 0, so nobody can keep an event forever.
+- The cleanup cuts a stored number at the maximum. If the operator lowers the
+  maximum, events that chose more days are deleted after the new maximum.
+- Events created before this feature store no number and follow
+  `BENEVOLE_RETENTION_DAYS`. A duplicate keeps the number of its source.
+  Saving the edit form without changing the number keeps it as it was.
+- If both values are set and `BENEVOLE_RETENTION_DAYS` is above
+  `BENEVOLE_RETENTION_MAX_DAYS`, the program does not start.
 - Dates are accepted up to two years ahead and, when deletion is on, back to
-  max(365, retention) days.
+  max(365, maximum retention) days.
 
 ### 4.7 Command line
 
@@ -204,7 +219,7 @@ Derived notions (computed, not stored):
 
 Flags and environment variables, documented in the README and
 `.env.example`: listen address, database file, public URL, trust proxy
-headers, retention, creation password, SMTP settings, "open creation"
+headers, retention (default and maximum), creation password, SMTP settings, "open creation"
 opt-out, and the four e-mail limits. An empty variable counts as unset.
 Invalid values stop the program at startup with a clear message; nothing
 silently falls back to a default.
@@ -254,7 +269,8 @@ internal/model/      domain types and pure rules (Slot.Check, fill status,
 internal/slotgen/    pure slot generator (start, end, step, min, max)
 internal/store/      SQLite access: one file per table group (events,
                      stands, slots, signups), cleanup.go for automatic
-                     deletion, embedded migrations tracked with
+                     deletion, retention.go for the deletion policy
+                     (default and maximum days), embedded migrations tracked with
                      PRAGMA user_version
 internal/mail/       SMTP sender, message formatting, background queue
 internal/ical/       iCalendar writer: text escaping, line folding, reminders

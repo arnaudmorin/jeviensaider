@@ -73,12 +73,12 @@ func TestCleanup(t *testing.T) {
 	}
 
 	// Disabled.
-	if n, err := s.Cleanup(ctx, 0, day("2030-01-01")); n != 0 || err != nil {
+	if n, err := s.Cleanup(ctx, Retention{}, day("2030-01-01")); n != 0 || err != nil {
 		t.Fatalf("disabled cleanup: %d, %v", n, err)
 	}
 
 	// Day 60 after the fête: only the undated event goes.
-	if n, err := s.Cleanup(ctx, 60, day("2026-08-19")); n != 1 || err != nil {
+	if n, err := s.Cleanup(ctx, Retention{DefaultDays: 60, MaxDays: 60}, day("2026-08-19")); n != 1 || err != nil {
 		t.Fatalf("cleanup 08-19: %d, %v", n, err)
 	}
 	if exists(undated) || !exists(fete) || !exists(late) {
@@ -86,7 +86,7 @@ func TestCleanup(t *testing.T) {
 	}
 
 	// Day 61 (= ExpiresOn): the fête goes, with its volunteers.
-	if n, err := s.Cleanup(ctx, 60, day("2026-08-20")); n != 1 || err != nil {
+	if n, err := s.Cleanup(ctx, Retention{DefaultDays: 60, MaxDays: 60}, day("2026-08-20")); n != 1 || err != nil {
 		t.Fatalf("cleanup 08-20: %d, %v", n, err)
 	}
 	if exists(fete) || !exists(late) {

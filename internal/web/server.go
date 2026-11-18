@@ -24,9 +24,14 @@ type Config struct {
 	// PostsPerMinute is the per-IP rate limit on POST requests (0: default 60).
 	PostsPerMinute int
 	// RetentionDays is how long events are kept after their last day of
-	// activity, shown on the admin page (0: kept forever). The deletion itself
-	// is run by the caller with store.Cleanup.
+	// activity when the organiser chose nothing, shown on the admin page
+	// (0: kept forever). The deletion itself is run by the caller with
+	// store.Cleanup.
 	RetentionDays int
+	// MaxRetentionDays is the longest period that an organiser can choose for
+	// an event. 0, or a value below RetentionDays, means RetentionDays: the
+	// organiser cannot ask for more than the default.
+	MaxRetentionDays int
 	// Mailer queues e-mails to organisers (nil: none are sent). MailEnabled
 	// says whether they really leave the server (an SMTP server is set up).
 	Mailer      Mailer
@@ -41,12 +46,13 @@ type Config struct {
 
 // Server holds the dependencies of the HTTP handlers.
 type Server struct {
-	store   *store.Store
-	cfg     Config
-	log     *slog.Logger
-	limiter *limiter
-	mails   *mailBudget
-	now     func() time.Time
+	store     *store.Store
+	cfg       Config
+	retention store.Retention
+	log       *slog.Logger
+	limiter   *limiter
+	mails     *mailBudget
+	now       func() time.Time
 }
 
 // New builds a Server.
@@ -58,7 +64,13 @@ func New(st *store.Store, cfg Config) (*Server, error) {
 		cfg.PostsPerMinute = 60
 	}
 	cfg.BaseURL = strings.TrimRight(cfg.BaseURL, "/")
-	s := &Server{store: st, cfg: cfg, log: cfg.Logger, limiter: newLimiter(cfg.PostsPerMinute)}
+	s := &Server{
+		store:     st,
+		cfg:       cfg,
+		retention: store.Retention{DefaultDays: cfg.RetentionDays, MaxDays: cfg.MaxRetentionDays},
+		log:       cfg.Logger,
+		limiter:   newLimiter(cfg.PostsPerMinute),
+	}
 	limits := DefaultMailLimits()
 	if cfg.MailLimits != nil {
 		limits = *cfg.MailLimits

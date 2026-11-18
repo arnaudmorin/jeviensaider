@@ -41,6 +41,7 @@ templ homeView(d homePage) {
 					</span>
 				</div>
 				<label class="check"><input type="checkbox" name="notify" value="1" checked?={ d.Form.NotifySignups }/> <span>Me prévenir par e-mail à chaque inscription ou désinscription</span></label>
+				@retentionInput(d.Retention, "home-retention")
 				if d.NeedPassword {
 					<div class="field">
 						<label for="home-password">Mot de passe de création</label>

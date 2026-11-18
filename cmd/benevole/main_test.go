@@ -76,7 +76,7 @@ func TestCleanupLoop(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan struct{})
 	go func() {
-		cleanupLoop(ctx, st, 60, slog.New(slog.NewTextHandler(io.Discard, nil)))
+		cleanupLoop(ctx, st, store.Retention{DefaultDays: 60, MaxDays: 60}, slog.New(slog.NewTextHandler(io.Discard, nil)))
 		close(done)
 	}()
 	// The first pass runs at once.
@@ -103,7 +103,7 @@ func TestCleanupLoop(t *testing.T) {
 }
 
 func TestLoadConfig(t *testing.T) {
-	for _, k := range []string{"ADDR", "DB", "BASE_URL", "TRUST_PROXY", "RETENTION_DAYS", "CREATE_PASSWORD", "OPEN_CREATION", "SMTP_HOST",
+	for _, k := range []string{"ADDR", "DB", "BASE_URL", "TRUST_PROXY", "RETENTION_DAYS", "RETENTION_MAX_DAYS", "CREATE_PASSWORD", "OPEN_CREATION", "SMTP_HOST",
 		"MAIL_CREATED_PER_ADDRESS_PER_DAY", "MAIL_CREATED_PER_HOUR", "MAIL_SIGNUPS_PER_EVENT_PER_HOUR", "MAIL_PER_HOUR"} {
 		t.Setenv("BENEVOLE_"+k, "")
 	}
@@ -123,9 +123,10 @@ func TestLoadConfig(t *testing.T) {
 
 	// Invalid values are errors, never a silent default.
 	for key, bad := range map[string]string{
-		"BENEVOLE_TRUST_PROXY":   "yes please",
-		"BENEVOLE_OPEN_CREATION": "maybe",
-		"BENEVOLE_MAIL_PER_HOUR": "lots",
+		"BENEVOLE_TRUST_PROXY":        "yes please",
+		"BENEVOLE_OPEN_CREATION":      "maybe",
+		"BENEVOLE_MAIL_PER_HOUR":      "lots",
+		"BENEVOLE_RETENTION_MAX_DAYS": "off",
 	} {
 		t.Run(key, func(t *testing.T) {
 			t.Setenv(key, bad)
@@ -136,5 +137,42 @@ func TestLoadConfig(t *testing.T) {
 				t.Errorf("%s=%q: %v", key, bad, err)
 			}
 		})
+	}
+}
+
+// The retention policy comes from the two values, and a flag overrides its
+// variable.
+func TestLoadConfigRetention(t *testing.T) {
+	for _, k := range []string{"RETENTION_DAYS", "RETENTION_MAX_DAYS"} {
+		t.Setenv("BENEVOLE_"+k, "")
+	}
+	c, err := loadConfig(nil)
+	if err != nil || c.retention != (store.Retention{DefaultDays: 60, MaxDays: 180}) {
+		t.Fatalf("defaults: %+v %v", c, err)
+	}
+
+	// A long default with no maximum set still starts (upgrade of an old
+	// deployment), with a maximum equal to the default.
+	t.Setenv("BENEVOLE_RETENTION_DAYS", "365")
+	if c, err = loadConfig(nil); err != nil || c.retention != (store.Retention{DefaultDays: 365, MaxDays: 365}) {
+		t.Fatalf("long default: %+v %v", c, err)
+	}
+
+	// Both values set and in conflict: no start.
+	t.Setenv("BENEVOLE_RETENTION_DAYS", "90")
+	t.Setenv("BENEVOLE_RETENTION_MAX_DAYS", "30")
+	if _, err = loadConfig(nil); err == nil || !strings.Contains(err.Error(), "maximum") {
+		t.Fatalf("a default above the maximum was accepted: %v", err)
+	}
+
+	// The flag wins over the variable, and fixes the conflict.
+	if c, err = loadConfig([]string{"-retention-max-days", "120"}); err != nil || c.retention != (store.Retention{DefaultDays: 90, MaxDays: 120}) {
+		t.Fatalf("flag over environment: %+v %v", c, err)
+	}
+
+	// Deletion off: nothing to cap.
+	t.Setenv("BENEVOLE_RETENTION_DAYS", "off")
+	if c, err = loadConfig(nil); err != nil || c.retention.Enabled() {
+		t.Fatalf("deletion off: %+v %v", c, err)
 	}
 }

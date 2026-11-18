@@ -3,6 +3,7 @@ package web
 import (
 	"errors"
 	"fmt"
+	"math"
 	"net/http"
 	"net/mail"
 	"regexp"
@@ -84,23 +85,60 @@ func formInt(r *http.Request, key string, def int) (int, error) {
 	return n, nil
 }
 
+// retentionField is the "days before deletion" input of the event forms.
+type retentionField struct {
+	Show  bool // false when events are kept forever: there is nothing to choose
+	Value int  // the days shown in the field
+	Max   int  // the longest period that the server allows
+}
+
+func (s *Server) retentionField(days int) retentionField {
+	return retentionField{Show: s.retention.Enabled(), Value: days, Max: s.retention.Max()}
+}
+
+// readRetention reads how many days after the event the server deletes it.
+//
+// It returns 0 when the form has no value, or when events are kept forever:
+// the caller then keeps what it has. A number from 1 to the maximum is
+// accepted. A value outside that range gives an error. days is the number that
+// was read, even when it is refused, so the form can show it again (0 if it
+// was not a number).
+func (s *Server) readRetention(r *http.Request) (days int, err error) {
+	v := strings.TrimSpace(r.FormValue("retention_days"))
+	if !s.retention.Enabled() || v == "" {
+		return 0, nil
+	}
+	max := s.retention.Max()
+	n, convErr := strconv.Atoi(v)
+	if errors.Is(convErr, strconv.ErrRange) && !strings.HasPrefix(v, "-") {
+		n, convErr = math.MaxInt, nil // a number too big to be accepted
+	}
+	switch {
+	case convErr != nil || n < 1:
+		return 0, userError(fmt.Sprintf("Durée de conservation invalide : indiquez un nombre de jours entre 1 et %d.", max))
+	case n > max:
+		return n, userError(fmt.Sprintf("La durée de conservation ne peut pas dépasser %d jours.", max))
+	}
+	return n, nil
+}
+
 // checkDateRange accepts dates up to two years ahead: a far-future date (a
 // typo, or a way around the automatic cleanup) would keep an event and its
 // personal data forever.
 //
-// Past dates are accepted back to the retention period (at least one year),
-// so organisers can still edit their events. When events are kept forever,
-// any past date is fine.
+// Past dates are accepted back to the longest retention period that an
+// organiser can choose (at least one year), so organisers can still edit
+// their events. When events are kept forever, any past date is fine.
 func (s *Server) checkDateRange(t time.Time) error {
 	today := s.now()
 	max := time.Date(today.Year()+2, today.Month(), today.Day(), 23, 59, 59, 0, time.UTC)
-	if s.cfg.RetentionDays <= 0 {
+	if !s.retention.Enabled() {
 		if t.After(max) {
 			return userError(fmt.Sprintf("date hors limites : choisissez une date avant le %s", dateFR(max.Format(model.DateLayout))))
 		}
 		return nil
 	}
-	back := s.cfg.RetentionDays
+	back := s.retention.Max()
 	if back < 365 {
 		back = 365
 	}
@@ -193,12 +231,19 @@ func (s *Server) readEventForm(r *http.Request) (model.Event, error) {
 		AdminEmail:    clean(r.FormValue("admin_email"), maxEmail, false),
 		NotifySignups: r.FormValue("notify") == "1",
 	}
+	// Read first: the number is kept to show the form again, even when
+	// another field is wrong.
+	var retentionErr error
+	ev.RetentionDays, retentionErr = s.readRetention(r)
 	var err error
 	ev.Title, ev.Date, err = s.readTitleAndDate(r)
 	if err != nil {
 		return ev, err
 	}
-	return ev, checkAdminEmail(ev.AdminEmail)
+	if err := checkAdminEmail(ev.AdminEmail); err != nil {
+		return ev, err
+	}
+	return ev, retentionErr
 }
 
 // readSlotForm reads a slot's times on date and its capacities. The times

@@ -125,7 +125,7 @@ templ adminLinks(d adminPage) {
 			}
 		</div>
 		if d.ExpiresOn != "" {
-			<p class="hint">L'événement et ses inscriptions seront supprimés automatiquement le { dateFR(d.ExpiresOn) }, { itoa(d.Retention) } jours après l'événement.</p>
+			<p class="hint">L'événement et ses inscriptions seront supprimés automatiquement le { dateFR(d.ExpiresOn) }, { itoa(d.Retention.Value) } jours après l'événement.</p>
 		}
 	</section>
 }
@@ -329,6 +329,7 @@ templ adminTools(d adminPage) {
 				<label><span class="label-text">Message aux bénévoles <span class="opt">facultatif</span></span> <textarea name="description" rows="3" maxlength="2000">{ d.Event.Description }</textarea></label>
 				<label>E-mail de l'organisateur <input type="email" name="admin_email" value={ d.Event.AdminEmail } required maxlength="120" autocomplete="email"/></label>
 				<label class="check"><input type="checkbox" name="notify" value="1" checked?={ d.Event.NotifySignups }/> <span>Me prévenir par e-mail à chaque inscription ou désinscription</span></label>
+				@retentionInput(d.Retention, "admin-retention")
 				<div><button class="btn primary" type="submit">Enregistrer</button></div>
 			</form>
 		</details>

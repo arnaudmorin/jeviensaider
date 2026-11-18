@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"benevole-ape/internal/mail"
+	"benevole-ape/internal/store"
 	"benevole-ape/internal/web"
 )
 
@@ -18,8 +19,10 @@ type config struct {
 	dbPath         string
 	baseURL        string // without a trailing slash
 	trustProxy     bool
-	retentionDays  int    // 0: events are kept forever
-	createPassword string // empty: anyone can create events
+	retentionDays  int             // 0: events are kept forever
+	retentionMax   int             // longest period an organiser can choose, 0: not set (see newRetention)
+	createPassword string          // empty: anyone can create events
+	retention      store.Retention // built from the two retention values above
 	smtp           *mail.Config
 	mailLimits     web.MailLimits
 	healthcheck    bool // only check a running server's health and exit
@@ -44,6 +47,10 @@ func loadConfig(args []string) (*config, error) {
 	if err != nil {
 		return nil, err
 	}
+	retentionMax, err := retentionMaxFromEnv()
+	if err != nil {
+		return nil, err
+	}
 
 	c := &config{}
 	fs := flag.NewFlagSet("benevole", flag.ExitOnError)
@@ -55,10 +62,14 @@ func loadConfig(args []string) (*config, error) {
 	fs.StringVar(&c.dbPath, "db", env("BENEVOLE_DB", "benevole.db"), "SQLite database file (env BENEVOLE_DB)")
 	fs.StringVar(&c.baseURL, "base-url", env("BENEVOLE_BASE_URL", ""), "public URL, e.g. https://benevoles.example.org (env BENEVOLE_BASE_URL)")
 	fs.BoolVar(&c.trustProxy, "trust-proxy", trustProxy, "trust X-Forwarded-* headers from a reverse proxy (env BENEVOLE_TRUST_PROXY)")
-	fs.IntVar(&c.retentionDays, "retention-days", retention, "delete events this many days after their last day of activity, 0 to keep them forever (env BENEVOLE_RETENTION_DAYS)")
+	fs.IntVar(&c.retentionDays, "retention-days", retention, "delete events this many days after their last day of activity when the organiser chose none, 0 to keep them forever (env BENEVOLE_RETENTION_DAYS)")
+	fs.IntVar(&c.retentionMax, "retention-max-days", retentionMax, "longest period an organiser can choose, 0 for the default of 180 days or the value of -retention-days if that is longer (env BENEVOLE_RETENTION_MAX_DAYS)")
 	fs.BoolVar(&c.healthcheck, "healthcheck", false, "query /healthz on the listen address and exit 0 if healthy (for container health checks)")
 	fs.Parse(args)
 	c.baseURL = strings.TrimRight(c.baseURL, "/")
+	if c.retention, err = newRetention(c.retentionDays, c.retentionMax); err != nil {
+		return nil, err
+	}
 
 	// The passwords are only read from the environment, so that they never
 	// show up in `ps` output.
