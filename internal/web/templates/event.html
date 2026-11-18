@@ -20,16 +20,23 @@
 {{if not .Event.IsDraft}}
 <div id="planning">
   <nav class="tabs" aria-label="Stands" hx-boost="true" hx-target="#planning" hx-select="#planning" hx-swap="outerHTML">
-    <a href="{{tabURL .EventURL 0 .TodoOnly}}" {{if eq .Tab "grid"}}class="active" aria-current="page"{{end}}>Vue d'ensemble</a>
-    {{range .P.Stands}}
-    <a href="{{tabURL $.EventURL .ID $.TodoOnly}}" {{if and (eq $.Tab "stand") (eq $.Stand.ID .ID)}}class="active" aria-current="page"{{end}}>
-      {{.Name}}{{if .Missing}}<span class="count" title="places à pourvoir">{{.Missing}}</span>{{else if .Slots}}<span class="count done" title="complet">✓</span>{{end}}
-    </a>
-    {{end}}
-    {{if .Me}}
-    <a href="{{.MeURL}}" class="me{{if eq .Tab "me"}} active{{end}}" {{if eq .Tab "me"}}aria-current="page"{{end}}>
-      Mes créneaux<span class="count mine">{{len .P.MySlots}}</span>
-    </a>
+    <div class="tabs-views">
+      <a class="tab{{if eq .Tab "grid"}} active{{end}}" href="{{tabURL .EventURL 0 .TodoOnly}}" {{if eq .Tab "grid"}}aria-current="page"{{end}}>Vue d'ensemble</a>
+      {{if .Me}}
+      <a class="tab me{{if eq .Tab "me"}} active{{end}}" href="{{.MeURL}}" {{if eq .Tab "me"}}aria-current="page"{{end}}>
+        Mes créneaux<span class="count mine">{{len .P.MySlots}}</span>
+      </a>
+      {{end}}
+    </div>
+    {{if .P.Stands}}
+    <div class="tabs-stands">
+      {{range .P.Stands}}
+      {{$on := and (eq $.Tab "stand") (eq $.Stand.ID .ID)}}
+      <a class="tab{{if $on}} active{{end}}" href="{{tabURL $.EventURL .ID $.TodoOnly}}" style="--stand: {{css .Color}}" {{if $on}}aria-current="page"{{end}}>
+        <span class="dot"></span>{{.Name}}{{if .Missing}}<span class="count" title="places à pourvoir">{{.Missing}}</span>{{else if .Slots}}<span class="count done" title="complet">✓</span>{{end}}
+      </a>
+      {{end}}
+    </div>
     {{end}}
   </nav>
 
