@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"text/template"
+	"time"
 
 	"benevole-ape/internal/mail"
 	"benevole-ape/internal/model"
@@ -91,8 +92,8 @@ func (s *Server) sendMail(m mail.Message) bool {
 	if s.cfg.Mailer == nil || m.To == "" || m.Body == "" {
 		return false
 	}
-	if !s.mails.all.allow("", mailsPerHour, now()) {
-		s.log.Warn("mail not sent: hourly limit of the site reached", "limit", mailsPerHour, "to", m.To, "subject", m.Subject)
+	if !s.mails.all.allow("", s.limits.PerHour, now()) {
+		s.log.Warn("mail not sent: hourly limit of the site reached", "limit", s.limits.PerHour, "to", m.To, "subject", m.Subject)
 		return false
 	}
 	s.cfg.Mailer.Enqueue(m)
@@ -107,12 +108,12 @@ func (s *Server) notifyCreated(r *http.Request, ev *model.Event) bool {
 		return false
 	}
 	t := now()
-	if !s.mails.createdTo.allow(strings.ToLower(ev.AdminEmail), createdPerRecipientPerDay, t) {
-		s.log.Warn("creation mail not sent: too many for this address today", "limit", createdPerRecipientPerDay, "to", ev.AdminEmail)
+	if !s.mails.createdTo.allow(strings.ToLower(ev.AdminEmail), s.limits.CreatedPerAddressPerDay, t) {
+		s.log.Warn("creation mail not sent: too many for this address today", "limit", s.limits.CreatedPerAddressPerDay, "to", ev.AdminEmail)
 		return false
 	}
-	if !s.mails.created.allow("", createdPerHour, t) {
-		s.log.Warn("creation mail not sent: too many events created this hour", "limit", createdPerHour, "to", ev.AdminEmail)
+	if !s.mails.created.allow("", s.limits.CreatedPerHour, t) {
+		s.log.Warn("creation mail not sent: too many events created this hour", "limit", s.limits.CreatedPerHour, "to", ev.AdminEmail)
 		return false
 	}
 	return s.sendMail(mail.Message{
@@ -148,20 +149,24 @@ func (s *Server) notifySignup(ctx context.Context, r *http.Request, ev *model.Ev
 	if sv == nil {
 		return
 	}
-	n, until := s.mails.signups.hit(strconv.FormatInt(ev.ID, 10), now())
-	switch {
-	case n == signupMailsPerEventHour+1:
+	n, until := 0, time.Time{}
+	if max := s.limits.SignupsPerEventPerHour; max > 0 {
+		n, until = s.mails.signups.hit(strconv.FormatInt(ev.ID, 10), now())
+	}
+	switch max := s.limits.SignupsPerEventPerHour; {
+	case max <= 0:
+	case n == max+1:
 		// Once over the limit (a busy hour, or someone signing up and
 		// cancelling in a loop), say so once, then stay quiet.
 		s.sendMail(mail.Message{
 			To:      ev.AdminEmail,
 			Subject: "Beaucoup d'inscriptions sur « " + ev.Title + " » : notifications en pause",
 			Body: renderMail("paused", map[string]any{
-				"Limit": signupMailsPerEventHour, "Until": hm(until.Local()), "AdminURL": s.absURL(r, adminURL(ev)),
+				"Limit": max, "Until": hm(until.Local()), "AdminURL": s.absURL(r, adminURL(ev)),
 			}),
 		})
 		return
-	case n < 1 || n > signupMailsPerEventHour:
+	case n < 1 || n > max:
 		return
 	}
 	verb := "Inscription"

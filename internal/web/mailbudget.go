@@ -5,16 +5,21 @@ import (
 	"time"
 )
 
-// Limits on outgoing e-mails. Creating an event sends a mail to an address
-// typed by the visitor, and every sign-up mails the organiser: without
-// limits, the site could be used to flood an inbox or to send spam, which
-// would also get its domain blacklisted.
-const (
-	createdPerRecipientPerDay = 3   // "event created" mails to one address
-	createdPerHour            = 30  // "event created" mails, all addresses
-	signupMailsPerEventHour   = 20  // sign-up notifications for one event
-	mailsPerHour              = 300 // all mails
-)
+// MailLimits caps outgoing e-mails. Creating an event sends a mail to an
+// address typed by the visitor, and every sign-up mails the organiser:
+// without limits, the site could be used to flood an inbox or to send spam,
+// which would also get its domain blacklisted. A limit of 0 means no limit.
+type MailLimits struct {
+	CreatedPerAddressPerDay int // "event created" mails to one address, per day
+	CreatedPerHour          int // "event created" mails, all addresses, per hour
+	SignupsPerEventPerHour  int // sign-up notifications for one event, per hour
+	PerHour                 int // all mails, per hour
+}
+
+// DefaultMailLimits are used when Config.MailLimits is nil.
+func DefaultMailLimits() MailLimits {
+	return MailLimits{CreatedPerAddressPerDay: 3, CreatedPerHour: 30, SignupsPerEventPerHour: 20, PerHour: 300}
+}
 
 // windowCounter counts hits per key over fixed time windows. Its memory is
 // bounded: when it tracks too many keys, new keys are refused.
@@ -63,8 +68,11 @@ func (c *windowCounter) hit(key string, now time.Time) (int, time.Time) {
 	return w.n, w.start.Add(c.per)
 }
 
-// allow records a hit and reports whether it is within max.
+// allow records a hit and reports whether it is within max (0: no limit).
 func (c *windowCounter) allow(key string, max int, now time.Time) bool {
+	if max <= 0 {
+		return true
+	}
 	n, _ := c.hit(key, now)
 	return n >= 1 && n <= max
 }

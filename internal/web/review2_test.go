@@ -10,6 +10,12 @@ import (
 )
 
 // Creating events must not let anyone flood an address with mails.
+var (
+	createdPerRecipientPerDay = DefaultMailLimits().CreatedPerAddressPerDay
+	createdPerHour            = DefaultMailLimits().CreatedPerHour
+	signupMailsPerEventHour   = DefaultMailLimits().SignupsPerEventPerHour
+)
+
 func TestCreationMailLimits(t *testing.T) {
 	fm := &fakeMailer{}
 	e := newEnv(t, Config{Mailer: fm, MailEnabled: true, BaseURL: "https://jeviensaider.example"})
@@ -139,4 +145,28 @@ func TestRenewPersonalLink(t *testing.T) {
 	expect(t, e.get(v, r.location), 200, "nouveau lien personnel", "Marie")
 	// The browser's cookie follows the new link.
 	expect(t, e.get(v, pub), 200, r.location)
+}
+
+func TestMailLimitsConfigurable(t *testing.T) {
+	// Custom limits.
+	fm := &fakeMailer{}
+	e := newEnv(t, Config{Mailer: fm, MailEnabled: true, BaseURL: "https://x.example", MailLimits: &MailLimits{CreatedPerAddressPerDay: 1, PerHour: 2}})
+	c := e.client()
+	for _, to := range []string{"a@example.org", "a@example.org", "b@example.org", "c@example.org"} {
+		e.post(c, "/events", url.Values{"title": {"T"}, "admin_email": {to}})
+	}
+	if msgs := fm.take(); len(msgs) != 2 || msgs[0].To != "a@example.org" || msgs[1].To != "b@example.org" {
+		t.Errorf("custom limits: %+v", msgs)
+	}
+
+	// No limits at all.
+	fm = &fakeMailer{}
+	e = newEnv(t, Config{Mailer: fm, MailEnabled: true, BaseURL: "https://x.example", MailLimits: &MailLimits{}})
+	c = e.client()
+	for i := 0; i < 50; i++ {
+		e.post(c, "/events", url.Values{"title": {"T"}, "admin_email": {"a@example.org"}})
+	}
+	if n := len(fm.take()); n != 50 {
+		t.Errorf("unlimited: %d mails, want 50", n)
+	}
 }

@@ -31,7 +31,9 @@ type Config struct {
 	// says whether they really leave the server (an SMTP server is set up).
 	Mailer      Mailer
 	MailEnabled bool
-	Logger      *slog.Logger
+	// MailLimits caps outgoing mails (nil: DefaultMailLimits).
+	MailLimits *MailLimits
+	Logger     *slog.Logger
 }
 
 // Server holds the dependencies of the HTTP handlers.
@@ -43,6 +45,7 @@ type Server struct {
 	assetVersion string
 	limiter      *limiter
 	mails        *mailBudget
+	limits       MailLimits
 }
 
 // New builds a Server and parses its templates.
@@ -55,6 +58,10 @@ func New(st *store.Store, cfg Config) (*Server, error) {
 	}
 	cfg.BaseURL = strings.TrimRight(cfg.BaseURL, "/")
 	s := &Server{store: st, cfg: cfg, log: cfg.Logger, limiter: newLimiter(cfg.PostsPerMinute), mails: newMailBudget()}
+	s.limits = DefaultMailLimits()
+	if cfg.MailLimits != nil {
+		s.limits = *cfg.MailLimits
+	}
 	if err := s.loadTemplates(); err != nil {
 		return nil, err
 	}

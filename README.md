@@ -106,12 +106,18 @@ Creating an event sends a mail to the address the visitor types. So with
 e-mails enabled, the server refuses to start without
 `BENEVOLE_CREATE_PASSWORD`; otherwise anybody could use it to e-mail anyone.
 On a private network, `BENEVOLE_OPEN_CREATION=true` lifts this. Mails are
-limited in any case:
+limited in any case. Each limit is a number, or `0` / `unlimited` for no
+limit; an invalid value stops the server:
 
-- 3 "event created" mails per address per day, and 30 per hour in all;
-- 20 sign-up notifications per event per hour; after that the organiser gets
-  one "notifications en pause" message;
-- 300 mails per hour for the whole site.
+| Environment variable | Default | Limit |
+|---|---|---|
+| `BENEVOLE_MAIL_CREATED_PER_ADDRESS_PER_DAY` | `3` | "Event created" mails to one address, per day |
+| `BENEVOLE_MAIL_CREATED_PER_HOUR` | `30` | "Event created" mails to all addresses, per hour |
+| `BENEVOLE_MAIL_SIGNUPS_PER_EVENT_PER_HOUR` | `20` | Sign-up notifications for one event, per hour; past it the organiser gets one "notifications en pause" message |
+| `BENEVOLE_MAIL_PER_HOUR` | `300` | All mails, per hour |
+
+The counters are kept in memory and start again from zero when the server
+restarts.
 
 To check the settings, send a test e-mail. It reads the same variables and
 prints the SMTP server's error if sending fails:
@@ -189,7 +195,15 @@ or use the `sqlite3 .backup` command below on the host.
 1. Copy the binary to the server as `/usr/local/bin/benevole`.
 2. Install the [systemd unit](deploy/benevole.service) and set
    `BENEVOLE_BASE_URL` in it.
-3. Put [Caddy](deploy/Caddyfile) in front of the app for automatic HTTPS.
+3. Put a reverse proxy in front of the app for HTTPS: [Caddy](deploy/Caddyfile)
+   (automatic certificates) or [nginx](deploy/nginx.conf) (with certbot).
+   Either way, set `BENEVOLE_TRUST_PROXY=true` and keep the app listening on
+   `127.0.0.1` only.
+
+The nginx template forwards the client's address and protocol, redirects
+HTTP to HTTPS, and keeps the secret admin and personal links out of its
+access log (their tokens are replaced with `***`, and the Referer, which can
+contain them, is not logged).
 
 **Backups.** The database is a single file in WAL mode. This command takes a
 consistent copy while the server is running, for example from a daily cron job:

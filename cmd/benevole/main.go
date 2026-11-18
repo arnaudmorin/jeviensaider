@@ -66,6 +66,10 @@ func main() {
 	if err == nil {
 		err = checkOpenCreation(smtpCfg, createPassword)
 	}
+	mailLimits, limErr := mailLimitsFromEnv()
+	if err == nil {
+		err = limErr
+	}
 	if err != nil {
 		logger.Error("configuration", "err", err)
 		os.Exit(2)
@@ -74,7 +78,9 @@ func main() {
 	if smtpCfg != nil {
 		s, _ := mail.NewSMTP(*smtpCfg) // already validated
 		sender = s
-		logger.Info("e-mails enabled", "smtp", smtpCfg.Host, "port", smtpCfg.Port, "tls", smtpCfg.TLS, "from", smtpCfg.From)
+		logger.Info("e-mails enabled", "smtp", smtpCfg.Host, "port", smtpCfg.Port, "tls", smtpCfg.TLS, "from", smtpCfg.From,
+			"limits", fmt.Sprintf("%d created/address/day, %d created/hour, %d sign-ups/event/hour, %d total/hour (0 = unlimited)",
+				mailLimits.CreatedPerAddressPerDay, mailLimits.CreatedPerHour, mailLimits.SignupsPerEventPerHour, mailLimits.PerHour))
 	} else {
 		logger.Warn("e-mails disabled: set BENEVOLE_SMTP_HOST to send them (they are only logged)")
 	}
@@ -94,6 +100,7 @@ func main() {
 		RetentionDays:  *retention,
 		Mailer:         mailQueue,
 		MailEnabled:    smtpCfg != nil,
+		MailLimits:     &mailLimits,
 		Logger:         logger,
 	})
 	if err != nil {
