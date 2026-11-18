@@ -32,8 +32,11 @@ func main() {
 	if len(os.Args) > 1 && os.Args[1] == "events" {
 		os.Exit(runEvents(os.Args[2:], os.Stdin, os.Stdout, os.Stderr))
 	}
+	if len(os.Args) > 1 && os.Args[1] == "mail-test" {
+		os.Exit(runMailTest(os.Args[2:], os.Stdout, os.Stderr))
+	}
 	flag.Usage = func() {
-		fmt.Fprintf(flag.CommandLine.Output(), "Usage:\n  benevole [flags]           run the web server\n  benevole events <command>  super-admin tool: list, show, delete events (see \"benevole events help\")\n\nFlags:\n")
+		fmt.Fprintf(flag.CommandLine.Output(), "Usage:\n  benevole [flags]           run the web server\n  benevole events <command>  super-admin tool: list, show, delete events (see \"benevole events help\")\n  benevole mail-test <addr>  send a test e-mail with the SMTP settings\n\nFlags:\n")
 		flag.PrintDefaults()
 	}
 	trustDefault, _ := strconv.ParseBool(env("BENEVOLE_TRUST_PROXY", "false"))

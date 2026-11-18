@@ -97,6 +97,14 @@ is never sent over an unencrypted connection. Messages are sent in the
 background and retried for about 15 minutes if the server is unavailable.
 Settings are checked at startup.
 
+To check the settings, send a test e-mail. It reads the same variables and
+prints the SMTP server's error if sending fails:
+
+```sh
+benevole mail-test you@example.org
+docker compose exec app benevole mail-test you@example.org   # with Docker
+```
+
 **Keeping events forever.** By default, events and their volunteers'
 contact details are deleted 60 days after the event, which suits a public
 instance. For a private instance that wants to keep its history, set
