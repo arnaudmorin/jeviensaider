@@ -128,7 +128,7 @@ func (s *Server) adminUpdateEvent(w http.ResponseWriter, r *http.Request, ev *mo
 		adminFail(w, r, ev, 0, "Le nom de l'événement est obligatoire.")
 		return
 	}
-	date, err := parseDate(r.FormValue("date"))
+	date, err := s.parseDate(r.FormValue("date"))
 	if err != nil {
 		adminFail(w, r, ev, 0, err.Error())
 		return
@@ -231,12 +231,12 @@ func (s *Server) adminGenerateSlots(w http.ResponseWriter, r *http.Request, ev *
 	standID, _ := pathID(r, "id")
 	fail := func(msg string) { adminFail(w, r, ev, standID, msg) }
 
-	start, err := parseDateTime(r.FormValue("date"), r.FormValue("from"))
+	start, err := s.parseDateTime(r.FormValue("date"), r.FormValue("from"))
 	if err != nil {
 		fail("Début : " + err.Error())
 		return
 	}
-	end, err := parseDateTime(r.FormValue("date"), r.FormValue("to"))
+	end, err := s.parseDateTime(r.FormValue("date"), r.FormValue("to"))
 	if err != nil {
 		fail("Fin : " + err.Error())
 		return
@@ -284,11 +284,11 @@ func (s *Server) adminUpdateSlot(w http.ResponseWriter, r *http.Request, ev *mod
 	if date == "" {
 		date = sl.StartsAt.Format(model.DateLayout)
 	}
-	if sl.StartsAt, err = parseDateTime(date, r.FormValue("from")); err != nil {
+	if sl.StartsAt, err = s.parseDateTime(date, r.FormValue("from")); err != nil {
 		fail("Début : " + err.Error())
 		return
 	}
-	if sl.EndsAt, err = parseDateTime(date, r.FormValue("to")); err != nil {
+	if sl.EndsAt, err = s.parseDateTime(date, r.FormValue("to")); err != nil {
 		fail("Fin : " + err.Error())
 		return
 	}
@@ -379,7 +379,7 @@ func (s *Server) adminDuplicate(w http.ResponseWriter, r *http.Request, ev *mode
 		adminFail(w, r, ev, 0, "Donnez un nom au nouvel événement.")
 		return
 	}
-	date, err := parseDate(r.FormValue("date"))
+	date, err := s.parseDate(r.FormValue("date"))
 	if err != nil {
 		adminFail(w, r, ev, 0, err.Error())
 		return

@@ -35,9 +35,10 @@ func main() {
 		flag.PrintDefaults()
 	}
 	trustDefault, _ := strconv.ParseBool(env("BENEVOLE_TRUST_PROXY", "false"))
-	retentionDefault, err := strconv.Atoi(env("BENEVOLE_RETENTION_DAYS", "60"))
+	retentionDefault, err := retentionFromEnv()
 	if err != nil {
-		retentionDefault = 60
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(2)
 	}
 	addr := flag.String("addr", env("BENEVOLE_ADDR", ":8080"), "listen address (env BENEVOLE_ADDR)")
 	dbPath := flag.String("db", env("BENEVOLE_DB", "benevole.db"), "SQLite database file (env BENEVOLE_DB)")
@@ -90,6 +91,8 @@ func main() {
 
 	if *retention > 0 {
 		go cleanupLoop(ctx, st, *retention, logger)
+	} else {
+		logger.Info("automatic deletion of events is disabled: events are kept forever")
 	}
 
 	go func() {

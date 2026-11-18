@@ -35,7 +35,7 @@ func (s *Server) createEvent(w http.ResponseWriter, r *http.Request) {
 		Location:    clean(r.FormValue("location"), 120, false),
 		Description: clean(r.FormValue("description"), 2000, true),
 	}
-	date, dateErr := parseDate(r.FormValue("date"))
+	date, dateErr := s.parseDate(r.FormValue("date"))
 	ev.Date = date
 
 	fail := func(msg string) {

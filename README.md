@@ -27,6 +27,7 @@ in a single SQLite file.
 - Duplicate an event to reuse it next year.
 - Erase personal data after the event (GDPR). Whole events are also deleted
   automatically 60 days after they end, and the admin page shows the date.
+  A private instance can turn this off and keep its events forever.
 
 **For parents**
 - An **overview grid** (stands × hours, coloured red / orange / green),
@@ -66,12 +67,21 @@ as downloadable artifacts. They can also be built locally with
 | `-db` | `BENEVOLE_DB` | `benevole.db` | SQLite file, created if missing |
 | `-base-url` | `BENEVOLE_BASE_URL` | *(from request)* | Public URL used in shareable links, e.g. `https://jeviensaider.fr` |
 | `-trust-proxy` | `BENEVOLE_TRUST_PROXY` | `false` | Trust `X-Forwarded-*` headers when behind Caddy or nginx |
-| `-retention-days` | `BENEVOLE_RETENTION_DAYS` | `60` | Delete events this many days after they end; `0` keeps them forever |
+| `-retention-days` | `BENEVOLE_RETENTION_DAYS` | `60` | Delete events this many days after they end; `0` or `off` keeps them forever |
 | — | `BENEVOLE_CREATE_PASSWORD` | *(none)* | Password required to create an event |
 
 On a public server, set `BENEVOLE_CREATE_PASSWORD` so that only the APE can
 create events. It is read from the environment only, so it never shows up in
 `ps` output.
+
+**Keeping events forever.** By default, events and their volunteers'
+contact details are deleted 60 days after the event, which suits a public
+instance. For a private instance that wants to keep its history, set
+`BENEVOLE_RETENTION_DAYS=0` (or `off`) in `.env`: nothing is deleted
+automatically, the admin page no longer announces a deletion date, and old
+events stay editable. Organisers can still delete an event or erase its
+personal data from the admin page. An invalid value stops the server with an
+error rather than falling back to 60 days.
 
 ## Super-admin command line
 

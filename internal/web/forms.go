@@ -66,41 +66,55 @@ func formInt(r *http.Request, key string, def int) (int, error) {
 // now is the clock used to validate dates (replaced in tests).
 var now = time.Now
 
-// checkDateRange accepts dates from one year ago to two years ahead. Without
-// a limit, a far-future date would keep an event (and its personal data)
-// away from the automatic cleanup forever.
-func checkDateRange(t time.Time) error {
+// checkDateRange accepts dates up to two years ahead: a far-future date (a
+// typo, or a way around the automatic cleanup) would keep an event and its
+// personal data forever.
+//
+// Past dates are accepted back to the retention period (at least one year),
+// so organisers can still edit their events. When events are kept forever,
+// any past date is fine.
+func (s *Server) checkDateRange(t time.Time) error {
 	today := now()
-	min := time.Date(today.Year()-1, today.Month(), today.Day(), 0, 0, 0, 0, time.UTC)
 	max := time.Date(today.Year()+2, today.Month(), today.Day(), 23, 59, 59, 0, time.UTC)
+	if s.cfg.RetentionDays <= 0 {
+		if t.After(max) {
+			return fmt.Errorf("date hors limites : choisissez une date avant le %s", dateFR(max.Format(model.DateLayout)))
+		}
+		return nil
+	}
+	back := s.cfg.RetentionDays
+	if back < 365 {
+		back = 365
+	}
+	min := time.Date(today.Year(), today.Month(), today.Day()-back, 0, 0, 0, 0, time.UTC)
 	if t.Before(min) || t.After(max) {
 		return fmt.Errorf("date hors limites : choisissez une date entre le %s et le %s", dateFR(min.Format(model.DateLayout)), dateFR(max.Format(model.DateLayout)))
 	}
 	return nil
 }
 
-func parseDate(s string) (string, error) {
-	s = strings.TrimSpace(s)
-	if s == "" {
+func (s *Server) parseDate(v string) (string, error) {
+	v = strings.TrimSpace(v)
+	if v == "" {
 		return "", nil
 	}
-	t, err := time.Parse(model.DateLayout, s)
+	t, err := time.Parse(model.DateLayout, v)
 	if err != nil {
 		return "", errors.New("date invalide (format attendu : AAAA-MM-JJ)")
 	}
-	if err := checkDateRange(t); err != nil {
+	if err := s.checkDateRange(t); err != nil {
 		return "", err
 	}
-	return s, nil
+	return v, nil
 }
 
 // parseDateTime combines a YYYY-MM-DD date and an HH:MM time.
-func parseDateTime(date, hhmm string) (time.Time, error) {
+func (s *Server) parseDateTime(date, hhmm string) (time.Time, error) {
 	t, err := time.Parse(model.TimeLayout, strings.TrimSpace(date)+" "+strings.TrimSpace(hhmm))
 	if err != nil {
 		return time.Time{}, errors.New("date ou heure invalide")
 	}
-	if err := checkDateRange(t); err != nil {
+	if err := s.checkDateRange(t); err != nil {
 		return time.Time{}, err
 	}
 	return t, nil

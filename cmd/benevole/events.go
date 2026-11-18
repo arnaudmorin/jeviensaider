@@ -29,7 +29,7 @@ Commands:
 Flags:
   -db FILE              SQLite database (env BENEVOLE_DB, default benevole.db)
   -base-url URL         public URL used to print links (env BENEVOLE_BASE_URL)
-  -retention-days N     retention used to compute expiry dates (env BENEVOLE_RETENTION_DAYS, default 60)
+  -retention-days N     retention used to compute expiry dates, 0 = kept forever (env BENEVOLE_RETENTION_DAYS, default 60)
   -y                    delete: do not ask for confirmation
 `
 
@@ -59,9 +59,10 @@ func runEvents(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	fs.Usage = func() { fmt.Fprint(stderr, eventsUsage) }
 	fs.StringVar(&c.db, "db", env("BENEVOLE_DB", "benevole.db"), "")
 	fs.StringVar(&c.baseURL, "base-url", env("BENEVOLE_BASE_URL", ""), "")
-	retention, err := strconv.Atoi(env("BENEVOLE_RETENTION_DAYS", "60"))
+	retention, err := retentionFromEnv()
 	if err != nil {
-		retention = 60
+		fmt.Fprintln(stderr, err)
+		return 2
 	}
 	fs.IntVar(&c.retention, "retention-days", retention, "")
 	fs.BoolVar(&c.yes, "y", false, "")
