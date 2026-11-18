@@ -283,3 +283,23 @@ form.inline { display: inline; margin: 0; }
 .danger-zone > summary { color: var(--danger); }
 .tools .card { margin-bottom: 8px; }
 .error-page { text-align: center; margin-top: 32px; }
+
+/* "Mon planning": personal mini grid in "Mes créneaux" */
+.myplan { margin: 20px 0 24px; }
+.myplan-title { font-size: 1.1rem; font-weight: 500; margin: 0 0 2px; }
+.myplan .meta { margin: 0 0 12px; }
+.mygrid { border-collapse: separate; border-spacing: 4px; margin: -4px; }
+.mygrid thead th { font-weight: 500; font-size: .8rem; color: var(--muted); text-align: center; white-space: nowrap; padding: 0 2px 2px; }
+.mygrid tbody th { text-align: left; font-weight: 500; white-space: nowrap; padding-right: 10px; position: sticky; left: 0; background: var(--bg); z-index: 1; }
+.mygrid td { padding: 0; min-width: 44px; }
+.mg { display: flex; align-items: center; justify-content: center; height: 34px; min-width: 44px; border-radius: 6px; font-size: .9rem; }
+.mg + .mg { margin-top: 4px; }
+.mg-me { background: var(--stand, var(--primary)); color: #fff; font-weight: 600; }
+.mg-me.clash { box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--danger); }
+.mg-free { border: 1px dashed var(--border); color: var(--muted); }
+.mg-free:hover { border-color: var(--primary); color: var(--primary); text-decoration: none; }
+.mg-other { background: var(--surface-2); color: var(--muted); }
+.legend { font-size: .8rem; color: var(--muted); display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; margin: 10px 0 0; }
+.mg.sample { display: inline-flex; height: 20px; min-width: 24px; font-size: .75rem; border-radius: 4px; }
+.mg-me.sample:not(.clash) { background: var(--primary); }
+.mg-me.clash.sample { background: var(--muted); }

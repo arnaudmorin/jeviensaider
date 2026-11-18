@@ -246,6 +246,7 @@ func templateFuncs() template.FuncMap {
 		"day":     dayFR,
 		"date":    dateFR,
 		"span":    func(a, b time.Time) string { return hm(a) + " – " + hm(b) },
+		"dur":     durationFR,
 		"pub":     model.DisplayName,
 		"label":   statusLabel,
 		"evlabel": eventStatusLabel,
@@ -312,5 +313,18 @@ func templateFuncs() template.FuncMap {
 			}
 			return template.CSS(defaultColor)
 		},
+	}
+}
+
+// durationFR formats a duration the French way: "45 min", "2 h", "2 h 30".
+func durationFR(d time.Duration) string {
+	m := int(d.Round(time.Minute) / time.Minute)
+	switch {
+	case m < 60:
+		return strconv.Itoa(m) + " min"
+	case m%60 == 0:
+		return strconv.Itoa(m/60) + " h"
+	default:
+		return fmt.Sprintf("%d h %02d", m/60, m%60)
 	}
 }

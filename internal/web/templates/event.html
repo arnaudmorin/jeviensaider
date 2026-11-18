@@ -126,6 +126,42 @@
       </div>
       {{end}}
 
+      {{with .MyP}}{{if gt (len .MySlots) 1}}
+      <section class="myplan" aria-labelledby="myplan-title">
+        <h2 id="myplan-title" class="myplan-title">Mon planning</h2>
+        <p class="meta">{{len .MySlots}} créneaux · {{dur .MyDuration}} · {{len .Stands}} {{plural (len .Stands) "stand" "stands"}}{{range .MySlots}}{{if .Clash}} · <span class="warn">⚠ créneaux en même temps</span>{{break}}{{end}}{{end}}</p>
+        <div class="table-wrap">
+          <table class="mygrid">
+            <thead>
+              <tr>
+                <th scope="col"></th>
+                {{range .Columns}}<th scope="col">{{if $.MyP.MultiDay}}<small>{{day .StartsAt}}</small><br>{{end}}{{hm .StartsAt}}</th>{{end}}
+              </tr>
+            </thead>
+            <tbody>
+              {{range .Rows}}
+              <tr>
+                <th scope="row" style="--stand: {{css .Stand.Color}}"><span class="dot"></span>{{.Stand.Name}}</th>
+                {{range .Cells}}
+                <td>{{range .}}
+                  {{if .Mine}}
+                  <span class="mg mg-me{{if .Clash}} clash{{end}}" style="--stand: {{css .Stand.Color}}" title="Vous : {{.Stand.Name}}, {{span .StartsAt .EndsAt}}{{if .Clash}} (en même temps qu'un autre créneau){{end}}">{{if .Clash}}⚠{{else}}✓{{end}}</span>
+                  {{else if and $.Event.IsOpen (not .Full)}}
+                  <a class="mg mg-free" href="{{$.EventURL}}/slots/{{.ID}}/signup" hx-get="{{$.EventURL}}/slots/{{.ID}}/signup" hx-target="#modal" title="Place libre : {{.Stand.Name}}, {{span .StartsAt .EndsAt}}" aria-label="S'inscrire : {{.Stand.Name}}, {{span .StartsAt .EndsAt}}">+</a>
+                  {{else}}
+                  <span class="mg mg-other" title="{{.Stand.Name}}, {{span .StartsAt .EndsAt}} : complet">·</span>
+                  {{end}}
+                {{end}}</td>
+                {{end}}
+              </tr>
+              {{end}}
+            </tbody>
+          </table>
+        </div>
+        <p class="legend"><span class="mg mg-me sample">✓</span> vous · <span class="mg mg-me clash sample">⚠</span> en même temps · <span class="mg mg-free sample">+</span> place libre</p>
+      </section>
+      {{end}}{{end}}
+
       {{if .P.MySlots}}
       <ul class="list">
         {{range .P.MySlots}}

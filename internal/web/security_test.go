@@ -213,3 +213,54 @@ func TestDateLimits(t *testing.T) {
 	})
 	expect(t, e.get(admin, adminPath), 200, "date hors limites")
 }
+
+func TestOverlapWarningAndMyPlanning(t *testing.T) {
+	e := newEnv(t, Config{})
+	admin := e.client()
+	adminPath, publicPath, slots := setupEvent(t, e, admin) // 14h, 15h, 16h on one stand
+	marie := e.client()
+	form := url.Values{"name": {"Marie Dupont"}, "email": {"m@example.org"}}
+	r := e.post(marie, publicPath+"/slots/"+slots[0]+"/signup", form)
+	expect(t, r, http.StatusSeeOther)
+	meLink := strings.TrimSuffix(r.location, "?welcome=1")
+
+	// A single sign-up: no personal grid yet.
+	if strings.Contains(e.get(marie, meLink).body, "Mon planning") {
+		t.Error("personal grid shown with a single sign-up")
+	}
+	// The next slot does not overlap: no warning.
+	if strings.Contains(e.get(marie, publicPath+"/slots/"+slots[1]+"/signup").body, "même horaire") {
+		t.Error("warning shown for a non-overlapping slot")
+	}
+	expect(t, e.post(marie, publicPath+"/slots/"+slots[1]+"/signup", form), http.StatusSeeOther)
+	expect(t, e.get(marie, meLink), 200, "Mon planning", "2 créneaux · 2 h · 1 stand")
+
+	// A second stand with a 14:30-15:30 slot, overlapping both.
+	expect(t, e.post(admin, adminPath+"/stands", url.Values{"name": {"Buvette"}}), http.StatusSeeOther)
+	ids := regexp.MustCompile(`id="stand-(\d+)"`).FindAllStringSubmatch(e.get(admin, adminPath).body, -1)
+	buvette := ids[len(ids)-1][1]
+	expect(t, e.post(admin, adminPath+"/stands/"+buvette+"/slots", url.Values{
+		"date": {"2026-06-20"}, "from": {"14:30"}, "to": {"15:30"}, "step": {"0"}, "min": {"1"},
+	}), http.StatusSeeOther)
+	newest := 0 // the Buvette slot is the most recent one
+	for _, m := range regexp.MustCompile(`/slots/(\d+)/signup`).FindAllStringSubmatch(e.get(marie, publicPath).body, -1) {
+		if n, _ := strconv.Atoi(m[1]); n > newest {
+			newest = n
+		}
+	}
+	buvetteSlot := strconv.Itoa(newest)
+	r = e.get(marie, publicPath+"/slots/"+buvetteSlot+"/signup")
+	expect(t, r, 200, "même horaire", "Pêche aux canards", "14h – 15h", "15h – 16h", "M'inscrire quand même")
+
+	// Warn, never block: the sign-up goes through, and the grid flags it.
+	expect(t, e.post(marie, publicPath+"/slots/"+buvetteSlot+"/signup", form), http.StatusSeeOther)
+	expect(t, e.get(marie, meLink), 200, "3 créneaux", "2 stands", "créneaux en même temps", "mg-me clash")
+}
+
+func TestDurationFR(t *testing.T) {
+	for d, want := range map[time.Duration]string{45 * time.Minute: "45 min", 2 * time.Hour: "2 h", 150 * time.Minute: "2 h 30"} {
+		if got := durationFR(d); got != want {
+			t.Errorf("durationFR(%v) = %q, want %q", d, got, want)
+		}
+	}
+}

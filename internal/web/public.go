@@ -158,6 +158,7 @@ type eventPage struct {
 	MeURL    string
 	MeAbsURL string
 	Welcome  bool
+	MyP      *model.Planning // "Mes créneaux": the planning of my stands only
 }
 
 func (s *Server) eventPage(w http.ResponseWriter, r *http.Request, ev *model.Event) {
@@ -195,6 +196,7 @@ func (s *Server) showEvent(w http.ResponseWriter, r *http.Request, ev *model.Eve
 	}
 	if meTab {
 		data.Tab = "me"
+		data.MyP = p.Mine()
 	} else if id, err := strconv.ParseInt(r.URL.Query().Get("stand"), 10, 64); err == nil {
 		if st := p.Stand(id); st != nil {
 			data.Tab, data.Stand = "stand", st
@@ -213,21 +215,26 @@ type signupPage struct {
 	Me       *model.Volunteer
 	Form     volunteerForm
 	Error    string
+	// Overlaps lists the visitor's existing sign-ups at the same time, to
+	// warn them before they confirm.
+	Overlaps []*model.SlotView
 }
 
-func (s *Server) loadSlotView(ctx context.Context, ev *model.Event, slotID, myID int64) (*model.SlotView, error) {
+// loadSlotView returns a slot with its sign-ups, and the visitor's other
+// sign-ups that overlap it.
+func (s *Server) loadSlotView(ctx context.Context, ev *model.Event, slotID, myID int64) (*model.SlotView, []*model.SlotView, error) {
 	p, err := s.planning(ctx, ev, myID)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	for _, st := range p.Stands {
 		for _, sl := range st.Slots {
 			if sl.ID == slotID {
-				return sl, nil
+				return sl, p.MyOverlaps(sl), nil
 			}
 		}
 	}
-	return nil, store.ErrNotFound
+	return nil, nil, store.ErrNotFound
 }
 
 func (s *Server) signupForm(w http.ResponseWriter, r *http.Request, ev *model.Event) {
@@ -243,11 +250,11 @@ func (s *Server) signupForm(w http.ResponseWriter, r *http.Request, ev *model.Ev
 		myID = me.ID
 		data.Form = volunteerForm{Name: me.Name, Email: me.Email, Phone: me.Phone}
 	}
-	sv, err := s.loadSlotView(r.Context(), ev, id, myID)
+	sv, overlaps, err := s.loadSlotView(r.Context(), ev, id, myID)
 	if s.storeError(w, r, err) {
 		return
 	}
-	data.Slot = sv
+	data.Slot, data.Overlaps = sv, overlaps
 	s.renderSignup(w, r, http.StatusOK, data)
 }
 
@@ -278,7 +285,7 @@ func (s *Server) signupSubmit(w http.ResponseWriter, r *http.Request, ev *model.
 		if me != nil {
 			myID = me.ID
 		}
-		sv, err := s.loadSlotView(r.Context(), ev, id, myID)
+		sv, overlaps, err := s.loadSlotView(r.Context(), ev, id, myID)
 		if s.storeError(w, r, err) {
 			return
 		}
@@ -287,6 +294,7 @@ func (s *Server) signupSubmit(w http.ResponseWriter, r *http.Request, ev *model.
 		r.Header.Del("HX-Request")
 		s.renderSignup(w, r, status, signupPage{
 			Common: Common{Title: "Inscription"}, Event: ev, EventURL: eventURL(ev), Slot: sv, Me: me, Form: form, Error: msg,
+			Overlaps: overlaps,
 		})
 	}
 	if err := form.validate(true); err != nil {

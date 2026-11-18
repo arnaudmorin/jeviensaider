@@ -26,6 +26,13 @@
 {{else if $s.Full}}
   <div class="callout info">Ce créneau est complet. Merci !</div>
 {{else}}
+{{if .Overlaps}}
+<div class="callout warning" role="alert">
+  <strong>Attention, même horaire :</strong> vous êtes déjà inscrit·e
+  {{range $i, $o := .Overlaps}}{{if $i}}, {{end}}sur « {{$o.Stand.Name}} » de {{span $o.StartsAt $o.EndsAt}}{{end}}.
+  Vous pouvez quand même vous inscrire si vous savez gérer les deux.
+</div>
+{{end}}
 <form method="post" action="{{.EventURL}}/slots/{{$s.ID}}/signup" class="stack">
   <label>Prénom et nom
     <input name="name" value="{{.Form.Name}}" required maxlength="80" autocomplete="name">
@@ -43,7 +50,7 @@
     <input name="comment" value="{{.Form.Comment}}" maxlength="300">
   </label>
   <label class="hp" aria-hidden="true">Site web <input name="website" tabindex="-1" autocomplete="off"></label>
-  <button type="submit" class="btn block">Je m'inscris</button>
+  <button type="submit" class="btn block">{{if .Overlaps}}M'inscrire quand même{{else}}Je m'inscris{{end}}</button>
 </form>
 {{end}}
 {{end}}

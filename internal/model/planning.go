@@ -15,6 +15,7 @@ type SlotView struct {
 	Missing int
 	Full    bool
 	Mine    bool // the current volunteer is signed up
+	Clash   bool // Mine, and overlaps another slot of the current volunteer
 }
 
 // StandView is a stand with its slots, in chronological order.
@@ -55,12 +56,13 @@ type Planning struct {
 	Needed   int
 	Count    int
 	MySlots  []*SlotView
+	MyID     int64 // the current volunteer, 0 if unknown
 }
 
 // BuildPlanning assembles stands, slots and sign-ups into a Planning.
 // stands must be in display order. myVolunteerID may be 0.
 func BuildPlanning(stands []Stand, slots []Slot, signups []SignupRow, myVolunteerID int64) *Planning {
-	p := &Planning{}
+	p := &Planning{MyID: myVolunteerID}
 	byStand := make(map[int64]*StandView, len(stands))
 	for i := range stands {
 		sv := &StandView{Stand: stands[i]}
@@ -136,6 +138,14 @@ func BuildPlanning(stands []Stand, slots []Slot, signups []SignupRow, myVoluntee
 	}
 	p.Groups = groups
 
+	for i, a := range p.MySlots {
+		for _, b := range p.MySlots[i+1:] {
+			if a.Overlaps(b.Slot) {
+				a.Clash, b.Clash = true, true
+			}
+		}
+	}
+
 	if len(p.Columns) > 0 {
 		first := p.Columns[0].StartsAt
 		for _, c := range p.Columns {
@@ -156,4 +166,47 @@ func (p *Planning) Stand(id int64) *StandView {
 		}
 	}
 	return nil
+}
+
+// Mine is the planning restricted to the stands where the current volunteer
+// has signed up: their personal overview.
+func (p *Planning) Mine() *Planning {
+	var stands []Stand
+	var slots []Slot
+	var signups []SignupRow
+	for _, st := range p.Stands {
+		mine := false
+		for _, v := range st.Slots {
+			mine = mine || v.Mine
+		}
+		if !mine {
+			continue
+		}
+		stands = append(stands, st.Stand)
+		for _, v := range st.Slots {
+			slots = append(slots, v.Slot)
+			signups = append(signups, v.Signups...)
+		}
+	}
+	return BuildPlanning(stands, slots, signups, p.MyID)
+}
+
+// MyOverlaps returns the current volunteer's other slots that overlap v.
+func (p *Planning) MyOverlaps(v *SlotView) []*SlotView {
+	var out []*SlotView
+	for _, m := range p.MySlots {
+		if m.ID != v.ID && m.Overlaps(v.Slot) {
+			out = append(out, m)
+		}
+	}
+	return out
+}
+
+// MyDuration is the total time of the current volunteer's slots.
+func (p *Planning) MyDuration() time.Duration {
+	var d time.Duration
+	for _, v := range p.MySlots {
+		d += v.EndsAt.Sub(v.StartsAt)
+	}
+	return d
 }
