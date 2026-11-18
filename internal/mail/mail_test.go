@@ -17,6 +17,7 @@ import (
 	"mime/quotedprintable"
 	"net"
 	"net/mail"
+	"net/textproto"
 	"strconv"
 	"strings"
 	"sync"
@@ -323,5 +324,86 @@ func TestSMTPSendEncrypted(t *testing.T) {
 	s.tlsConfig = nil // verify against the system roots: the self-signed cert fails
 	if err := s.Send(context.Background(), Message{To: "orga@example.org", Subject: "s", Body: "x"}); err == nil {
 		t.Error("untrusted certificate accepted")
+	}
+}
+
+// scriptedSender fails according to a function of the recipient.
+type scriptedSender struct {
+	mu    sync.Mutex
+	fail  func(Message, int) error // message, attempt number for it
+	tries map[string]int
+	sent  []string
+}
+
+func (s *scriptedSender) Send(_ context.Context, m Message) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.tries == nil {
+		s.tries = map[string]int{}
+	}
+	n := s.tries[m.To]
+	s.tries[m.To]++
+	if err := s.fail(m, n); err != nil {
+		return err
+	}
+	s.sent = append(s.sent, m.To)
+	return nil
+}
+
+func TestQueuePermanentErrorsAndNoHeadOfLineBlocking(t *testing.T) {
+	s := &scriptedSender{fail: func(m Message, n int) error {
+		switch m.To {
+		case "unknown@b.fr":
+			return &textproto.Error{Code: 550, Msg: "no such user"}
+		case "slow@b.fr":
+			if n == 0 {
+				return &textproto.Error{Code: 451, Msg: "try again later"}
+			}
+		}
+		return nil
+	}}
+	q := NewQueue(s, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	q.retries = []time.Duration{200 * time.Millisecond}
+	q.Enqueue(Message{To: "unknown@b.fr"})
+	q.Enqueue(Message{To: "slow@b.fr"})
+	q.Enqueue(Message{To: "ok@b.fr"})
+
+	// ok@ is sent while slow@ waits for its retry.
+	deadline := time.Now().Add(150 * time.Millisecond)
+	for {
+		s.mu.Lock()
+		sent := append([]string(nil), s.sent...)
+		s.mu.Unlock()
+		if len(sent) == 1 && sent[0] == "ok@b.fr" {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("ok@ blocked behind a retry: sent %v", sent)
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	q.Close(ctx)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.tries["unknown@b.fr"] != 1 {
+		t.Errorf("permanent error retried: %d tries", s.tries["unknown@b.fr"])
+	}
+	if len(s.sent) != 2 || s.sent[1] != "slow@b.fr" {
+		t.Errorf("sent %v, want ok@ then slow@ (after its retry)", s.sent)
+	}
+	q.Enqueue(Message{To: "late@b.fr"}) // after Close: dropped, no panic
+}
+
+func TestPermanentAndLocalAddr(t *testing.T) {
+	if !Permanent(&textproto.Error{Code: 554}) || Permanent(&textproto.Error{Code: 421}) || Permanent(errors.New("dial: timeout")) {
+		t.Error("Permanent misclassifies")
+	}
+	for addr, want := range map[string]bool{"127.0.0.1": true, "::1": true, "10.1.2.3": true, "192.168.1.43": true, "172.18.0.2": true, "fd00::1": true, "203.0.113.5": false, "2001:db8::1": false} {
+		if got := localAddr(&net.TCPAddr{IP: net.ParseIP(addr)}); got != want {
+			t.Errorf("localAddr(%s) = %v", addr, got)
+		}
 	}
 }

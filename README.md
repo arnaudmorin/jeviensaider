@@ -39,7 +39,8 @@ in a single SQLite file.
   missing.
 - Sign up with just a name; a phone number is optional, and no e-mail is
   asked or stored. There is no account: the browser remembers them, and a personal link
-  lets them manage their slots from another device.
+  lets them manage their slots from another device. A link shared by mistake
+  can be replaced with a new one.
 - A **"Mes créneaux"** tab, with a warning when two of their slots overlap.
 
 ## Quick start
@@ -75,7 +76,7 @@ as downloadable artifacts. They can also be built locally with
 
 On a public server, set `BENEVOLE_CREATE_PASSWORD` so that only the APE can
 create events. It is read from the environment only, so it never shows up in
-`ps` output.
+`ps` output. It is also asked for when an organiser duplicates an event.
 
 **E-mails.** The app e-mails organisers: the admin link when an event is
 created or duplicated, then, unless they turn it off, one message per sign-up
@@ -86,16 +87,31 @@ with these variables (environment only):
 |---|---|---|
 | `BENEVOLE_SMTP_HOST` | *(none)* | SMTP server; empty disables sending (messages are only logged, without their content) |
 | `BENEVOLE_SMTP_PORT` | `587` | `587` (STARTTLS) or `465` (TLS) |
-| `BENEVOLE_SMTP_TLS` | `starttls`, or `tls` on 465 | `starttls`, `tls`, or `none` for a local relay without authentication |
+| `BENEVOLE_SMTP_TLS` | `starttls`, or `tls` on 465 | `starttls`, `tls`, or `none` for a relay on this machine or a private network, without authentication |
 | `BENEVOLE_SMTP_USERNAME` / `BENEVOLE_SMTP_PASSWORD` | *(none)* | Credentials, if the server requires them |
 | `BENEVOLE_SMTP_FROM` | `Je viens aider <noreply@…>` | Sender, by default on the domain of `BENEVOLE_BASE_URL` |
+| `BENEVOLE_OPEN_CREATION` | `false` | Allow e-mails without `BENEVOLE_CREATE_PASSWORD` (see below) |
 
 With SMTP enabled, `BENEVOLE_BASE_URL` is required: links in e-mails are
 built from it, never from the request. The connection is always encrypted
 (STARTTLS is required, not optional) unless `none` is chosen, and a password
-is never sent over an unencrypted connection. Messages are sent in the
-background and retried for about 15 minutes if the server is unavailable.
-Settings are checked at startup.
+is never sent over an unencrypted connection. `none` is refused unless the
+SMTP server's address is a loopback or private one. Messages are sent in the
+background. If the server is unavailable they are retried for about
+15 minutes without holding up the others, and a message the server rejects
+(an unknown address, for example) is not retried. Settings are checked at
+startup.
+
+Creating an event sends a mail to the address the visitor types. So with
+e-mails enabled, the server refuses to start without
+`BENEVOLE_CREATE_PASSWORD`; otherwise anybody could use it to e-mail anyone.
+On a private network, `BENEVOLE_OPEN_CREATION=true` lifts this. Mails are
+limited in any case:
+
+- 3 "event created" mails per address per day, and 30 per hour in all;
+- 20 sign-up notifications per event per hour; after that the organiser gets
+  one "notifications en pause" message;
+- 300 mails per hour for the whole site.
 
 To check the settings, send a test e-mail. It reads the same variables and
 prints the SMTP server's error if sending fails:
@@ -220,9 +236,10 @@ internal/web/      handlers, middleware, embedded templates and static files (ht
   is still being prepared is never deleted.
 - **E-mails.** Links come from `BENEVOLE_BASE_URL`, so a forged `Host`
   header cannot turn them into links to another site. Headers are encoded
-  and line breaks refused, so names cannot inject headers. Anyone who can
-  create an event can make the app send one message to any address: on a
-  public server, set `BENEVOLE_CREATE_PASSWORD`.
+  and line breaks refused, so names cannot inject headers. E-mails require a
+  creation password (or an explicit opt-out), and every kind of mail is
+  rate-limited, so the site cannot be used to flood an inbox. A rejected
+  address or a down SMTP server cannot block or drop the other messages.
 - **Privacy.** Volunteers give only a name and, optionally, a phone number;
   no e-mail is stored. Public pages show only "Prénom N.", phone numbers are
   visible to the organisers only, and pages are marked `noindex`.

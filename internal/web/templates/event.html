@@ -190,6 +190,9 @@
           <input type="text" readonly value="{{.MeAbsURL}}" id="me-link">
           <button type="button" class="btn text small" data-copy="#me-link">Copier</button>
         </div>
+        <form method="post" action="{{.MeURL}}/renew">
+          <p class="hint">Partagé par erreur ? <button type="submit" class="linklike">Changer de lien</button> : l'ancien ne fonctionnera plus.</p>
+        </form>
       </div>
 
       <details>

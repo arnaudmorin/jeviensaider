@@ -63,6 +63,9 @@ func main() {
 	slog.SetDefault(logger)
 
 	smtpCfg, err := smtpFromEnv(strings.TrimRight(*baseURL, "/"))
+	if err == nil {
+		err = checkOpenCreation(smtpCfg, createPassword)
+	}
 	if err != nil {
 		logger.Error("configuration", "err", err)
 		os.Exit(2)

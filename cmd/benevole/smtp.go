@@ -57,3 +57,19 @@ func smtpFromEnv(baseURL string) (*mail.Config, error) {
 	}
 	return cfg, nil
 }
+
+// checkOpenCreation refuses to send e-mails when anyone can create an
+// event: creating one sends a mail to an address the visitor types, which
+// would let anybody use the server to send mail to anyone. Set
+// BENEVOLE_OPEN_CREATION=true to accept that (on a private network, say);
+// the number of such mails is limited anyway.
+func checkOpenCreation(smtp *mail.Config, createPassword string) error {
+	if smtp == nil || createPassword != "" {
+		return nil
+	}
+	if open, _ := strconv.ParseBool(os.Getenv("BENEVOLE_OPEN_CREATION")); open {
+		return nil
+	}
+	return fmt.Errorf("e-mails are enabled (BENEVOLE_SMTP_HOST) but anyone can create events: set BENEVOLE_CREATE_PASSWORD, " +
+		"or BENEVOLE_OPEN_CREATION=true to let anybody make the server e-mail any address")
+}

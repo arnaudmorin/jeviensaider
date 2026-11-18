@@ -42,6 +42,7 @@ type Server struct {
 	pages        map[string]*template.Template
 	assetVersion string
 	limiter      *limiter
+	mails        *mailBudget
 }
 
 // New builds a Server and parses its templates.
@@ -53,7 +54,7 @@ func New(st *store.Store, cfg Config) (*Server, error) {
 		cfg.PostsPerMinute = 60
 	}
 	cfg.BaseURL = strings.TrimRight(cfg.BaseURL, "/")
-	s := &Server{store: st, cfg: cfg, log: cfg.Logger, limiter: newLimiter(cfg.PostsPerMinute)}
+	s := &Server{store: st, cfg: cfg, log: cfg.Logger, limiter: newLimiter(cfg.PostsPerMinute), mails: newMailBudget()}
 	if err := s.loadTemplates(); err != nil {
 		return nil, err
 	}
@@ -77,6 +78,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /e/{slug}/me/{token}", s.withVolunteer(s.mePage))
 	mux.HandleFunc("POST /e/{slug}/me/{token}", s.withVolunteer(s.meUpdate))
 	mux.HandleFunc("POST /e/{slug}/me/{token}/signups/{id}/delete", s.withVolunteer(s.meCancel))
+	mux.HandleFunc("POST /e/{slug}/me/{token}/renew", s.withVolunteer(s.meRenew))
 
 	// Admin, the token is the credential.
 	mux.HandleFunc("GET /a/{token}", s.withAdmin(s.adminPage))
@@ -113,7 +115,8 @@ func (s *Server) Handler() http.Handler {
 
 func (s *Server) healthz(w http.ResponseWriter, r *http.Request) {
 	if err := s.store.Ping(r.Context()); err != nil {
-		http.Error(w, "db: "+err.Error(), http.StatusServiceUnavailable)
+		s.log.Error("healthz", "err", err)
+		http.Error(w, "database unavailable", http.StatusServiceUnavailable)
 		return
 	}
 	w.Write([]byte("ok\n"))

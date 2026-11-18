@@ -48,8 +48,7 @@ func (s *Server) createEvent(w http.ResponseWriter, r *http.Request) {
 			Common: Common{Title: "Je viens aider"}, NeedPassword: s.cfg.CreatePassword != "", MailEnabled: s.cfg.MailEnabled, Error: msg, Form: ev,
 		})
 	}
-	if s.cfg.CreatePassword != "" &&
-		subtle.ConstantTimeCompare([]byte(r.FormValue("password")), []byte(s.cfg.CreatePassword)) != 1 {
+	if !s.createPasswordOK(r) {
 		fail("Mot de passe de création incorrect.")
 		return
 	}
@@ -69,13 +68,19 @@ func (s *Server) createEvent(w http.ResponseWriter, r *http.Request) {
 		s.serverError(w, r, err)
 		return
 	}
-	s.notifyCreated(r, &ev)
+	sent := s.notifyCreated(r, &ev)
 	msg := "Événement créé ! Ce lien d'administration est votre seule clé pour le gérer : ajoutez-le à vos favoris et ne le partagez qu'avec les organisateurs."
-	if s.cfg.MailEnabled {
+	if s.cfg.MailEnabled && sent {
 		msg = "Événement créé ! Ce lien d'administration est votre seule clé pour le gérer : il vient de vous être envoyé à " + ev.AdminEmail + ". Ne le partagez qu'avec les organisateurs."
 	}
 	setFlash(w, "success", msg)
 	redirect(w, r, "/a/"+ev.AdminToken)
+}
+
+// createPasswordOK checks the creation password, if one is configured.
+func (s *Server) createPasswordOK(r *http.Request) bool {
+	return s.cfg.CreatePassword == "" ||
+		subtle.ConstantTimeCompare([]byte(r.FormValue("password")), []byte(s.cfg.CreatePassword)) == 1
 }
 
 // ---- event loading helpers ----
@@ -253,6 +258,11 @@ func (s *Server) loadSlotView(ctx context.Context, ev *model.Event, slotID, myID
 
 func (s *Server) signupForm(w http.ResponseWriter, r *http.Request, ev *model.Event) {
 	id, ok := pathID(r, "id")
+	if ev.IsDraft() {
+		// The planning of a draft is not public yet.
+		s.renderError(w, r, http.StatusNotFound, "Les inscriptions ne sont pas encore ouvertes. Revenez bientôt !")
+		return
+	}
 	if !ok {
 		s.renderError(w, r, http.StatusNotFound, "Créneau introuvable.")
 		return
@@ -282,6 +292,10 @@ func (s *Server) renderSignup(w http.ResponseWriter, r *http.Request, status int
 
 func (s *Server) signupSubmit(w http.ResponseWriter, r *http.Request, ev *model.Event) {
 	id, ok := pathID(r, "id")
+	if ev.IsDraft() {
+		s.renderError(w, r, http.StatusNotFound, "Les inscriptions ne sont pas encore ouvertes. Revenez bientôt !")
+		return
+	}
 	if !ok {
 		s.renderError(w, r, http.StatusNotFound, "Créneau introuvable.")
 		return
@@ -359,6 +373,11 @@ func capitalize(s string) string {
 // ---- volunteer self-service ----
 
 func (s *Server) meUpdate(w http.ResponseWriter, r *http.Request, ev *model.Event, vol *model.Volunteer) {
+	if !ev.IsOpen() {
+		setFlash(w, "error", "Les inscriptions sont closes : contactez l'APE pour toute modification.")
+		redirect(w, r, meURL(ev, vol))
+		return
+	}
 	form := readVolunteerForm(r)
 	if err := form.validate(); err != nil {
 		setFlash(w, "error", err.Error())
@@ -390,6 +409,17 @@ func (s *Server) meCancel(w http.ResponseWriter, r *http.Request, ev *model.Even
 	}
 	s.notifySignup(r.Context(), r, ev, vol, slotID, "", true)
 	setFlash(w, "info", "Votre inscription a été annulée.")
+	redirect(w, r, meURL(ev, vol))
+}
+
+// meRenew replaces the volunteer's personal link, for when it was shared
+// by mistake: the old link stops working at once.
+func (s *Server) meRenew(w http.ResponseWriter, r *http.Request, ev *model.Event, vol *model.Volunteer) {
+	if s.storeError(w, r, s.store.RenewVolunteerToken(r.Context(), vol)) {
+		return
+	}
+	setVolunteerCookie(w, ev, vol)
+	setFlash(w, "success", "Voici votre nouveau lien personnel : l'ancien ne fonctionne plus. Pensez à le garder.")
 	redirect(w, r, meURL(ev, vol))
 }
 

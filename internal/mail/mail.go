@@ -16,6 +16,7 @@ import (
 	"net"
 	"net/mail"
 	"net/smtp"
+	"net/textproto"
 	"strconv"
 	"strings"
 	"sync"
@@ -38,7 +39,7 @@ type Sender interface {
 const (
 	TLSStartTLS = "starttls" // plain connection upgraded with STARTTLS (port 587); required
 	TLSImplicit = "tls"      // TLS from the start (port 465)
-	TLSNone     = "none"     // no encryption: only for a relay on localhost or a private network
+	TLSNone     = "none"     // no encryption: only accepted for a relay on localhost or a private network
 )
 
 // Config describes the SMTP server.
@@ -118,12 +119,12 @@ func (s *SMTP) tlsConf() *tls.Config {
 func (s *SMTP) Send(ctx context.Context, m Message) error {
 	to, err := mail.ParseAddress(m.To)
 	if err != nil {
-		return fmt.Errorf("recipient %q: %v", m.To, err)
+		return permanentError{fmt.Errorf("recipient %q: %v", m.To, err)}
 	}
 	from, _ := mail.ParseAddress(s.cfg.From)
 	data, err := Format(s.cfg.From, to.String(), m.Subject, m.Body, time.Now())
 	if err != nil {
-		return err
+		return permanentError{err}
 	}
 
 	ctx, cancel := context.WithTimeout(ctx, s.cfg.Timeout)
@@ -136,6 +137,10 @@ func (s *SMTP) Send(ctx context.Context, m Message) error {
 	}
 	deadline, _ := ctx.Deadline()
 	conn.SetDeadline(deadline)
+	if s.cfg.TLS == TLSNone && !localAddr(conn.RemoteAddr()) {
+		conn.Close()
+		return permanentError{fmt.Errorf("SMTP TLS mode none is only allowed for a server on this machine or a private network, not %s", conn.RemoteAddr())}
+	}
 	if s.cfg.TLS == TLSImplicit {
 		conn = tls.Client(conn, s.tlsConf())
 	}
@@ -230,80 +235,149 @@ func (l Log) Send(_ context.Context, m Message) error {
 	return nil
 }
 
+// permanentError marks a failure that retrying cannot fix.
+type permanentError struct{ err error }
+
+func (e permanentError) Error() string { return e.err.Error() }
+func (e permanentError) Unwrap() error { return e.err }
+
+// Permanent reports whether err cannot be fixed by retrying: a 5xx reply
+// from the SMTP server (unknown recipient, rejected message…) or an invalid
+// message.
+func Permanent(err error) bool {
+	var pe permanentError
+	if errors.As(err, &pe) {
+		return true
+	}
+	var te *textproto.Error
+	return errors.As(err, &te) && te.Code >= 500
+}
+
 // Queue sends messages in the background, so a slow or unreachable SMTP
-// server never delays a web page. Failed messages are retried a few times.
+// server never delays a web page. Temporary failures are retried later
+// without holding up the other messages; permanent ones are not retried.
 type Queue struct {
 	sender  Sender
 	log     *slog.Logger
-	ch      chan Message
-	wg      sync.WaitGroup
+	ch      chan queued
 	retries []time.Duration
+
+	mu      sync.Mutex
+	closed  bool
+	pending sync.WaitGroup // messages not yet sent or given up
 	stop    chan struct{}
+	ctx     context.Context // cancelled on stop, aborts a send in progress
+	cancel  context.CancelFunc
+	done    chan struct{}
+}
+
+type queued struct {
+	m       Message
+	attempt int
 }
 
 // NewQueue starts a background worker sending through s.
 func NewQueue(s Sender, logger *slog.Logger) *Queue {
+	ctx, cancel := context.WithCancel(context.Background())
 	q := &Queue{
 		sender:  s,
 		log:     logger,
-		ch:      make(chan Message, 200),
+		ch:      make(chan queued, 200),
 		retries: []time.Duration{30 * time.Second, 2 * time.Minute, 10 * time.Minute},
 		stop:    make(chan struct{}),
+		ctx:     ctx,
+		cancel:  cancel,
+		done:    make(chan struct{}),
 	}
-	q.wg.Add(1)
 	go q.run()
 	return q
 }
 
 // Enqueue schedules m and returns immediately. If the queue is full (the
-// SMTP server has been down for a while), the message is dropped and logged.
+// SMTP server has been down for a while) or closed, the message is dropped
+// and logged.
 func (q *Queue) Enqueue(m Message) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	if q.closed {
+		q.log.Error("mail queue closed, message dropped", "to", m.To, "subject", m.Subject)
+		return
+	}
+	q.pending.Add(1)
 	select {
-	case q.ch <- m:
+	case q.ch <- queued{m: m}:
 	default:
+		q.pending.Done()
 		q.log.Error("mail queue full, message dropped", "to", m.To, "subject", m.Subject)
 	}
 }
 
 func (q *Queue) run() {
-	defer q.wg.Done()
-	for m := range q.ch {
-		q.deliver(m)
-	}
-}
-
-func (q *Queue) deliver(m Message) {
-	for attempt := 0; ; attempt++ {
-		err := q.sender.Send(context.Background(), m)
-		if err == nil {
-			q.log.Info("mail sent", "to", m.To, "subject", m.Subject)
-			return
-		}
-		if attempt >= len(q.retries) {
-			q.log.Error("mail not sent, giving up", "to", m.To, "subject", m.Subject, "err", err)
-			return
-		}
-		q.log.Warn("mail not sent, will retry", "to", m.To, "subject", m.Subject, "err", err, "in", q.retries[attempt])
+	defer close(q.done)
+	for {
 		select {
-		case <-time.After(q.retries[attempt]):
+		case it := <-q.ch:
+			q.deliver(it)
 		case <-q.stop:
-			q.log.Error("mail not sent, server stopping", "to", m.To, "subject", m.Subject, "err", err)
 			return
 		}
 	}
 }
 
-// Close stops accepting messages and waits (up to ctx) for the queued ones
-// to be sent. Pending retries are abandoned.
+func (q *Queue) deliver(it queued) {
+	m := it.m
+	err := q.sender.Send(q.ctx, m)
+	switch {
+	case err == nil:
+		q.log.Info("mail sent", "to", m.To, "subject", m.Subject)
+		q.pending.Done()
+	case Permanent(err):
+		q.log.Error("mail rejected, not retried", "to", m.To, "subject", m.Subject, "err", err)
+		q.pending.Done()
+	case it.attempt >= len(q.retries):
+		q.log.Error("mail not sent, giving up", "to", m.To, "subject", m.Subject, "err", err)
+		q.pending.Done()
+	default:
+		d := q.retries[it.attempt]
+		q.log.Warn("mail not sent, will retry", "to", m.To, "subject", m.Subject, "err", err, "in", d)
+		it.attempt++
+		time.AfterFunc(d, func() {
+			select {
+			case q.ch <- it:
+			case <-q.stop:
+				q.log.Error("mail not sent, server stopping", "to", m.To, "subject", m.Subject)
+				q.pending.Done()
+			}
+		})
+	}
+}
+
+// Close stops accepting messages and waits (up to ctx) for the queued ones,
+// retries included, to be sent. What is still pending then is abandoned.
 func (q *Queue) Close(ctx context.Context) {
-	close(q.ch)
-	done := make(chan struct{})
-	go func() { q.wg.Wait(); close(done) }()
+	q.mu.Lock()
+	if q.closed {
+		q.mu.Unlock()
+		return
+	}
+	q.closed = true
+	q.mu.Unlock()
+	idle := make(chan struct{})
+	go func() { q.pending.Wait(); close(idle) }()
 	select {
-	case <-done:
+	case <-idle:
 	case <-ctx.Done():
 	}
 	close(q.stop)
+	q.cancel()
+	<-q.done
+}
+
+// localAddr reports whether a is a loopback or private (RFC 1918, ULA)
+// address, where an unencrypted connection to a relay is acceptable.
+func localAddr(a net.Addr) bool {
+	ta, ok := a.(*net.TCPAddr)
+	return ok && (ta.IP.IsLoopback() || ta.IP.IsPrivate())
 }
 
 // heloName is the name we greet the SMTP server with: the sender's domain.

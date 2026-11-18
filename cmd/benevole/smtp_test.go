@@ -3,6 +3,8 @@ package main
 import (
 	"strings"
 	"testing"
+
+	"benevole-ape/internal/mail"
 )
 
 func TestSMTPFromEnv(t *testing.T) {
@@ -42,5 +44,20 @@ func TestSMTPFromEnv(t *testing.T) {
 	t.Setenv("BENEVOLE_SMTP_TLS", "none")
 	if _, err := smtpFromEnv("https://jeviensaider.fr"); err == nil {
 		t.Error("password over an unencrypted connection accepted")
+	}
+}
+
+func TestCheckOpenCreation(t *testing.T) {
+	cfg := &mail.Config{Host: "smtp.example.org"}
+	t.Setenv("BENEVOLE_OPEN_CREATION", "")
+	if checkOpenCreation(nil, "") != nil || checkOpenCreation(cfg, "secret") != nil {
+		t.Error("refused a safe configuration")
+	}
+	if err := checkOpenCreation(cfg, ""); err == nil || !strings.Contains(err.Error(), "BENEVOLE_CREATE_PASSWORD") {
+		t.Errorf("open creation with e-mails: %v", err)
+	}
+	t.Setenv("BENEVOLE_OPEN_CREATION", "true")
+	if checkOpenCreation(cfg, "") != nil {
+		t.Error("explicit opt-in refused")
 	}
 }

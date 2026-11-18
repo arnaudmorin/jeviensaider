@@ -200,6 +200,9 @@
         <label>Nouveau nom <input name="title" required maxlength="120" value="{{.Event.Title}} (copie)"></label>
         <label>Nouvelle date <input type="date" name="date"></label>
       </div>
+      {{if .NeedPassword}}
+      <label>Mot de passe de création <input type="password" name="password" required autocomplete="current-password"></label>
+      {{end}}
       <div><button class="btn" type="submit">Dupliquer</button></div>
     </form>
   </details>

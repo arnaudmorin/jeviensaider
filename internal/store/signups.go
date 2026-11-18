@@ -35,6 +35,17 @@ func (s *Store) UpdateVolunteer(ctx context.Context, v *model.Volunteer) error {
 		`UPDATE volunteers SET name = ?, phone = ? WHERE id = ?`, v.Name, v.Phone, v.ID))
 }
 
+// RenewVolunteerToken gives v a new edit token; the old one stops working.
+func (s *Store) RenewVolunteerToken(ctx context.Context, v *model.Volunteer) error {
+	tok := Token()
+	if err := affectedOne(s.db.ExecContext(ctx,
+		`UPDATE volunteers SET edit_token = ? WHERE id = ?`, tok, v.ID)); err != nil {
+		return err
+	}
+	v.EditToken = tok
+	return nil
+}
+
 // SignupRequest is what a volunteer submits to take a slot.
 type SignupRequest struct {
 	EventID   int64

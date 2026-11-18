@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"net/http"
+	"strconv"
 	"strings"
 	"text/template"
 
@@ -63,6 +64,17 @@ Pour ne plus recevoir ces e-mails : page d'administration, « Modifier l'événe
 -- 
 Je viens aider
 {{end}}
+
+{{define "paused"}}Bonjour,
+
+Plus de {{.Limit}} inscriptions ou désinscriptions ont eu lieu en une heure sur votre événement. Pour ne pas encombrer votre boîte, les notifications sont en pause jusqu'à {{.Until}}.
+
+Le planning à jour est toujours sur la page d'administration :
+{{.AdminURL}}
+
+-- 
+Je viens aider
+{{end}}
 `))
 
 func renderMail(name string, data any) string {
@@ -73,16 +85,37 @@ func renderMail(name string, data any) string {
 	return strings.TrimLeft(b.String(), "\n")
 }
 
-func (s *Server) sendMail(m mail.Message) {
+// sendMail queues m within the overall hourly limit and reports whether it
+// was queued.
+func (s *Server) sendMail(m mail.Message) bool {
 	if s.cfg.Mailer == nil || m.To == "" || m.Body == "" {
-		return
+		return false
+	}
+	if !s.mails.all.allow("", mailsPerHour, now()) {
+		s.log.Warn("mail not sent: hourly limit of the site reached", "limit", mailsPerHour, "to", m.To, "subject", m.Subject)
+		return false
 	}
 	s.cfg.Mailer.Enqueue(m)
+	return true
 }
 
-// notifyCreated sends the organiser the admin link of a new event.
-func (s *Server) notifyCreated(r *http.Request, ev *model.Event) {
-	s.sendMail(mail.Message{
+// notifyCreated sends the organiser the admin link of a new event, and
+// reports whether the mail was queued. The address was typed by the
+// visitor, so mails to one address and in total are limited.
+func (s *Server) notifyCreated(r *http.Request, ev *model.Event) bool {
+	if s.cfg.Mailer == nil || ev.AdminEmail == "" {
+		return false
+	}
+	t := now()
+	if !s.mails.createdTo.allow(strings.ToLower(ev.AdminEmail), createdPerRecipientPerDay, t) {
+		s.log.Warn("creation mail not sent: too many for this address today", "limit", createdPerRecipientPerDay, "to", ev.AdminEmail)
+		return false
+	}
+	if !s.mails.created.allow("", createdPerHour, t) {
+		s.log.Warn("creation mail not sent: too many events created this hour", "limit", createdPerHour, "to", ev.AdminEmail)
+		return false
+	}
+	return s.sendMail(mail.Message{
 		To:      ev.AdminEmail,
 		Subject: "Votre événement « " + ev.Title + " » est créé",
 		Body: renderMail("created", map[string]any{
@@ -113,6 +146,22 @@ func (s *Server) notifySignup(ctx context.Context, r *http.Request, ev *model.Ev
 		}
 	}
 	if sv == nil {
+		return
+	}
+	n, until := s.mails.signups.hit(strconv.FormatInt(ev.ID, 10), now())
+	switch {
+	case n == signupMailsPerEventHour+1:
+		// Once over the limit (a busy hour, or someone signing up and
+		// cancelling in a loop), say so once, then stay quiet.
+		s.sendMail(mail.Message{
+			To:      ev.AdminEmail,
+			Subject: "Beaucoup d'inscriptions sur « " + ev.Title + " » : notifications en pause",
+			Body: renderMail("paused", map[string]any{
+				"Limit": signupMailsPerEventHour, "Until": hm(until.Local()), "AdminURL": s.absURL(r, adminURL(ev)),
+			}),
+		})
+		return
+	case n < 1 || n > signupMailsPerEventHour:
 		return
 	}
 	verb := "Inscription"

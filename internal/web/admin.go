@@ -65,6 +65,9 @@ type adminPage struct {
 	Statuses   []string
 	ExpiresOn  string // "YYYY-MM-DD", empty if events are kept forever
 	Retention  int
+	// NeedPassword: duplicating creates an event, so it asks for the
+	// creation password too.
+	NeedPassword bool
 }
 
 func (s *Server) adminPage(w http.ResponseWriter, r *http.Request, ev *model.Event) {
@@ -119,6 +122,8 @@ func (s *Server) adminPage(w http.ResponseWriter, r *http.Request, ev *model.Eve
 		Statuses:   []string{model.StatusDraft, model.StatusOpen, model.StatusClosed},
 		ExpiresOn:  expires,
 		Retention:  s.cfg.RetentionDays,
+
+		NeedPassword: s.cfg.CreatePassword != "",
 	})
 }
 
@@ -380,6 +385,12 @@ func (s *Server) adminPurge(w http.ResponseWriter, r *http.Request, ev *model.Ev
 }
 
 func (s *Server) adminDuplicate(w http.ResponseWriter, r *http.Request, ev *model.Event) {
+	// An admin link is shared among organisers: on its own, it must not
+	// allow creating events (and sending creation e-mails).
+	if !s.createPasswordOK(r) {
+		adminFail(w, r, ev, 0, "Mot de passe de création incorrect.")
+		return
+	}
 	title := clean(r.FormValue("title"), 120, false)
 	if title == "" {
 		adminFail(w, r, ev, 0, "Donnez un nom au nouvel événement.")
@@ -394,8 +405,11 @@ func (s *Server) adminDuplicate(w http.ResponseWriter, r *http.Request, ev *mode
 	if s.storeError(w, r, err) {
 		return
 	}
-	s.notifyCreated(r, dup)
-	setFlash(w, "success", "Nouvel événement créé à partir de « "+ev.Title+" ». Voici son lien d'administration : conservez-le !")
+	msg := "Nouvel événement créé à partir de « " + ev.Title + " ». Voici son lien d'administration : conservez-le !"
+	if s.notifyCreated(r, dup) && s.cfg.MailEnabled {
+		msg += " Il a aussi été envoyé à " + dup.AdminEmail + "."
+	}
+	setFlash(w, "success", msg)
 	redirect(w, r, adminURL(dup))
 }
 
