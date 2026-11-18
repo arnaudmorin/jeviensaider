@@ -40,7 +40,8 @@ in a single SQLite file.
 
 ## Quick start
 
-Requires Go ≥ 1.23. No C toolchain is needed: the SQLite driver is pure Go.
+Requires Go ≥ 1.26; with an older Go, the `go` command downloads the right
+toolchain by itself. No C toolchain is needed: the SQLite driver is pure Go.
 
 ```sh
 make run      # http://localhost:8080, database ./benevole.db
@@ -182,7 +183,16 @@ internal/web/      handlers, middleware, embedded templates and static files (ht
 ## Continuous integration
 
 The [GitHub Actions workflow](.github/workflows/build.yml) runs on every push
-or pull request to `master`. It checks `gofmt`, runs `go vet` and the tests
-with the race detector, then builds the three Linux binaries and the Docker
-image. The image is pushed to GitHub's container registry only for pushes to
-`master`; pull requests just build it.
+or pull request to `master`, and once a week:
+
+- `gofmt`, `go vet`, the tests with the race detector, and
+  [`govulncheck`](https://go.dev/doc/security/vuln/) to catch known
+  vulnerabilities in Go and the dependencies (the weekly run catches newly
+  published ones);
+- the three Linux binaries;
+- the Docker image: built only for pull requests, built and pushed to
+  `ghcr.io` for pushes to `master`. Only that job may write packages.
+
+Actions are pinned to commit SHAs and the Docker base images to digests, so
+a moved tag cannot change what runs. [Dependabot](.github/dependabot.yml)
+proposes updates for them and for the Go modules every week.

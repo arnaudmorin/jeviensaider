@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"testing"
@@ -178,4 +179,37 @@ func TestPlantedPersonalLink(t *testing.T) {
 	if strings.Contains(page.body, `value="Alice Victim"`) {
 		t.Error("Mallory's record was renamed to Alice")
 	}
+}
+
+func TestValidEmail(t *testing.T) {
+	for _, ok := range []string{"marie@example.org", "marie.dupont+ape@ecole.fr", "o'brien@mail.co.uk", "a-b_c@sub-domain.example.fr"} {
+		if !validEmail(ok) {
+			t.Errorf("%q refused", ok)
+		}
+	}
+	for _, bad := range []string{
+		"x@y.fr?bcc=evil@z.fr", "x@y.fr&body=hi", "x@y.fr#frag", "x%40y@z.fr", "a/b@c.fr", `"q"@c.fr`,
+		"Marie <m@example.org>", "m@example", "m@@example.org", "@example.org", "m@example.org.", "m @example.org", "m@exa_mple.org",
+	} {
+		if validEmail(bad) {
+			t.Errorf("%q accepted", bad)
+		}
+	}
+}
+
+func TestDateLimits(t *testing.T) {
+	e := newEnv(t, Config{}) // clock fixed at 2026-05-01
+	c := e.client()
+	expect(t, e.post(c, "/events", url.Values{"title": {"Far"}, "date": {"9999-12-31"}}), http.StatusBadRequest, "date hors limites")
+	expect(t, e.post(c, "/events", url.Values{"title": {"Old"}, "date": {"2025-04-30"}}), http.StatusBadRequest, "date hors limites")
+	expect(t, e.post(c, "/events", url.Values{"title": {"Soon"}, "date": {"2028-05-01"}}), http.StatusSeeOther)
+
+	admin := e.client()
+	adminPath, _, _ := setupEvent(t, e, admin)
+	r := e.get(admin, adminPath)
+	standID := regexp.MustCompile(`id="stand-(\d+)"`).FindStringSubmatch(r.body)[1]
+	e.post(admin, adminPath+"/stands/"+standID+"/slots", url.Values{
+		"date": {"2099-06-20"}, "from": {"10:00"}, "to": {"11:00"}, "step": {"60"}, "min": {"1"},
+	})
+	expect(t, e.get(admin, adminPath), 200, "date hors limites")
 }

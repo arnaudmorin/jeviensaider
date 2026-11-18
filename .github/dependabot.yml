@@ -1,0 +1,15 @@
+# Keeps the pinned versions fresh: Go modules, the actions (pinned by commit
+# SHA) and the Docker base images (pinned by digest).
+version: 2
+updates:
+  - package-ecosystem: gomod
+    directory: /
+    schedule: { interval: weekly }
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly }
+    groups:
+      actions: { patterns: ["*"] }
+  - package-ecosystem: docker
+    directory: /
+    schedule: { interval: weekly }

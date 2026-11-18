@@ -2,7 +2,9 @@ package web
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
+	"net/mail"
 	"regexp"
 	"strconv"
 	"strings"
@@ -61,13 +63,33 @@ func formInt(r *http.Request, key string, def int) (int, error) {
 	return n, nil
 }
 
+// now is the clock used to validate dates (replaced in tests).
+var now = time.Now
+
+// checkDateRange accepts dates from one year ago to two years ahead. Without
+// a limit, a far-future date would keep an event (and its personal data)
+// away from the automatic cleanup forever.
+func checkDateRange(t time.Time) error {
+	today := now()
+	min := time.Date(today.Year()-1, today.Month(), today.Day(), 0, 0, 0, 0, time.UTC)
+	max := time.Date(today.Year()+2, today.Month(), today.Day(), 23, 59, 59, 0, time.UTC)
+	if t.Before(min) || t.After(max) {
+		return fmt.Errorf("date hors limites : choisissez une date entre le %s et le %s", dateFR(min.Format(model.DateLayout)), dateFR(max.Format(model.DateLayout)))
+	}
+	return nil
+}
+
 func parseDate(s string) (string, error) {
 	s = strings.TrimSpace(s)
 	if s == "" {
 		return "", nil
 	}
-	if _, err := time.Parse(model.DateLayout, s); err != nil {
+	t, err := time.Parse(model.DateLayout, s)
+	if err != nil {
 		return "", errors.New("date invalide (format attendu : AAAA-MM-JJ)")
+	}
+	if err := checkDateRange(t); err != nil {
+		return "", err
 	}
 	return s, nil
 }
@@ -77,6 +99,9 @@ func parseDateTime(date, hhmm string) (time.Time, error) {
 	t, err := time.Parse(model.TimeLayout, strings.TrimSpace(date)+" "+strings.TrimSpace(hhmm))
 	if err != nil {
 		return time.Time{}, errors.New("date ou heure invalide")
+	}
+	if err := checkDateRange(t); err != nil {
+		return time.Time{}, err
 	}
 	return t, nil
 }
@@ -100,11 +125,24 @@ func readVolunteerForm(r *http.Request) volunteerForm {
 
 var phoneRe = regexp.MustCompile(`^[0-9+ .()-]{6,30}$`)
 
+// emailRe is deliberately strict: a plain address, without the characters
+// (?, &, =, #, %, /, quotes, spaces…) that could add headers such as a BCC
+// to the organiser's mailto: link.
+var emailRe = regexp.MustCompile(`^[A-Za-z0-9._+'-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}$`)
+
+func validEmail(s string) bool {
+	if !emailRe.MatchString(s) {
+		return false
+	}
+	addr, err := mail.ParseAddress(s)
+	return err == nil && addr.Address == s
+}
+
 func (f volunteerForm) validate(requireContact bool) error {
 	if f.Name == "" {
 		return errors.New("Merci d'indiquer votre nom.")
 	}
-	if f.Email != "" && (!strings.Contains(f.Email, "@") || strings.ContainsAny(f.Email, " <>")) {
+	if f.Email != "" && !validEmail(f.Email) {
 		return errors.New("L'adresse e-mail ne semble pas valide.")
 	}
 	if f.Phone != "" && !phoneRe.MatchString(f.Phone) {

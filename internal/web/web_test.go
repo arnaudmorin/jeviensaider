@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"benevole-ape/internal/store"
 )
@@ -27,6 +28,10 @@ func newEnv(t *testing.T, cfg Config) *env {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// The tests use fixed dates in June 2026: validate them against a fixed
+	// clock so they keep passing in the future.
+	now = func() time.Time { return time.Date(2026, 5, 1, 12, 0, 0, 0, time.UTC) }
+	t.Cleanup(func() { now = time.Now })
 	cfg.Logger = slog.New(slog.NewTextHandler(io.Discard, nil))
 	if cfg.PostsPerMinute == 0 {
 		cfg.PostsPerMinute = 10000
