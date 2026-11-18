@@ -1,10 +1,11 @@
 # Usage:
 #   cp .env.example .env   # then edit it
-#   docker compose up -d --build
+#   docker compose pull && docker compose up -d   # prebuilt image from GitHub
+#   docker compose up -d --build                  # or build it locally
 services:
   app:
     build: .
-    image: jeviensaider:latest
+    image: ghcr.io/arnaudmorin/jeviensaider:latest
     restart: unless-stopped
     ports:
       # Bound to localhost: put a reverse proxy (Caddy, nginx) in front for

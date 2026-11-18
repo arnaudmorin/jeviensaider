@@ -74,8 +74,13 @@ create events. It is read from the environment only, so it never shows up in
 
 ```sh
 cp .env.example .env          # set BENEVOLE_BASE_URL and BENEVOLE_CREATE_PASSWORD
-docker compose up -d --build
+docker compose pull && docker compose up -d   # prebuilt image
+# or: docker compose up -d --build            # build it locally
 ```
+
+Every push to `master` publishes a multi-arch image (amd64, arm64, armv7) to
+`ghcr.io/arnaudmorin/jeviensaider`. It is tagged `latest` and with the
+commit's short SHA (`sha-xxxxxxx`) for pinning a version.
 
 - The app listens on `127.0.0.1:8080` (change `PORT` in `.env`). Put a reverse
   proxy in front of it for HTTPS.
@@ -137,4 +142,6 @@ internal/web/      handlers, middleware, embedded templates and static files (ht
 
 The [GitHub Actions workflow](.github/workflows/build.yml) runs on every push
 or pull request to `master`. It checks `gofmt`, runs `go vet` and the tests
-with the race detector, then builds the three Linux binaries.
+with the race detector, then builds the three Linux binaries and the Docker
+image. The image is pushed to GitHub's container registry only for pushes to
+`master`; pull requests just build it.

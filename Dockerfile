@@ -1,13 +1,17 @@
 # syntax=docker/dockerfile:1
 
 # --- Build: static binary (pure Go SQLite driver, no CGO) ---
-FROM golang:1.23-alpine AS build
+# Runs on the build machine's platform and cross-compiles for the target, so
+# multi-arch builds need no emulation.
+FROM --platform=$BUILDPLATFORM golang:1.23-alpine AS build
 WORKDIR /src
 ENV CGO_ENABLED=0 GOTOOLCHAIN=local
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-RUN go build -trimpath -ldflags '-s -w' -o /out/benevole ./cmd/benevole \
+ARG TARGETOS TARGETARCH TARGETVARIANT
+RUN GOOS=$TARGETOS GOARCH=$TARGETARCH GOARM=${TARGETVARIANT#v} \
+    go build -trimpath -ldflags '-s -w' -o /out/benevole ./cmd/benevole \
  && mkdir -p /out/data
 
 # --- Run: distroless, non-root (uid 65532), CA certs and tzdata included ---
