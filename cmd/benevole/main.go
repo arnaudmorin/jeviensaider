@@ -4,15 +4,12 @@ package main
 import (
 	"context"
 	"errors"
-	"flag"
 	"fmt"
 	"log/slog"
 	"net"
 	"net/http"
 	"os"
 	"os/signal"
-	"strconv"
-	"strings"
 	"syscall"
 	"time"
 
@@ -21,8 +18,10 @@ import (
 	"benevole-ape/internal/web"
 )
 
+// env returns an environment variable, or def when it is unset or empty
+// (compose files often pass empty values for unset ones).
 func env(key, def string) string {
-	if v, ok := os.LookupEnv(key); ok {
+	if v := os.Getenv(key); v != "" {
 		return v
 	}
 	return def
@@ -35,81 +34,58 @@ func main() {
 	if len(os.Args) > 1 && os.Args[1] == "mail-test" {
 		os.Exit(runMailTest(os.Args[2:], os.Stdout, os.Stderr))
 	}
-	flag.Usage = func() {
-		fmt.Fprintf(flag.CommandLine.Output(), "Usage:\n  benevole [flags]           run the web server\n  benevole events <command>  super-admin tool: list, show, delete events (see \"benevole events help\")\n  benevole mail-test <addr>  send a test e-mail with the SMTP settings\n\nFlags:\n")
-		flag.PrintDefaults()
-	}
-	trustDefault, _ := strconv.ParseBool(env("BENEVOLE_TRUST_PROXY", "false"))
-	retentionDefault, err := retentionFromEnv()
+	cfg, err := loadConfig(os.Args[1:])
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
+		fmt.Fprintln(os.Stderr, "configuration:", err)
 		os.Exit(2)
 	}
-	addr := flag.String("addr", env("BENEVOLE_ADDR", ":8080"), "listen address (env BENEVOLE_ADDR)")
-	dbPath := flag.String("db", env("BENEVOLE_DB", "benevole.db"), "SQLite database file (env BENEVOLE_DB)")
-	baseURL := flag.String("base-url", env("BENEVOLE_BASE_URL", ""), "public URL, e.g. https://benevoles.example.org (env BENEVOLE_BASE_URL)")
-	trustProxy := flag.Bool("trust-proxy", trustDefault, "trust X-Forwarded-* headers from a reverse proxy (env BENEVOLE_TRUST_PROXY)")
-	retention := flag.Int("retention-days", retentionDefault, "delete events this many days after their last day of activity, 0 to keep them forever (env BENEVOLE_RETENTION_DAYS)")
-	healthcheck := flag.Bool("healthcheck", false, "query /healthz on the listen address and exit 0 if healthy (for container health checks)")
-	flag.Parse()
-	if *healthcheck {
-		os.Exit(checkHealth(*addr))
+	if cfg.healthcheck {
+		os.Exit(checkHealth(cfg.addr))
 	}
-	// The creation password is only read from the environment, so it never
-	// shows up in `ps` output.
-	createPassword := os.Getenv("BENEVOLE_CREATE_PASSWORD")
+	os.Exit(serve(cfg))
+}
 
+// serve runs the web server until SIGINT or SIGTERM, and returns the exit
+// code.
+func serve(cfg *config) int {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	slog.SetDefault(logger)
 
-	smtpCfg, err := smtpFromEnv(strings.TrimRight(*baseURL, "/"))
-	if err == nil {
-		err = checkOpenCreation(smtpCfg, createPassword)
-	}
-	mailLimits, limErr := mailLimitsFromEnv()
-	if err == nil {
-		err = limErr
-	}
-	if err != nil {
-		logger.Error("configuration", "err", err)
-		os.Exit(2)
-	}
 	var sender mail.Sender = mail.Log{Logger: logger}
-	if smtpCfg != nil {
-		s, _ := mail.NewSMTP(*smtpCfg) // already validated
-		sender = s
-		logger.Info("e-mails enabled", "smtp", smtpCfg.Host, "port", smtpCfg.Port, "tls", smtpCfg.TLS, "from", smtpCfg.From,
+	if cfg.smtp != nil {
+		sender, _ = mail.NewSMTP(*cfg.smtp) // already validated
+		l := cfg.mailLimits
+		logger.Info("e-mails enabled", "smtp", cfg.smtp.Host, "port", cfg.smtp.Port, "tls", cfg.smtp.TLS, "from", cfg.smtp.From,
 			"limits", fmt.Sprintf("%d created/address/day, %d created/hour, %d sign-ups/event/hour, %d total/hour (0 = unlimited)",
-				mailLimits.CreatedPerAddressPerDay, mailLimits.CreatedPerHour, mailLimits.SignupsPerEventPerHour, mailLimits.PerHour))
+				l.CreatedPerAddressPerDay, l.CreatedPerHour, l.SignupsPerEventPerHour, l.PerHour))
 	} else {
 		logger.Warn("e-mails disabled: set BENEVOLE_SMTP_HOST to send them (they are only logged)")
 	}
 	mailQueue := mail.NewQueue(sender, logger)
 
-	st, err := store.Open(*dbPath)
+	st, err := store.Open(cfg.dbPath)
 	if err != nil {
-		logger.Error("open database", "path", *dbPath, "err", err)
-		os.Exit(1)
+		logger.Error("open database", "path", cfg.dbPath, "err", err)
+		return 1
 	}
 	defer st.Close()
 
 	srv, err := web.New(st, web.Config{
-		BaseURL:        *baseURL,
-		CreatePassword: createPassword,
-		TrustProxy:     *trustProxy,
-		RetentionDays:  *retention,
+		BaseURL:        cfg.baseURL,
+		CreatePassword: cfg.createPassword,
+		TrustProxy:     cfg.trustProxy,
+		RetentionDays:  cfg.retentionDays,
 		Mailer:         mailQueue,
-		MailEnabled:    smtpCfg != nil,
-		MailLimits:     &mailLimits,
+		MailEnabled:    cfg.smtp != nil,
+		MailLimits:     &cfg.mailLimits,
 		Logger:         logger,
 	})
 	if err != nil {
 		logger.Error("init web", "err", err)
-		os.Exit(1)
+		return 1
 	}
-
 	httpSrv := &http.Server{
-		Addr:              *addr,
+		Addr:              cfg.addr,
 		Handler:           srv.Handler(),
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       30 * time.Second,
@@ -120,15 +96,13 @@ func main() {
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-
-	if *retention > 0 {
-		go cleanupLoop(ctx, st, *retention, logger)
+	if cfg.retentionDays > 0 {
+		go cleanupLoop(ctx, st, cfg.retentionDays, logger)
 	} else {
 		logger.Info("automatic deletion of events is disabled: events are kept forever")
 	}
-
 	go func() {
-		logger.Info("listening", "addr", *addr, "db", *dbPath, "create_password", createPassword != "", "retention_days", *retention)
+		logger.Info("listening", "addr", cfg.addr, "db", cfg.dbPath, "create_password", cfg.createPassword != "", "retention_days", cfg.retentionDays)
 		if err := httpSrv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			logger.Error("listen", "err", err)
 			stop()
@@ -143,6 +117,7 @@ func main() {
 		logger.Error("shutdown", "err", err)
 	}
 	mailQueue.Close(shutdownCtx) // send what is queued, within the same 10 s
+	return 0
 }
 
 // checkHealth calls /healthz on the local listen address. It lets minimal

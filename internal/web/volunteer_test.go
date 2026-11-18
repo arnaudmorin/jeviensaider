@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -107,4 +108,64 @@ func TestStandDescriptions(t *testing.T) {
 	if strings.Contains(r.body, "Vue d&#39;ensemble") || strings.Contains(r.body, "Vue d'ensemble") {
 		t.Error("views bar shown to an unknown visitor")
 	}
+}
+
+func TestOverlapWarningAndMyPlanning(t *testing.T) {
+	e := newEnv(t, Config{})
+	admin := e.client()
+	adminPath, publicPath, slots := setupEvent(t, e, admin) // 14h, 15h, 16h on one stand
+	marie := e.client()
+	form := url.Values{"name": {"Marie Dupont"}}
+	r := e.post(marie, publicPath+"/slots/"+slots[0]+"/signup", form)
+	expect(t, r, http.StatusSeeOther)
+	meLink := strings.TrimSuffix(r.location, "?welcome=1")
+
+	// "Mes créneaux" shows the overview table, restricted to my stands.
+	r = e.get(marie, meLink)
+	expect(t, r, 200, "Mon planning", "1 créneau · 1 h · 1 stand", `<table class="grid">`, `<span class="cell-me">Vous</span>`)
+	// Only my slots: the stand's 15h and 16h slots are not shown, and mine
+	// can be cancelled from the table.
+	if mine := r.body[strings.Index(r.body, "Mon planning"):]; strings.Contains(mine, "15h<small>") || strings.Contains(mine, "16h<small>") {
+		t.Error("slots I am not signed up for are in my planning")
+	}
+	expect(t, r, 200, `class="cell-cancel"`, "Annuler votre inscription : Pêche aux canards, 14h – 15h ?")
+	// The next slot does not overlap: no warning.
+	if strings.Contains(e.get(marie, publicPath+"/slots/"+slots[1]+"/signup").body, "même horaire") {
+		t.Error("warning shown for a non-overlapping slot")
+	}
+	expect(t, e.post(marie, publicPath+"/slots/"+slots[1]+"/signup", form), http.StatusSeeOther)
+	expect(t, e.get(marie, meLink), 200, "Mon planning", "2 créneaux · 2 h · 1 stand")
+
+	// A second stand with a 14:30-15:30 slot, overlapping both.
+	expect(t, e.post(admin, adminPath+"/stands", url.Values{"name": {"Buvette"}}), http.StatusSeeOther)
+	ids := regexp.MustCompile(`id="stand-(\d+)"`).FindAllStringSubmatch(e.get(admin, adminPath).body, -1)
+	buvette := ids[len(ids)-1][1]
+	expect(t, e.post(admin, adminPath+"/stands/"+buvette+"/slots", url.Values{
+		"date": {"2026-06-20"}, "from": {"14:30"}, "to": {"15:30"}, "step": {"0"}, "min": {"1"},
+	}), http.StatusSeeOther)
+	newest := 0 // the Buvette slot is the most recent one
+	for _, m := range regexp.MustCompile(`/slots/(\d+)/signup`).FindAllStringSubmatch(e.get(marie, publicPath).body, -1) {
+		if n, _ := strconv.Atoi(m[1]); n > newest {
+			newest = n
+		}
+	}
+	buvetteSlot := strconv.Itoa(newest)
+	r = e.get(marie, publicPath+"/slots/"+buvetteSlot+"/signup")
+	expect(t, r, 200, "même horaire", "Pêche aux canards", "14h – 15h", "15h – 16h", "M'inscrire quand même")
+
+	// Warn, never block: the sign-up goes through, and the grid flags it.
+	expect(t, e.post(marie, publicPath+"/slots/"+buvetteSlot+"/signup", form), http.StatusSeeOther)
+	r = e.get(marie, meLink)
+	expect(t, r, 200, "3 créneaux", "2 stands", "créneaux en même temps", "mine clash", "Vous ⚠")
+	// Only my stands: a third stand where I am not signed up is not shown.
+	expect(t, e.post(admin, adminPath+"/stands", url.Values{"name": {"Tombola"}}), http.StatusSeeOther)
+	ids = regexp.MustCompile(`id="stand-(\d+)"`).FindAllStringSubmatch(e.get(admin, adminPath).body, -1)
+	expect(t, e.post(admin, adminPath+"/stands/"+ids[len(ids)-1][1]+"/slots", url.Values{
+		"date": {"2026-06-20"}, "from": {"10:00"}, "to": {"11:00"}, "step": {"0"}, "min": {"1"},
+	}), http.StatusSeeOther)
+	r = e.get(marie, meLink)
+	if mine := r.body[strings.Index(r.body, "Mon planning"):]; strings.Contains(mine, "Tombola") {
+		t.Error("a stand without my sign-up is in my planning")
+	}
+	expect(t, e.get(marie, publicPath), 200, "Tombola")
 }

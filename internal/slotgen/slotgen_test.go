@@ -68,10 +68,10 @@ func TestGenerateErrors(t *testing.T) {
 		min, max int
 		want     error
 	}{
-		{"reversed", e, s, time.Hour, 1, 0, ErrRange},
-		{"empty", s, s, time.Hour, 1, 0, ErrRange},
-		{"min0", s, e, time.Hour, 0, 0, ErrMin},
-		{"max<min", s, e, time.Hour, 3, 2, ErrMax},
+		{"reversed", e, s, time.Hour, 1, 0, model.ErrSlotRange},
+		{"empty", s, s, time.Hour, 1, 0, model.ErrSlotRange},
+		{"min0", s, e, time.Hour, 0, 0, model.ErrSlotMin},
+		{"max<min", s, e, time.Hour, 3, 2, model.ErrSlotMax},
 		{"too many", s, e, time.Minute, 1, 0, ErrTooMany},
 	}
 	for _, c := range cases {

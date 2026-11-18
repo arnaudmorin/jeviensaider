@@ -7,7 +7,7 @@
   <form method="post" action="{{$a}}/status" class="segmented" aria-label="Statut des inscriptions">
     {{range .Statuses}}
     <button type="submit" name="status" value="{{.}}" {{if eq . $.Event.Status}}class="on" disabled aria-pressed="true"{{end}}>
-      {{if eq . "draft"}}Brouillon{{else if eq . "open"}}Ouvert{{else}}Clos{{end}}
+      {{evlabel .}}
     </button>
     {{end}}
   </form>

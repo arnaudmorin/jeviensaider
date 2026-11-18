@@ -1,6 +1,8 @@
 package web
 
 import (
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -94,4 +96,50 @@ func newMailBudget(limits MailLimits) *mailBudget {
 		signups:   newWindowCounter(time.Hour),
 		all:       newWindowCounter(time.Hour),
 	}
+}
+
+// allowMail records one mail of any kind, and reports whether it is within
+// the site's hourly limit.
+func (b *mailBudget) allowMail(now time.Time) bool {
+	return b.all.allow("", b.limits.PerHour, now)
+}
+
+// allowCreated records an "event created" mail to addr, and reports whether
+// it is within the limits; if not, why says which one.
+func (b *mailBudget) allowCreated(addr string, now time.Time) (ok bool, why string) {
+	if !b.createdTo.allow(strings.ToLower(addr), b.limits.CreatedPerAddressPerDay, now) {
+		return false, "too many for this address today"
+	}
+	if !b.created.allow("", b.limits.CreatedPerHour, now) {
+		return false, "too many events created this hour"
+	}
+	return true, ""
+}
+
+// notice is what to do with a sign-up notification.
+type notice int
+
+const (
+	noticeSend  notice = iota // send it
+	noticePause               // the limit was just exceeded: send "notifications paused" instead
+	noticeSkip                // over the limit, already said: send nothing
+)
+
+// signupNotice records a sign-up notification for an event and decides what
+// to send. Over the hourly limit (a busy hour, or someone signing up and
+// cancelling in a loop), the organiser is told once, then nothing until the
+// window ends (until).
+func (b *mailBudget) signupNotice(eventID int64, now time.Time) (n notice, until time.Time) {
+	max := b.limits.SignupsPerEventPerHour
+	if max <= 0 {
+		return noticeSend, time.Time{}
+	}
+	count, until := b.signups.hit(strconv.FormatInt(eventID, 10), now)
+	switch {
+	case count >= 1 && count <= max:
+		return noticeSend, until
+	case count == max+1:
+		return noticePause, until
+	}
+	return noticeSkip, until
 }

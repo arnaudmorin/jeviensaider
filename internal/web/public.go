@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
-	"strings"
 
 	"benevole-ape/internal/model"
 	"benevole-ape/internal/store"
@@ -33,35 +32,14 @@ func (s *Server) home(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) createEvent(w http.ResponseWriter, r *http.Request) {
-	ev := model.Event{
-		Title:         clean(r.FormValue("title"), 120, false),
-		Location:      clean(r.FormValue("location"), 120, false),
-		Description:   clean(r.FormValue("description"), 2000, true),
-		AdminEmail:    clean(r.FormValue("admin_email"), 120, false),
-		NotifySignups: r.FormValue("notify") == "1",
-	}
-	date, dateErr := s.parseDate(r.FormValue("date"))
-	ev.Date = date
-
-	fail := func(msg string) {
-		s.render(w, r, http.StatusBadRequest, "home", homePage{
-			Common: Common{Title: "Je viens aider"}, NeedPassword: s.cfg.CreatePassword != "", MailEnabled: s.cfg.MailEnabled, Error: msg, Form: ev,
-		})
-	}
+	ev, err := s.readEventForm(r)
 	if !s.createPasswordOK(r) {
-		fail("Mot de passe de création incorrect.")
-		return
+		err = userError("Mot de passe de création incorrect.")
 	}
-	if ev.Title == "" {
-		fail("Le nom de l'événement est obligatoire.")
-		return
-	}
-	if dateErr != nil {
-		fail(dateErr.Error())
-		return
-	}
-	if err := checkAdminEmail(ev.AdminEmail); err != nil {
-		fail(err.Error())
+	if err != nil {
+		s.render(w, r, http.StatusBadRequest, "home", homePage{
+			Common: Common{Title: "Je viens aider"}, NeedPassword: s.cfg.CreatePassword != "", MailEnabled: s.cfg.MailEnabled, Error: err.Error(), Form: ev,
+		})
 		return
 	}
 	if err := s.store.CreateEvent(r.Context(), &ev); err != nil {
@@ -173,10 +151,10 @@ func (s *Server) planning(ctx context.Context, ev *model.Event, myID int64) (*mo
 	if err != nil {
 		return nil, err
 	}
-	return model.BuildPlanning(stands, slots, signups, myID), nil
+	return model.BuildPlanning(stands, slots, signups, myID, ev.IsOpen()), nil
 }
 
-// ---- event page (overview grid / stand tabs / my slots) ----
+// ---- event page (overview, "Mes créneaux") ----
 
 type eventPage struct {
 	Common
@@ -189,7 +167,7 @@ type eventPage struct {
 	MeURL    string
 	MeAbsURL string
 	Welcome  bool
-	MyP      *model.Planning // "Mes créneaux": the planning of my stands only
+	MyP      *model.Planning // "Mes créneaux": the planning restricted to my slots
 }
 
 func (s *Server) eventPage(w http.ResponseWriter, r *http.Request, ev *model.Event) {
@@ -257,15 +235,19 @@ func (s *Server) loadSlotView(ctx context.Context, ev *model.Event, slotID, myID
 	return sv, p.MyOverlaps(sv), nil
 }
 
-func (s *Server) signupForm(w http.ResponseWriter, r *http.Request, ev *model.Event) {
-	id, ok := pathID(r, "id")
+// publicID reads the {id} of a public URL about an event's planning (a
+// slot, a stand). A draft's planning is not public yet: "not found".
+func (s *Server) publicID(w http.ResponseWriter, r *http.Request, ev *model.Event) (int64, bool) {
 	if ev.IsDraft() {
-		// The planning of a draft is not public yet.
 		s.renderError(w, r, http.StatusNotFound, msgNotOpenYet)
-		return
+		return 0, false
 	}
+	return s.pathID(w, r)
+}
+
+func (s *Server) signupForm(w http.ResponseWriter, r *http.Request, ev *model.Event) {
+	id, ok := s.publicID(w, r, ev)
 	if !ok {
-		s.renderError(w, r, http.StatusNotFound, "Créneau introuvable.")
 		return
 	}
 	me := s.cookieVolunteer(r, ev)
@@ -278,25 +260,16 @@ func (s *Server) signupForm(w http.ResponseWriter, r *http.Request, ev *model.Ev
 		return
 	}
 	data.Slot, data.Overlaps = sv, overlaps
-	s.renderSignup(w, r, http.StatusOK, data)
-}
-
-func (s *Server) renderSignup(w http.ResponseWriter, r *http.Request, status int, data signupPage) {
 	if isHTMX(r) {
-		s.renderTemplate(w, r, status, "signup", "signup_dialog", data)
+		s.renderTemplate(w, r, http.StatusOK, "signup", "signup_dialog", data)
 		return
 	}
-	s.render(w, r, status, "signup", data)
+	s.render(w, r, http.StatusOK, "signup", data)
 }
 
 func (s *Server) signupSubmit(w http.ResponseWriter, r *http.Request, ev *model.Event) {
-	id, ok := pathID(r, "id")
-	if ev.IsDraft() {
-		s.renderError(w, r, http.StatusNotFound, msgNotOpenYet)
-		return
-	}
+	id, ok := s.publicID(w, r, ev)
 	if !ok {
-		s.renderError(w, r, http.StatusNotFound, "Créneau introuvable.")
 		return
 	}
 	// Honeypot: bots fill every field, humans never see this one.
@@ -306,47 +279,30 @@ func (s *Server) signupSubmit(w http.ResponseWriter, r *http.Request, ev *model.
 	}
 	me := s.cookieVolunteer(r, ev)
 	form := readVolunteerForm(r)
-
-	fail := func(status int, msg string) {
-		sv, overlaps, err := s.loadSlotView(r.Context(), ev, id, volunteerID(me))
-		if s.storeError(w, r, err) {
-			return
-		}
-		// A failed POST is always rendered as a full page (the form is
-		// submitted without htmx).
-		r.Header.Del("HX-Request")
-		s.renderSignup(w, r, status, signupPage{
-			Common: Common{Title: "Inscription"}, Event: ev, EventURL: eventURL(ev), Slot: sv, Me: me, Form: form, Error: msg,
-			Overlaps: overlaps,
-		})
-	}
 	if err := form.validate(); err != nil {
-		fail(http.StatusBadRequest, err.Error())
+		s.signupFailed(w, r, ev, id, me, form, http.StatusBadRequest, err.Error())
 		return
 	}
-	req := store.SignupRequest{
-		EventID: ev.ID, SlotID: id, Name: form.Name, Phone: form.Phone, Comment: form.Comment,
-	}
+	req := store.SignupRequest{EventID: ev.ID, SlotID: id, Name: form.Name, Phone: form.Phone, Comment: form.Comment}
 	if me != nil {
 		req.EditToken = me.EditToken
 	}
 	res, err := s.store.SignUp(r.Context(), req)
-	switch {
-	case errors.Is(err, store.ErrSlotFull), errors.Is(err, store.ErrAlreadySigned), errors.Is(err, store.ErrEventNotOpen):
-		fail(http.StatusConflict, capitalize(err.Error())+".")
+	if msg, ok := userMessage(err); ok { // full slot, already signed up, event closed
+		s.signupFailed(w, r, ev, id, me, form, http.StatusConflict, msg)
 		return
-	case s.storeError(w, r, err):
+	}
+	if s.storeError(w, r, err) {
 		return
 	}
 
 	setVolunteerCookie(w, ev, res.Volunteer)
 	s.notifySignup(r.Context(), r, ev, res.Volunteer, id, form.Comment, false)
-	slot, _ := s.store.GetSlot(r.Context(), ev.ID, id)
 	if res.NewVolunteer {
 		redirect(w, r, meURL(ev, res.Volunteer)+"?welcome=1")
 		return
 	}
-	msg := fmt.Sprintf("C'est noté ! Vous êtes inscrit·e de %s à %s. Merci !", hm(slot.StartsAt), hm(slot.EndsAt))
+	msg := fmt.Sprintf("C'est noté ! Vous êtes inscrit·e de %s à %s. Merci !", hm(res.Slot.StartsAt), hm(res.Slot.EndsAt))
 	kind := "success"
 	if len(res.Overlapping) > 0 {
 		kind = "warning"
@@ -357,12 +313,17 @@ func (s *Server) signupSubmit(w http.ResponseWriter, r *http.Request, ev *model.
 	redirect(w, r, eventURL(ev))
 }
 
-func capitalize(s string) string {
-	if s == "" {
-		return s
+// signupFailed shows the sign-up form again with the visitor's input and an
+// error. It is always a full page: the form is posted without htmx.
+func (s *Server) signupFailed(w http.ResponseWriter, r *http.Request, ev *model.Event, slotID int64, me *model.Volunteer, form volunteerForm, status int, msg string) {
+	sv, overlaps, err := s.loadSlotView(r.Context(), ev, slotID, volunteerID(me))
+	if s.storeError(w, r, err) {
+		return
 	}
-	r := []rune(s)
-	return strings.ToUpper(string(r[0])) + string(r[1:])
+	s.render(w, r, status, "signup", signupPage{
+		Common: Common{Title: "Inscription"}, Event: ev, EventURL: eventURL(ev),
+		Slot: sv, Overlaps: overlaps, Me: me, Form: form, Error: msg,
+	})
 }
 
 // ---- stand details ----
@@ -376,27 +337,30 @@ type standPage struct {
 // standInfo shows a stand's full description ("Voir plus" in the overview),
 // as a dialog with htmx or as a page.
 func (s *Server) standInfo(w http.ResponseWriter, r *http.Request, ev *model.Event) {
-	id, ok := pathID(r, "id")
-	if ev.IsDraft() {
-		s.renderError(w, r, http.StatusNotFound, msgNotOpenYet)
+	id, ok := s.publicID(w, r, ev)
+	if !ok {
 		return
 	}
 	stands, err := s.store.ListStands(r.Context(), ev.ID)
 	if s.storeError(w, r, err) {
 		return
 	}
+	var st *model.Stand
 	for i := range stands {
-		if ok && stands[i].ID == id {
-			data := standPage{Common: s.common(w, r, stands[i].Name), EventURL: eventURL(ev), Stand: &stands[i]}
-			if isHTMX(r) {
-				s.renderTemplate(w, r, http.StatusOK, "stand", "stand_dialog", data)
-			} else {
-				s.render(w, r, http.StatusOK, "stand", data)
-			}
-			return
+		if stands[i].ID == id {
+			st = &stands[i]
 		}
 	}
-	s.renderError(w, r, http.StatusNotFound, "Stand introuvable.")
+	if st == nil {
+		s.renderError(w, r, http.StatusNotFound, "Stand introuvable.")
+		return
+	}
+	data := standPage{Common: s.common(w, r, st.Name), EventURL: eventURL(ev), Stand: st}
+	if isHTMX(r) {
+		s.renderTemplate(w, r, http.StatusOK, "stand", "stand_dialog", data)
+		return
+	}
+	s.render(w, r, http.StatusOK, "stand", data)
 }
 
 // ---- volunteer self-service ----
@@ -422,9 +386,8 @@ func (s *Server) meUpdate(w http.ResponseWriter, r *http.Request, ev *model.Even
 }
 
 func (s *Server) meCancel(w http.ResponseWriter, r *http.Request, ev *model.Event, vol *model.Volunteer) {
-	id, ok := pathID(r, "id")
+	id, ok := s.pathID(w, r)
 	if !ok {
-		s.renderError(w, r, http.StatusNotFound, "Inscription introuvable.")
 		return
 	}
 	if !ev.IsOpen() {

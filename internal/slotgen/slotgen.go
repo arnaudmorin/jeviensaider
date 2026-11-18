@@ -8,28 +8,19 @@ import (
 	"benevole-ape/internal/model"
 )
 
-var (
-	ErrRange   = errors.New("l'heure de fin doit être après l'heure de début")
-	ErrMin     = errors.New("le nombre minimum de personnes doit être au moins 1")
-	ErrMax     = errors.New("le maximum doit être supérieur ou égal au minimum")
-	ErrTooMany = errors.New("trop de créneaux générés (maximum 96)")
-)
+// ErrTooMany is returned when a generation would exceed MaxSlots.
+var ErrTooMany = errors.New("too many slots generated")
 
 // MaxSlots bounds a single generation, to catch typos like a 1-minute step.
 const MaxSlots = 96
 
 // Generate splits [start, end) into slots of length step. A step of 0 (or one
 // longer than the range) yields a single slot. If the range is not a multiple
-// of step, the last slot is shorter. max may be 0 (no maximum).
+// of step, the last slot is shorter. max may be 0 (no maximum). Invalid
+// times or capacities return the error of model.Slot.Check.
 func Generate(standID int64, start, end time.Time, step time.Duration, min, max int) ([]model.Slot, error) {
-	if !end.After(start) {
-		return nil, ErrRange
-	}
-	if min < 1 {
-		return nil, ErrMin
-	}
-	if max != 0 && max < min {
-		return nil, ErrMax
+	if err := (model.Slot{StartsAt: start, EndsAt: end, MinPeople: min, MaxPeople: max}).Check(); err != nil {
+		return nil, err
 	}
 	if step <= 0 {
 		step = end.Sub(start)

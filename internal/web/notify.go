@@ -4,10 +4,8 @@ import (
 	"bytes"
 	"context"
 	"net/http"
-	"strconv"
 	"strings"
 	"text/template"
-	"time"
 
 	"benevole-ape/internal/mail"
 	"benevole-ape/internal/model"
@@ -18,12 +16,9 @@ type Mailer interface {
 	Enqueue(mail.Message)
 }
 
-var mailTemplates = template.Must(template.New("mail").Funcs(template.FuncMap{
-	"day":    dayFR,
-	"date":   dateFR,
-	"span":   func(sv *model.SlotView) string { return hm(sv.StartsAt) + " – " + hm(sv.EndsAt) },
-	"plural": func(n int, one, many string) string { return map[bool]string{true: one, false: many}[n <= 1] },
-}).Parse(`
+// mailTemplates are plain text (text/template): the same helpers as the
+// pages, no HTML escaping.
+var mailTemplates = template.Must(template.New("mail").Funcs(templateFuncs()).Parse(`
 {{define "created"}}Bonjour,
 
 Votre événement « {{.Event.Title}} »{{with .Event.Date}} du {{date .}}{{end}} a bien été créé sur Je viens aider.
@@ -49,7 +44,7 @@ Je viens aider
 
 {{define "signup"}}Bonjour,
 
-{{.Name}} {{if .Cancel}}s'est désinscrit·e de{{else}}s'est inscrit·e sur{{end}} « {{.Slot.Stand.Name}} », {{day .Slot.StartsAt}}, {{span .Slot}}.
+{{.Name}} {{if .Cancel}}s'est désinscrit·e de{{else}}s'est inscrit·e sur{{end}} « {{.Slot.Stand.Name}} », {{day .Slot.StartsAt}}, {{span .Slot.StartsAt .Slot.EndsAt}}.
 {{if not .Cancel}}
 Téléphone : {{or .Phone "non renseigné"}}{{with .Comment}}
 Commentaire : {{.}}{{end}}
@@ -92,7 +87,7 @@ func (s *Server) sendMail(m mail.Message) bool {
 	if s.cfg.Mailer == nil || m.To == "" || m.Body == "" {
 		return false
 	}
-	if !s.mails.all.allow("", s.mails.limits.PerHour, now()) {
+	if !s.mails.allowMail(s.now()) {
 		s.log.Warn("mail not sent: hourly limit of the site reached", "limit", s.mails.limits.PerHour, "to", m.To, "subject", m.Subject)
 		return false
 	}
@@ -107,13 +102,8 @@ func (s *Server) notifyCreated(r *http.Request, ev *model.Event) bool {
 	if s.cfg.Mailer == nil || ev.AdminEmail == "" {
 		return false
 	}
-	t := now()
-	if !s.mails.createdTo.allow(strings.ToLower(ev.AdminEmail), s.mails.limits.CreatedPerAddressPerDay, t) {
-		s.log.Warn("creation mail not sent: too many for this address today", "limit", s.mails.limits.CreatedPerAddressPerDay, "to", ev.AdminEmail)
-		return false
-	}
-	if !s.mails.created.allow("", s.mails.limits.CreatedPerHour, t) {
-		s.log.Warn("creation mail not sent: too many events created this hour", "limit", s.mails.limits.CreatedPerHour, "to", ev.AdminEmail)
+	if ok, why := s.mails.allowCreated(ev.AdminEmail, s.now()); !ok {
+		s.log.Warn("creation mail not sent: "+why, "to", ev.AdminEmail)
 		return false
 	}
 	return s.sendMail(mail.Message{
@@ -142,24 +132,17 @@ func (s *Server) notifySignup(ctx context.Context, r *http.Request, ev *model.Ev
 	if sv == nil {
 		return
 	}
-	n, until := 0, time.Time{}
-	if max := s.mails.limits.SignupsPerEventPerHour; max > 0 {
-		n, until = s.mails.signups.hit(strconv.FormatInt(ev.ID, 10), now())
-	}
-	switch max := s.mails.limits.SignupsPerEventPerHour; {
-	case max <= 0:
-	case n == max+1:
-		// Once over the limit (a busy hour, or someone signing up and
-		// cancelling in a loop), say so once, then stay quiet.
+	switch notice, until := s.mails.signupNotice(ev.ID, s.now()); notice {
+	case noticeSkip:
+		return
+	case noticePause:
 		s.sendMail(mail.Message{
 			To:      ev.AdminEmail,
 			Subject: "Beaucoup d'inscriptions sur « " + ev.Title + " » : notifications en pause",
 			Body: renderMail("paused", map[string]any{
-				"Limit": max, "Until": hm(until.Local()), "AdminURL": s.absURL(r, adminURL(ev)),
+				"Limit": s.mails.limits.SignupsPerEventPerHour, "Until": hm(until.Local()), "AdminURL": s.absURL(r, adminURL(ev)),
 			}),
 		})
-		return
-	case n < 1 || n > max:
 		return
 	}
 	verb := "Inscription"

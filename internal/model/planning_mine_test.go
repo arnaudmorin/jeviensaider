@@ -22,7 +22,7 @@ func TestMinePlanning(t *testing.T) {
 		{Signup: Signup{SlotID: 20, VolunteerID: me}},
 		{Signup: Signup{SlotID: 30, VolunteerID: other}},
 	}
-	p := BuildPlanning(stands, slots, signups, me)
+	p := BuildPlanning(stands, slots, signups, me, true)
 
 	clash := map[int64]bool{}
 	for _, v := range p.MySlots {
@@ -30,6 +30,9 @@ func TestMinePlanning(t *testing.T) {
 	}
 	if clash[10] || !clash[11] || !clash[20] {
 		t.Errorf("clash flags: %v", clash)
+	}
+	if !p.HasClash {
+		t.Error("HasClash not set")
 	}
 	if got := p.MyDuration(); got != 3*time.Hour {
 		t.Errorf("MyDuration = %v", got)

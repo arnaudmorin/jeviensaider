@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"time"
 
 	"benevole-ape/internal/store"
 )
@@ -33,7 +34,10 @@ type Config struct {
 	MailEnabled bool
 	// MailLimits caps outgoing mails (nil: DefaultMailLimits).
 	MailLimits *MailLimits
-	Logger     *slog.Logger
+	// Now is the clock, for date checks and e-mail limits (nil: time.Now).
+	// Tests set a fixed one.
+	Now    func() time.Time
+	Logger *slog.Logger
 }
 
 // Server holds the dependencies of the HTTP handlers.
@@ -45,6 +49,7 @@ type Server struct {
 	assetVersion string
 	limiter      *limiter
 	mails        *mailBudget
+	now          func() time.Time
 }
 
 // New builds a Server and parses its templates.
@@ -62,6 +67,10 @@ func New(st *store.Store, cfg Config) (*Server, error) {
 		limits = *cfg.MailLimits
 	}
 	s.mails = newMailBudget(limits)
+	s.now = cfg.Now
+	if s.now == nil {
+		s.now = time.Now
+	}
 	if err := s.loadTemplates(); err != nil {
 		return nil, err
 	}

@@ -12,6 +12,8 @@ import (
 	"unicode"
 
 	"benevole-ape/internal/model"
+	"benevole-ape/internal/slotgen"
+	"benevole-ape/internal/store"
 )
 
 const defaultColor = "#3d7cc9"
@@ -22,6 +24,19 @@ var palette = []string{"#3d7cc9", "#d9534f", "#2e9e6a", "#e8932c", "#8a5cc7", "#
 var colorRe = regexp.MustCompile(`^#[0-9a-fA-F]{6}$`)
 
 func validColor(s string) bool { return colorRe.MatchString(s) }
+
+// Maximum lengths of text fields, in characters. The templates repeat them
+// as maxlength attributes, so that browsers stop typing at the same point.
+const (
+	maxTitle            = 120 // event title and location
+	maxDescription      = 2000
+	maxEmail            = 120
+	maxStandName        = 80
+	maxStandDescription = 1000
+	maxName             = 80 // volunteer
+	maxPhone            = 30
+	maxComment          = 300
+)
 
 // clean trims, strips control characters (newlines kept if multiline) and
 // caps the length in runes.
@@ -45,9 +60,15 @@ func clean(s string, max int, multiline bool) string {
 	return strings.TrimSpace(b.String())
 }
 
-func pathID(r *http.Request, name string) (int64, bool) {
-	id, err := strconv.ParseInt(r.PathValue(name), 10, 64)
-	return id, err == nil && id > 0
+// pathID reads the {id} of the URL. An invalid one renders "not found",
+// like an ID that does not exist, and returns false.
+func (s *Server) pathID(w http.ResponseWriter, r *http.Request) (int64, bool) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil || id <= 0 {
+		s.storeError(w, r, store.ErrNotFound)
+		return 0, false
+	}
+	return id, true
 }
 
 // formInt parses an optional integer field; empty means def.
@@ -58,13 +79,10 @@ func formInt(r *http.Request, key string, def int) (int, error) {
 	}
 	n, err := strconv.Atoi(v)
 	if err != nil || n < 0 || n > 1000 {
-		return 0, errors.New("nombre invalide : " + v)
+		return 0, userError("nombre invalide : " + v)
 	}
 	return n, nil
 }
-
-// now is the clock used to validate dates (replaced in tests).
-var now = time.Now
 
 // checkDateRange accepts dates up to two years ahead: a far-future date (a
 // typo, or a way around the automatic cleanup) would keep an event and its
@@ -74,11 +92,11 @@ var now = time.Now
 // so organisers can still edit their events. When events are kept forever,
 // any past date is fine.
 func (s *Server) checkDateRange(t time.Time) error {
-	today := now()
+	today := s.now()
 	max := time.Date(today.Year()+2, today.Month(), today.Day(), 23, 59, 59, 0, time.UTC)
 	if s.cfg.RetentionDays <= 0 {
 		if t.After(max) {
-			return fmt.Errorf("date hors limites : choisissez une date avant le %s", dateFR(max.Format(model.DateLayout)))
+			return userError(fmt.Sprintf("date hors limites : choisissez une date avant le %s", dateFR(max.Format(model.DateLayout))))
 		}
 		return nil
 	}
@@ -88,7 +106,7 @@ func (s *Server) checkDateRange(t time.Time) error {
 	}
 	min := time.Date(today.Year(), today.Month(), today.Day()-back, 0, 0, 0, 0, time.UTC)
 	if t.Before(min) || t.After(max) {
-		return fmt.Errorf("date hors limites : choisissez une date entre le %s et le %s", dateFR(min.Format(model.DateLayout)), dateFR(max.Format(model.DateLayout)))
+		return userError(fmt.Sprintf("date hors limites : choisissez une date entre le %s et le %s", dateFR(min.Format(model.DateLayout)), dateFR(max.Format(model.DateLayout))))
 	}
 	return nil
 }
@@ -100,7 +118,7 @@ func (s *Server) parseDate(v string) (string, error) {
 	}
 	t, err := time.Parse(model.DateLayout, v)
 	if err != nil {
-		return "", errors.New("date invalide (format attendu : AAAA-MM-JJ)")
+		return "", userError("date invalide (format attendu : AAAA-MM-JJ)")
 	}
 	if err := s.checkDateRange(t); err != nil {
 		return "", err
@@ -112,7 +130,7 @@ func (s *Server) parseDate(v string) (string, error) {
 func (s *Server) parseDateTime(date, hhmm string) (time.Time, error) {
 	t, err := time.Parse(model.TimeLayout, strings.TrimSpace(date)+" "+strings.TrimSpace(hhmm))
 	if err != nil {
-		return time.Time{}, errors.New("date ou heure invalide")
+		return time.Time{}, userError("date ou heure invalide")
 	}
 	if err := s.checkDateRange(t); err != nil {
 		return time.Time{}, err
@@ -126,6 +144,83 @@ type userError string
 
 func (e userError) Error() string { return string(e) }
 
+// userMessage returns the French sentence to show for err, if err is one a
+// user can cause and fix (a full slot, a bad time range…). Other errors are
+// internal: the caller reports them with serverError.
+func userMessage(err error) (string, bool) {
+	var ue userError
+	switch {
+	case errors.As(err, &ue):
+		return string(ue), true
+	case errors.Is(err, store.ErrSlotFull):
+		return "Ce créneau est déjà complet.", true
+	case errors.Is(err, store.ErrAlreadySigned):
+		return "Vous êtes déjà inscrit·e sur ce créneau.", true
+	case errors.Is(err, store.ErrEventNotOpen):
+		return "Les inscriptions ne sont pas ouvertes pour cet événement.", true
+	case errors.Is(err, store.ErrTooManyStands):
+		return fmt.Sprintf("Un événement ne peut pas avoir plus de %d stands.", store.MaxStands), true
+	case errors.Is(err, store.ErrTooManySlots):
+		return fmt.Sprintf("Un événement ne peut pas avoir plus de %d créneaux.", store.MaxSlots), true
+	case errors.Is(err, model.ErrSlotRange):
+		return "L'heure de fin doit être après l'heure de début.", true
+	case errors.Is(err, model.ErrSlotMin):
+		return "Le minimum doit être au moins 1.", true
+	case errors.Is(err, model.ErrSlotMax):
+		return "Le maximum doit être vide ou supérieur ou égal au minimum.", true
+	case errors.Is(err, slotgen.ErrTooMany):
+		return fmt.Sprintf("Trop de créneaux d'un coup (maximum %d) : vérifiez la durée.", slotgen.MaxSlots), true
+	}
+	return "", false
+}
+
+// readTitleAndDate reads an event's name (required) and date (optional).
+func (s *Server) readTitleAndDate(r *http.Request) (title, date string, err error) {
+	title = clean(r.FormValue("title"), maxTitle, false)
+	date, err = s.parseDate(r.FormValue("date"))
+	if err == nil && title == "" {
+		err = userError("Le nom de l'événement est obligatoire.")
+	}
+	return title, date, err
+}
+
+// readEventForm reads the event settings form (creation and edition). The
+// event is filled even when an error is returned, to show the form again.
+func (s *Server) readEventForm(r *http.Request) (model.Event, error) {
+	ev := model.Event{
+		Location:      clean(r.FormValue("location"), maxTitle, false),
+		Description:   clean(r.FormValue("description"), maxDescription, true),
+		AdminEmail:    clean(r.FormValue("admin_email"), maxEmail, false),
+		NotifySignups: r.FormValue("notify") == "1",
+	}
+	var err error
+	ev.Title, ev.Date, err = s.readTitleAndDate(r)
+	if err != nil {
+		return ev, err
+	}
+	return ev, checkAdminEmail(ev.AdminEmail)
+}
+
+// readSlotForm reads a slot's times on date and its capacities. The times
+// and capacities themselves are checked by model.Slot.Check.
+func (s *Server) readSlotForm(r *http.Request, date string) (model.Slot, error) {
+	var sl model.Slot
+	var err error
+	if sl.StartsAt, err = s.parseDateTime(date, r.FormValue("from")); err != nil {
+		return sl, userError("Début : " + err.Error())
+	}
+	if sl.EndsAt, err = s.parseDateTime(date, r.FormValue("to")); err != nil {
+		return sl, userError("Fin : " + err.Error())
+	}
+	if sl.MinPeople, err = formInt(r, "min", 1); err != nil {
+		return sl, userError("Minimum : " + err.Error())
+	}
+	if sl.MaxPeople, err = formInt(r, "max", 0); err != nil {
+		return sl, userError("Maximum : " + err.Error())
+	}
+	return sl, nil
+}
+
 // volunteerForm is what a volunteer types in the sign-up form.
 type volunteerForm struct {
 	Name    string
@@ -136,9 +231,9 @@ type volunteerForm struct {
 // readVolunteerForm reads a sign-up: a name, an optional phone and comment.
 func readVolunteerForm(r *http.Request) volunteerForm {
 	return volunteerForm{
-		Name:    clean(r.FormValue("name"), 80, false),
-		Phone:   clean(r.FormValue("phone"), 30, false),
-		Comment: clean(r.FormValue("comment"), 300, false),
+		Name:    clean(r.FormValue("name"), maxName, false),
+		Phone:   clean(r.FormValue("phone"), maxPhone, false),
+		Comment: clean(r.FormValue("comment"), maxComment, false),
 	}
 }
 

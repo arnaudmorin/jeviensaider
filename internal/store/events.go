@@ -54,12 +54,18 @@ func Slugify(s string) string {
 
 // CreateEvent inserts e, filling in ID, Slug, AdminToken and Status.
 func (s *Store) CreateEvent(ctx context.Context, e *model.Event) error {
+	return insertEvent(ctx, s.db, e)
+}
+
+// insertEvent inserts e with a new slug and admin token, as a draft unless
+// e.Status is set, and fills in its ID.
+func insertEvent(ctx context.Context, q querier, e *model.Event) error {
 	e.Slug = Slugify(e.Title) + "-" + shortID()
 	e.AdminToken = Token()
 	if e.Status == "" {
 		e.Status = model.StatusDraft
 	}
-	res, err := s.db.ExecContext(ctx,
+	res, err := q.ExecContext(ctx,
 		`INSERT INTO events (slug, title, description, location, date, admin_token, status, admin_email, notify_signups) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		e.Slug, e.Title, e.Description, e.Location, e.Date, e.AdminToken, e.Status, e.AdminEmail, e.NotifySignups)
 	if err != nil {
@@ -108,7 +114,6 @@ func (s *Store) PurgeVolunteers(ctx context.Context, eventID int64) (int64, erro
 func (s *Store) DuplicateEvent(ctx context.Context, src *model.Event, title, date string) (*model.Event, error) {
 	dst := &model.Event{
 		Title: title, Date: date, Description: src.Description, Location: src.Location,
-		Slug: Slugify(title) + "-" + shortID(), AdminToken: Token(), Status: model.StatusDraft,
 		AdminEmail: src.AdminEmail, NotifySignups: src.NotifySignups,
 	}
 	var shift time.Duration
@@ -116,13 +121,7 @@ func (s *Store) DuplicateEvent(ctx context.Context, src *model.Event, title, dat
 		shift = b.Sub(a)
 	}
 	err := s.withTx(ctx, func(tx *sql.Tx) error {
-		res, err := tx.ExecContext(ctx,
-			`INSERT INTO events (slug, title, description, location, date, admin_token, status, admin_email, notify_signups) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-			dst.Slug, dst.Title, dst.Description, dst.Location, dst.Date, dst.AdminToken, dst.Status, dst.AdminEmail, dst.NotifySignups)
-		if err != nil {
-			return err
-		}
-		if dst.ID, err = res.LastInsertId(); err != nil {
+		if err := insertEvent(ctx, tx, dst); err != nil {
 			return err
 		}
 		stands, err := listStands(ctx, tx, src.ID)
@@ -146,9 +145,8 @@ func (s *Store) DuplicateEvent(ctx context.Context, src *model.Event, title, dat
 			}
 		}
 		for _, sl := range slots {
-			if _, err := tx.ExecContext(ctx,
-				`INSERT INTO slots (stand_id, starts_at, ends_at, min_people, max_people) VALUES (?, ?, ?, ?, ?)`,
-				newID[sl.StandID], fmtTime(sl.StartsAt.Add(shift)), fmtTime(sl.EndsAt.Add(shift)), sl.MinPeople, nullInt(sl.MaxPeople)); err != nil {
+			sl.StartsAt, sl.EndsAt = sl.StartsAt.Add(shift), sl.EndsAt.Add(shift)
+			if err := insertSlot(ctx, tx, newID[sl.StandID], sl); err != nil {
 				return err
 			}
 		}
@@ -158,4 +156,39 @@ func (s *Store) DuplicateEvent(ctx context.Context, src *model.Event, title, dat
 		return nil, err
 	}
 	return dst, nil
+}
+
+// EventSummary is an event with counts, for the command-line admin tool.
+type EventSummary struct {
+	model.Event
+	Stands, Slots, Volunteers, Signups int
+	LastDay                            time.Time
+}
+
+// ListEventSummaries returns every event, most recent last day first.
+func (s *Store) ListEventSummaries(ctx context.Context) ([]EventSummary, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT e.id, e.slug, e.title, e.description, e.location, e.date, e.admin_token, e.status, e.created_at, e.admin_email, e.notify_signups,
+		(SELECT count(*) FROM stands st WHERE st.event_id = e.id),
+		(SELECT count(*) FROM slots sl JOIN stands st ON st.id = sl.stand_id WHERE st.event_id = e.id),
+		(SELECT count(*) FROM volunteers v WHERE v.event_id = e.id),
+		(SELECT count(*) FROM signups sg JOIN volunteers v ON v.id = sg.volunteer_id WHERE v.event_id = e.id),
+		`+lastDayExpr+` AS last_day
+		FROM events e ORDER BY last_day DESC, e.id DESC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []EventSummary
+	for rows.Next() {
+		var e EventSummary
+		var created, last string
+		if err := rows.Scan(&e.ID, &e.Slug, &e.Title, &e.Description, &e.Location, &e.Date, &e.AdminToken, &e.Status, &created, &e.AdminEmail, &e.NotifySignups,
+			&e.Stands, &e.Slots, &e.Volunteers, &e.Signups, &last); err != nil {
+			return nil, err
+		}
+		e.CreatedAt = parseTime(created)
+		e.LastDay, _ = time.ParseInLocation(model.DateLayout, last, time.Local)
+		out = append(out, e)
+	}
+	return out, rows.Err()
 }

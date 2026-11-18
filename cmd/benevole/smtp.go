@@ -67,8 +67,9 @@ func checkOpenCreation(smtp *mail.Config, createPassword string) error {
 	if smtp == nil || createPassword != "" {
 		return nil
 	}
-	if open, _ := strconv.ParseBool(os.Getenv("BENEVOLE_OPEN_CREATION")); open {
-		return nil
+	open, err := boolFromEnv("BENEVOLE_OPEN_CREATION", false)
+	if err != nil || open {
+		return err
 	}
 	return fmt.Errorf("e-mails are enabled (BENEVOLE_SMTP_HOST) but anyone can create events: set BENEVOLE_CREATE_PASSWORD, " +
 		"or BENEVOLE_OPEN_CREATION=true to let anybody make the server e-mail any address")

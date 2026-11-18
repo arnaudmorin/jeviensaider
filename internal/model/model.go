@@ -3,6 +3,7 @@
 package model
 
 import (
+	"errors"
 	"strings"
 	"time"
 	"unicode"
@@ -22,6 +23,14 @@ const (
 	StatusOpen   = "open"
 	StatusClosed = "closed"
 )
+
+// Statuses lists the event statuses in their natural order.
+var Statuses = []string{StatusDraft, StatusOpen, StatusClosed}
+
+// ValidStatus reports whether s is one of Statuses.
+func ValidStatus(s string) bool {
+	return s == StatusDraft || s == StatusOpen || s == StatusClosed
+}
 
 type Event struct {
 	ID          int64
@@ -68,6 +77,28 @@ type Slot struct {
 	EndsAt    time.Time
 	MinPeople int
 	MaxPeople int // 0 = no maximum
+}
+
+// Errors returned by Slot.Check.
+var (
+	ErrSlotRange = errors.New("slot ends before it starts")
+	ErrSlotMin   = errors.New("slot minimum is below 1")
+	ErrSlotMax   = errors.New("slot maximum is below its minimum")
+)
+
+// Check verifies the times and capacities of a slot: it ends after it
+// starts, needs at least one person, and its maximum (0 = none) is not
+// below its minimum.
+func (s Slot) Check() error {
+	switch {
+	case !s.EndsAt.After(s.StartsAt):
+		return ErrSlotRange
+	case s.MinPeople < 1:
+		return ErrSlotMin
+	case s.MaxPeople != 0 && s.MaxPeople < s.MinPeople:
+		return ErrSlotMax
+	}
+	return nil
 }
 
 // Overlaps reports whether two slots share some time.

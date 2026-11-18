@@ -66,7 +66,7 @@ func TestSignupMailsPause(t *testing.T) {
 	}
 
 	// An hour later, notifications resume.
-	now = func() time.Time { return time.Date(2026, 5, 1, 13, 0, 1, 0, time.UTC) }
+	e.setClock(time.Date(2026, 5, 1, 13, 0, 1, 0, time.UTC))
 	e.post(e.client(), pub+"/slots/"+slot+"/signup", url.Values{"name": {"Paul"}})
 	if msgs := fm.take(); len(msgs) != 1 || !strings.HasPrefix(msgs[0].Subject, "Inscription : Paul") {
 		t.Errorf("after an hour: %+v", msgs)

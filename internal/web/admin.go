@@ -44,11 +44,18 @@ func adminFail(w http.ResponseWriter, r *http.Request, ev *model.Event, standID 
 	backToStand(w, r, ev, standID)
 }
 
-// genDefaults pre-fills a stand's slot generator.
-type genDefaults struct {
-	Date string
-	From string
-	To   string
+// adminError reports err after an admin action: a message the organiser can
+// act on (flash, back to the stand), or an internal error. It returns false
+// when err is nil.
+func (s *Server) adminError(w http.ResponseWriter, r *http.Request, ev *model.Event, standID int64, err error) bool {
+	if err == nil {
+		return false
+	}
+	if msg, ok := userMessage(err); ok {
+		adminFail(w, r, ev, standID, msg)
+		return true
+	}
+	return s.storeError(w, r, err)
 }
 
 type adminPage struct {
@@ -60,7 +67,7 @@ type adminPage struct {
 	AdminPath  string
 	EventURL   string
 	Volunteers int
-	Gen        map[int64]genDefaults
+	Gen        map[int64]genDefaults // slot generator, per stand
 	NextColor  string
 	Statuses   []string
 	ExpiresOn  string // "YYYY-MM-DD", empty if events are kept forever
@@ -90,12 +97,42 @@ func (s *Server) adminPage(w http.ResponseWriter, r *http.Request, ev *model.Eve
 		}
 		expires = store.ExpiresOn(last, s.cfg.RetentionDays).Format(model.DateLayout)
 	}
-	date := ev.Date
+	s.render(w, r, http.StatusOK, "admin", adminPage{
+		Common:       s.common(w, r, "Admin · "+ev.Title),
+		Event:        ev,
+		P:            p,
+		PublicURL:    s.absURL(r, eventURL(ev)),
+		AdminURL:     s.absURL(r, adminURL(ev)),
+		AdminPath:    adminURL(ev),
+		EventURL:     eventURL(ev),
+		Volunteers:   nvol,
+		Gen:          generatorDefaults(p.Stands, ev.Date, s.now()),
+		NextColor:    palette[len(p.Stands)%len(palette)],
+		Statuses:     model.Statuses,
+		ExpiresOn:    expires,
+		Retention:    s.cfg.RetentionDays,
+		NeedPassword: s.cfg.CreatePassword != "",
+	})
+}
+
+// genDefaults pre-fills a stand's slot generator.
+type genDefaults struct {
+	Date string
+	From string
+	To   string
+}
+
+// generatorDefaults suggests, for each stand, the next slots to generate.
+// A stand without slots starts at 14:00–17:00 on the event's date (or today).
+// Otherwise the suggestion continues where the stand's last slot ends, for
+// the same duration: organisers usually add slots one block after another.
+func generatorDefaults(stands []*model.StandView, eventDate string, today time.Time) map[int64]genDefaults {
+	date := eventDate
 	if date == "" {
-		date = time.Now().Format(model.DateLayout)
+		date = today.Format(model.DateLayout)
 	}
 	gen := map[int64]genDefaults{}
-	for _, st := range p.Stands {
+	for _, st := range stands {
 		d := genDefaults{Date: date, From: "14:00", To: "17:00"}
 		if n := len(st.Slots); n > 0 {
 			last := st.Slots[n-1]
@@ -108,45 +145,16 @@ func (s *Server) adminPage(w http.ResponseWriter, r *http.Request, ev *model.Eve
 		}
 		gen[st.ID] = d
 	}
-	s.render(w, r, http.StatusOK, "admin", adminPage{
-		Common:     s.common(w, r, "Admin · "+ev.Title),
-		Event:      ev,
-		P:          p,
-		PublicURL:  s.absURL(r, eventURL(ev)),
-		AdminURL:   s.absURL(r, adminURL(ev)),
-		AdminPath:  adminURL(ev),
-		EventURL:   eventURL(ev),
-		Volunteers: nvol,
-		Gen:        gen,
-		NextColor:  palette[len(p.Stands)%len(palette)],
-		Statuses:   []string{model.StatusDraft, model.StatusOpen, model.StatusClosed},
-		ExpiresOn:  expires,
-		Retention:  s.cfg.RetentionDays,
-
-		NeedPassword: s.cfg.CreatePassword != "",
-	})
+	return gen
 }
 
 func (s *Server) adminUpdateEvent(w http.ResponseWriter, r *http.Request, ev *model.Event) {
-	title := clean(r.FormValue("title"), 120, false)
-	if title == "" {
-		adminFail(w, r, ev, 0, "Le nom de l'événement est obligatoire.")
+	form, err := s.readEventForm(r)
+	if s.adminError(w, r, ev, 0, err) {
 		return
 	}
-	date, err := s.parseDate(r.FormValue("date"))
-	if err != nil {
-		adminFail(w, r, ev, 0, err.Error())
-		return
-	}
-	email := clean(r.FormValue("admin_email"), 120, false)
-	if err := checkAdminEmail(email); err != nil {
-		adminFail(w, r, ev, 0, err.Error())
-		return
-	}
-	ev.Title, ev.Date, ev.AdminEmail = title, date, email
-	ev.NotifySignups = r.FormValue("notify") == "1"
-	ev.Location = clean(r.FormValue("location"), 120, false)
-	ev.Description = clean(r.FormValue("description"), 2000, true)
+	ev.Title, ev.Date, ev.Location, ev.Description = form.Title, form.Date, form.Location, form.Description
+	ev.AdminEmail, ev.NotifySignups = form.AdminEmail, form.NotifySignups
 	if s.storeError(w, r, s.store.UpdateEvent(r.Context(), ev)) {
 		return
 	}
@@ -156,7 +164,7 @@ func (s *Server) adminUpdateEvent(w http.ResponseWriter, r *http.Request, ev *mo
 
 func (s *Server) adminSetStatus(w http.ResponseWriter, r *http.Request, ev *model.Event) {
 	st := r.FormValue("status")
-	if st != model.StatusDraft && st != model.StatusOpen && st != model.StatusClosed {
+	if !model.ValidStatus(st) {
 		adminFail(w, r, ev, 0, "Statut inconnu.")
 		return
 	}
@@ -171,8 +179,8 @@ func (s *Server) adminSetStatus(w http.ResponseWriter, r *http.Request, ev *mode
 func readStand(r *http.Request, ev *model.Event) (*model.Stand, error) {
 	st := &model.Stand{
 		EventID:     ev.ID,
-		Name:        clean(r.FormValue("name"), 80, false),
-		Description: clean(r.FormValue("description"), 1000, true),
+		Name:        clean(r.FormValue("name"), maxStandName, false),
+		Description: clean(r.FormValue("description"), maxStandDescription, true),
 		Color:       r.FormValue("color"),
 	}
 	if st.Name == "" {
@@ -186,16 +194,10 @@ func readStand(r *http.Request, ev *model.Event) (*model.Stand, error) {
 
 func (s *Server) adminCreateStand(w http.ResponseWriter, r *http.Request, ev *model.Event) {
 	st, err := readStand(r, ev)
-	if err != nil {
-		adminFail(w, r, ev, 0, err.Error())
-		return
+	if err == nil {
+		err = s.store.CreateStand(r.Context(), st)
 	}
-	err = s.store.CreateStand(r.Context(), st)
-	if errors.Is(err, store.ErrTooManyStands) {
-		adminFail(w, r, ev, 0, capitalize(err.Error())+".")
-		return
-	}
-	if s.storeError(w, r, err) {
+	if s.adminError(w, r, ev, 0, err) {
 		return
 	}
 	setFlash(w, "success", fmt.Sprintf("Stand « %s » ajouté. Ajoutez maintenant ses créneaux.", st.Name))
@@ -203,14 +205,16 @@ func (s *Server) adminCreateStand(w http.ResponseWriter, r *http.Request, ev *mo
 }
 
 func (s *Server) adminUpdateStand(w http.ResponseWriter, r *http.Request, ev *model.Event) {
-	id, _ := pathID(r, "id")
-	st, err := readStand(r, ev)
-	if err != nil {
-		adminFail(w, r, ev, id, err.Error())
+	id, ok := s.pathID(w, r)
+	if !ok {
 		return
 	}
-	st.ID = id
-	if s.storeError(w, r, s.store.UpdateStand(r.Context(), st)) {
+	st, err := readStand(r, ev)
+	if err == nil {
+		st.ID = id
+		err = s.store.UpdateStand(r.Context(), st)
+	}
+	if s.adminError(w, r, ev, id, err) {
 		return
 	}
 	setFlash(w, "success", "Stand mis à jour.")
@@ -218,8 +222,8 @@ func (s *Server) adminUpdateStand(w http.ResponseWriter, r *http.Request, ev *mo
 }
 
 func (s *Server) adminDeleteStand(w http.ResponseWriter, r *http.Request, ev *model.Event) {
-	id, _ := pathID(r, "id")
-	if s.storeError(w, r, s.store.DeleteStand(r.Context(), ev.ID, id)) {
+	id, ok := s.pathID(w, r)
+	if !ok || s.storeError(w, r, s.store.DeleteStand(r.Context(), ev.ID, id)) {
 		return
 	}
 	setFlash(w, "info", "Stand supprimé (avec ses créneaux et inscriptions).")
@@ -227,7 +231,10 @@ func (s *Server) adminDeleteStand(w http.ResponseWriter, r *http.Request, ev *mo
 }
 
 func (s *Server) adminMoveStand(w http.ResponseWriter, r *http.Request, ev *model.Event) {
-	id, _ := pathID(r, "id")
+	id, ok := s.pathID(w, r)
+	if !ok {
+		return
+	}
 	delta := 1
 	if r.FormValue("dir") == "up" {
 		delta = -1
@@ -239,45 +246,25 @@ func (s *Server) adminMoveStand(w http.ResponseWriter, r *http.Request, ev *mode
 }
 
 func (s *Server) adminGenerateSlots(w http.ResponseWriter, r *http.Request, ev *model.Event) {
-	standID, _ := pathID(r, "id")
-	fail := func(msg string) { adminFail(w, r, ev, standID, msg) }
-
-	start, err := s.parseDateTime(r.FormValue("date"), r.FormValue("from"))
-	if err != nil {
-		fail("Début : " + err.Error())
+	standID, ok := s.pathID(w, r)
+	if !ok {
 		return
 	}
-	end, err := s.parseDateTime(r.FormValue("date"), r.FormValue("to"))
-	if err != nil {
-		fail("Fin : " + err.Error())
-		return
+	var slots []model.Slot
+	form, err := s.readSlotForm(r, r.FormValue("date"))
+	if err == nil {
+		var step int
+		if step, err = formInt(r, "step", 0); err != nil {
+			err = userError("Durée : " + err.Error())
+		}
+		if err == nil {
+			slots, err = slotgen.Generate(standID, form.StartsAt, form.EndsAt, time.Duration(step)*time.Minute, form.MinPeople, form.MaxPeople)
+		}
+		if err == nil {
+			err = s.store.CreateSlots(r.Context(), ev.ID, standID, slots)
+		}
 	}
-	step, err := formInt(r, "step", 0)
-	if err != nil {
-		fail("Durée : " + err.Error())
-		return
-	}
-	minP, err := formInt(r, "min", 1)
-	if err != nil {
-		fail("Minimum : " + err.Error())
-		return
-	}
-	maxP, err := formInt(r, "max", 0)
-	if err != nil {
-		fail("Maximum : " + err.Error())
-		return
-	}
-	slots, err := slotgen.Generate(standID, start, end, time.Duration(step)*time.Minute, minP, maxP)
-	if err != nil {
-		fail(capitalize(err.Error()) + ".")
-		return
-	}
-	err = s.store.CreateSlots(r.Context(), ev.ID, standID, slots)
-	if errors.Is(err, store.ErrTooManySlots) {
-		fail(capitalize(err.Error()) + ".")
-		return
-	}
-	if s.storeError(w, r, err) {
+	if s.adminError(w, r, ev, standID, err) {
 		return
 	}
 	setFlash(w, "success", fmt.Sprintf("%d créneau(x) ajouté(s).", len(slots)))
@@ -285,37 +272,27 @@ func (s *Server) adminGenerateSlots(w http.ResponseWriter, r *http.Request, ev *
 }
 
 func (s *Server) adminUpdateSlot(w http.ResponseWriter, r *http.Request, ev *model.Event) {
-	id, _ := pathID(r, "id")
+	id, ok := s.pathID(w, r)
+	if !ok {
+		return
+	}
 	sl, err := s.store.GetSlot(r.Context(), ev.ID, id)
 	if s.storeError(w, r, err) {
 		return
 	}
-	fail := func(msg string) { adminFail(w, r, ev, sl.StandID, msg) }
 	date := r.FormValue("date")
 	if date == "" {
 		date = sl.StartsAt.Format(model.DateLayout)
 	}
-	if sl.StartsAt, err = s.parseDateTime(date, r.FormValue("from")); err != nil {
-		fail("Début : " + err.Error())
-		return
+	form, err := s.readSlotForm(r, date)
+	if err == nil {
+		sl.StartsAt, sl.EndsAt, sl.MinPeople, sl.MaxPeople = form.StartsAt, form.EndsAt, form.MinPeople, form.MaxPeople
+		err = sl.Check()
 	}
-	if sl.EndsAt, err = s.parseDateTime(date, r.FormValue("to")); err != nil {
-		fail("Fin : " + err.Error())
-		return
+	if err == nil {
+		err = s.store.UpdateSlot(r.Context(), ev.ID, sl)
 	}
-	if !sl.EndsAt.After(sl.StartsAt) {
-		fail("L'heure de fin doit être après l'heure de début.")
-		return
-	}
-	if sl.MinPeople, err = formInt(r, "min", 1); err != nil || sl.MinPeople < 1 {
-		fail("Le minimum doit être au moins 1.")
-		return
-	}
-	if sl.MaxPeople, err = formInt(r, "max", 0); err != nil || (sl.MaxPeople != 0 && sl.MaxPeople < sl.MinPeople) {
-		fail("Le maximum doit être vide ou supérieur ou égal au minimum.")
-		return
-	}
-	if s.storeError(w, r, s.store.UpdateSlot(r.Context(), ev.ID, sl)) {
+	if s.adminError(w, r, ev, sl.StandID, err) {
 		return
 	}
 	setFlash(w, "success", "Créneau mis à jour.")
@@ -323,18 +300,20 @@ func (s *Server) adminUpdateSlot(w http.ResponseWriter, r *http.Request, ev *mod
 }
 
 func (s *Server) adminDeleteSlot(w http.ResponseWriter, r *http.Request, ev *model.Event) {
-	id, _ := pathID(r, "id")
-	sl, err := s.store.GetSlot(r.Context(), ev.ID, id)
-	if s.storeError(w, r, err) {
+	id, ok := s.pathID(w, r)
+	if !ok {
 		return
 	}
-	if s.storeError(w, r, s.store.DeleteSlot(r.Context(), ev.ID, id)) {
+	sl, err := s.store.GetSlot(r.Context(), ev.ID, id)
+	if s.storeError(w, r, err) || s.storeError(w, r, s.store.DeleteSlot(r.Context(), ev.ID, id)) {
 		return
 	}
 	setFlash(w, "info", "Créneau supprimé.")
 	backToStand(w, r, ev, sl.StandID)
 }
 
+// adminAddSignup registers someone by hand (a parent who phoned in). It is
+// allowed whatever the event's status; capacity still applies.
 func (s *Server) adminAddSignup(w http.ResponseWriter, r *http.Request, ev *model.Event) {
 	slotID, err := strconv.ParseInt(r.FormValue("slot"), 10, 64)
 	if err != nil {
@@ -342,29 +321,27 @@ func (s *Server) adminAddSignup(w http.ResponseWriter, r *http.Request, ev *mode
 		return
 	}
 	form := readVolunteerForm(r)
-	if err := form.validate(); err != nil {
-		adminFail(w, r, ev, 0, err.Error())
+	err = form.validate()
+	var res *store.SignupResult
+	if err == nil {
+		res, err = s.store.SignUp(r.Context(), store.SignupRequest{
+			EventID: ev.ID, SlotID: slotID, Name: form.Name, Phone: form.Phone,
+			Comment: form.Comment, Admin: true,
+		})
+	}
+	if errors.Is(err, store.ErrNotFound) {
+		err = userError("Choisissez un créneau.")
+	}
+	if s.adminError(w, r, ev, 0, err) {
 		return
 	}
-	_, err = s.store.SignUp(r.Context(), store.SignupRequest{
-		EventID: ev.ID, SlotID: slotID, Name: form.Name, Phone: form.Phone,
-		Comment: form.Comment, Admin: true,
-	})
-	if errors.Is(err, store.ErrSlotFull) || errors.Is(err, store.ErrNotFound) {
-		adminFail(w, r, ev, 0, capitalize(err.Error())+".")
-		return
-	}
-	if s.storeError(w, r, err) {
-		return
-	}
-	sl, _ := s.store.GetSlot(r.Context(), ev.ID, slotID)
 	setFlash(w, "success", form.Name+" a été inscrit·e.")
-	backToStand(w, r, ev, sl.StandID)
+	backToStand(w, r, ev, res.Slot.StandID)
 }
 
 func (s *Server) adminDeleteSignup(w http.ResponseWriter, r *http.Request, ev *model.Event) {
-	id, _ := pathID(r, "id")
-	if s.storeError(w, r, s.store.AdminDeleteSignup(r.Context(), ev.ID, id)) {
+	id, ok := s.pathID(w, r)
+	if !ok || s.storeError(w, r, s.store.AdminDeleteSignup(r.Context(), ev.ID, id)) {
 		return
 	}
 	setFlash(w, "info", "Inscription retirée.")
@@ -391,18 +368,12 @@ func (s *Server) adminDuplicate(w http.ResponseWriter, r *http.Request, ev *mode
 		adminFail(w, r, ev, 0, "Mot de passe de création incorrect.")
 		return
 	}
-	title := clean(r.FormValue("title"), 120, false)
-	if title == "" {
-		adminFail(w, r, ev, 0, "Donnez un nom au nouvel événement.")
-		return
+	title, date, err := s.readTitleAndDate(r)
+	var dup *model.Event
+	if err == nil {
+		dup, err = s.store.DuplicateEvent(r.Context(), ev, title, date)
 	}
-	date, err := s.parseDate(r.FormValue("date"))
-	if err != nil {
-		adminFail(w, r, ev, 0, err.Error())
-		return
-	}
-	dup, err := s.store.DuplicateEvent(r.Context(), ev, title, date)
-	if s.storeError(w, r, err) {
+	if s.adminError(w, r, ev, 0, err) {
 		return
 	}
 	msg := "Nouvel événement créé à partir de « " + ev.Title + " ». Voici son lien d'administration : conservez-le !"
@@ -428,8 +399,43 @@ func (s *Server) adminDeleteEvent(w http.ResponseWriter, r *http.Request, ev *mo
 // ---- print view ----
 
 type printPage struct {
-	Event *model.Event
-	P     *model.Planning
+	Event    *model.Event
+	MultiDay bool
+	Stands   []printStand
+}
+
+// printStand is one printed page: a stand and the lines of its table.
+type printStand struct {
+	*model.StandView
+	Rows []printRow
+}
+
+// printRow is a line of a stand's printed table: a volunteer, or an empty
+// line where a missing person can be written by hand.
+type printRow struct {
+	Slot    *model.SlotView
+	Signup  *model.SignupRow // nil for an empty line
+	Rowspan int              // on a slot's first line: how many lines its time cell covers
+}
+
+// printRows lists, for each slot, its volunteers then one empty line per
+// missing person (at least one line per slot).
+func printRows(st *model.StandView) []printRow {
+	var rows []printRow
+	for _, sl := range st.Slots {
+		n := max(sl.Count+sl.Missing, 1)
+		for i := range n {
+			row := printRow{Slot: sl}
+			if i == 0 {
+				row.Rowspan = n
+			}
+			if i < len(sl.Signups) {
+				row.Signup = &sl.Signups[i]
+			}
+			rows = append(rows, row)
+		}
+	}
+	return rows
 }
 
 func (s *Server) adminPrint(w http.ResponseWriter, r *http.Request, ev *model.Event) {
@@ -438,5 +444,9 @@ func (s *Server) adminPrint(w http.ResponseWriter, r *http.Request, ev *model.Ev
 		s.serverError(w, r, err)
 		return
 	}
-	s.renderTemplate(w, r, http.StatusOK, "print", "print", printPage{Event: ev, P: p})
+	page := printPage{Event: ev, MultiDay: p.MultiDay}
+	for _, st := range p.Stands {
+		page.Stands = append(page.Stands, printStand{StandView: st, Rows: printRows(st)})
+	}
+	s.renderTemplate(w, r, http.StatusOK, "print", "print", page)
 }

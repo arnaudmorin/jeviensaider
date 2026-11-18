@@ -22,16 +22,24 @@ func scanVolunteer(row interface{ Scan(...any) error }) (*model.Volunteer, error
 
 // VolunteerByToken finds the volunteer owning an edit token for this event.
 func (s *Store) VolunteerByToken(ctx context.Context, eventID int64, token string) (*model.Volunteer, error) {
+	return volunteerByToken(ctx, s.db, eventID, token)
+}
+
+func volunteerByToken(ctx context.Context, q querier, eventID int64, token string) (*model.Volunteer, error) {
 	if token == "" {
 		return nil, ErrNotFound
 	}
-	return scanVolunteer(s.db.QueryRowContext(ctx,
+	return scanVolunteer(q.QueryRowContext(ctx,
 		`SELECT `+volunteerCols+` FROM volunteers WHERE edit_token = ? AND event_id = ?`, token, eventID))
 }
 
 // UpdateVolunteer saves the name and phone number.
 func (s *Store) UpdateVolunteer(ctx context.Context, v *model.Volunteer) error {
-	return affectedOne(s.db.ExecContext(ctx,
+	return updateVolunteer(ctx, s.db, v)
+}
+
+func updateVolunteer(ctx context.Context, q querier, v *model.Volunteer) error {
+	return affectedOne(q.ExecContext(ctx,
 		`UPDATE volunteers SET name = ?, phone = ? WHERE id = ?`, v.Name, v.Phone, v.ID))
 }
 
@@ -61,6 +69,7 @@ type SignupRequest struct {
 
 // SignupResult reports what SignUp did.
 type SignupResult struct {
+	Slot         model.Slot
 	Volunteer    *model.Volunteer
 	NewVolunteer bool
 	Overlapping  []model.Slot // other slots of this volunteer that overlap
@@ -71,89 +80,111 @@ type SignupResult struct {
 func (s *Store) SignUp(ctx context.Context, req SignupRequest) (*SignupResult, error) {
 	res := &SignupResult{}
 	err := s.withTx(ctx, func(tx *sql.Tx) error {
-		var status string
-		if err := tx.QueryRowContext(ctx, `SELECT status FROM events WHERE id = ?`, req.EventID).Scan(&status); err != nil {
-			return notFound(err)
-		}
-		if status != model.StatusOpen && !req.Admin {
-			return ErrEventNotOpen
-		}
-		slot, err := getSlot(ctx, tx, req.EventID, req.SlotID)
-		if err != nil {
+		if err := checkOpen(ctx, tx, req); err != nil {
 			return err
 		}
-
-		var vol *model.Volunteer
-		if req.EditToken != "" {
-			vol, err = scanVolunteer(tx.QueryRowContext(ctx,
-				`SELECT `+volunteerCols+` FROM volunteers WHERE edit_token = ? AND event_id = ?`, req.EditToken, req.EventID))
-			if err != nil && err != ErrNotFound {
-				return err
-			}
-			// The browser remembers someone else (a shared device, or a
-			// personal link someone shared): sign up a new volunteer rather
-			// than renaming that person and exposing their sign-ups.
-			if vol != nil && req.Name != "" && !sameName(vol.Name, req.Name) {
-				vol = nil
-			}
-		}
-		if vol == nil {
-			vol = &model.Volunteer{EventID: req.EventID, Name: req.Name, Phone: req.Phone, EditToken: Token()}
-			r, err := tx.ExecContext(ctx,
-				`INSERT INTO volunteers (event_id, name, phone, edit_token) VALUES (?, ?, ?, ?)`,
-				vol.EventID, vol.Name, vol.Phone, vol.EditToken)
-			if err != nil {
-				return err
-			}
-			if vol.ID, err = r.LastInsertId(); err != nil {
-				return err
-			}
-			res.NewVolunteer = true
-		} else if req.Name != "" && (req.Name != vol.Name || req.Phone != vol.Phone) {
-			// Same person (same name): keep their details up to date.
-			vol.Name, vol.Phone = req.Name, req.Phone
-			if _, err := tx.ExecContext(ctx, `UPDATE volunteers SET name = ?, phone = ? WHERE id = ?`,
-				vol.Name, vol.Phone, vol.ID); err != nil {
-				return err
-			}
-		}
-		res.Volunteer = vol
-
-		var already, count int
-		if err := tx.QueryRowContext(ctx,
-			`SELECT COALESCE(SUM(volunteer_id = ?), 0), COUNT(*) FROM signups WHERE slot_id = ?`, vol.ID, slot.ID).
-			Scan(&already, &count); err != nil {
+		var err error
+		if res.Slot, err = getSlot(ctx, tx, req.EventID, req.SlotID); err != nil {
 			return err
 		}
-		if already > 0 {
-			return ErrAlreadySigned
-		}
-		if slot.IsFull(count) {
-			return ErrSlotFull
-		}
-		if _, err := tx.ExecContext(ctx, `INSERT INTO signups (slot_id, volunteer_id, comment) VALUES (?, ?, ?)`,
-			slot.ID, vol.ID, req.Comment); err != nil {
-			if strings.Contains(err.Error(), "UNIQUE") {
-				return ErrAlreadySigned
-			}
+		if res.Volunteer, res.NewVolunteer, err = findOrCreateVolunteer(ctx, tx, req); err != nil {
 			return err
 		}
-
-		mine, err := volunteerSlots(ctx, tx, vol.ID)
-		if err != nil {
+		if err := addSignup(ctx, tx, res.Slot, res.Volunteer.ID, req.Comment); err != nil {
 			return err
 		}
-		for _, o := range mine {
-			if o.ID != slot.ID && o.Overlaps(slot) {
-				res.Overlapping = append(res.Overlapping, o)
-			}
-		}
-		return nil
+		res.Overlapping, err = overlapping(ctx, tx, res.Volunteer.ID, res.Slot)
+		return err
 	})
 	if err != nil {
 		return nil, err
 	}
 	return res, nil
+}
+
+// checkOpen refuses sign-ups on an event that is not open, except those made
+// by the organiser.
+func checkOpen(ctx context.Context, q querier, req SignupRequest) error {
+	var status string
+	if err := q.QueryRowContext(ctx, `SELECT status FROM events WHERE id = ?`, req.EventID).Scan(&status); err != nil {
+		return notFound(err)
+	}
+	if status != model.StatusOpen && !req.Admin {
+		return ErrEventNotOpen
+	}
+	return nil
+}
+
+// findOrCreateVolunteer returns the volunteer of req.EditToken, with their
+// details updated, or a new volunteer. It reports whether it created one.
+func findOrCreateVolunteer(ctx context.Context, q querier, req SignupRequest) (*model.Volunteer, bool, error) {
+	vol, err := volunteerByToken(ctx, q, req.EventID, req.EditToken)
+	if err != nil && err != ErrNotFound {
+		return nil, false, err
+	}
+	// The browser remembers someone else (a shared device, or a personal link
+	// someone shared): sign up a new volunteer rather than renaming that
+	// person and exposing their sign-ups.
+	if vol != nil && req.Name != "" && !sameName(vol.Name, req.Name) {
+		vol = nil
+	}
+	if vol == nil {
+		vol = &model.Volunteer{EventID: req.EventID, Name: req.Name, Phone: req.Phone, EditToken: Token()}
+		r, err := q.ExecContext(ctx,
+			`INSERT INTO volunteers (event_id, name, phone, edit_token) VALUES (?, ?, ?, ?)`,
+			vol.EventID, vol.Name, vol.Phone, vol.EditToken)
+		if err != nil {
+			return nil, false, err
+		}
+		vol.ID, err = r.LastInsertId()
+		return vol, true, err
+	}
+	// Same person (same name): keep their details up to date.
+	if req.Name != "" && (req.Name != vol.Name || req.Phone != vol.Phone) {
+		vol.Name, vol.Phone = req.Name, req.Phone
+		if err := updateVolunteer(ctx, q, vol); err != nil {
+			return nil, false, err
+		}
+	}
+	return vol, false, nil
+}
+
+// addSignup puts a volunteer on a slot, unless they already are or the slot
+// is full.
+func addSignup(ctx context.Context, q querier, slot model.Slot, volunteerID int64, comment string) error {
+	var already, count int
+	if err := q.QueryRowContext(ctx,
+		`SELECT COALESCE(SUM(volunteer_id = ?), 0), COUNT(*) FROM signups WHERE slot_id = ?`, volunteerID, slot.ID).
+		Scan(&already, &count); err != nil {
+		return err
+	}
+	if already > 0 {
+		return ErrAlreadySigned
+	}
+	if slot.IsFull(count) {
+		return ErrSlotFull
+	}
+	_, err := q.ExecContext(ctx, `INSERT INTO signups (slot_id, volunteer_id, comment) VALUES (?, ?, ?)`,
+		slot.ID, volunteerID, comment)
+	if err != nil && strings.Contains(err.Error(), "UNIQUE") {
+		return ErrAlreadySigned
+	}
+	return err
+}
+
+// overlapping returns the volunteer's other slots that overlap slot.
+func overlapping(ctx context.Context, q querier, volunteerID int64, slot model.Slot) ([]model.Slot, error) {
+	mine, err := volunteerSlots(ctx, q, volunteerID)
+	if err != nil {
+		return nil, err
+	}
+	var out []model.Slot
+	for _, o := range mine {
+		if o.ID != slot.ID && o.Overlaps(slot) {
+			out = append(out, o)
+		}
+	}
+	return out, nil
 }
 
 func volunteerSlots(ctx context.Context, q querier, volunteerID int64) ([]model.Slot, error) {
@@ -198,11 +229,11 @@ func (s *Store) ListSignups(ctx context.Context, eventID int64) ([]model.SignupR
 	return out, rows.Err()
 }
 
-// CountVolunteers returns the number of distinct volunteers of an event.
+// CountVolunteers returns the number of volunteers of an event (the people
+// whose name and phone are stored).
 func (s *Store) CountVolunteers(ctx context.Context, eventID int64) (int, error) {
 	var n int
-	err := s.db.QueryRowContext(ctx,
-		`SELECT COUNT(DISTINCT su.volunteer_id) FROM signups su JOIN volunteers v ON v.id = su.volunteer_id WHERE v.event_id = ?`, eventID).Scan(&n)
+	err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM volunteers WHERE event_id = ?`, eventID).Scan(&n)
 	return n, err
 }
 

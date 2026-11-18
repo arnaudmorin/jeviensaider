@@ -79,9 +79,6 @@ func (s *Server) csrf(next http.Handler) http.Handler {
 	})
 }
 
-// maxBuckets bounds the memory used by the rate limiter.
-const maxBuckets = 50000
-
 // secureCookies adds the Secure attribute to every cookie of an HTTPS
 // response, so the volunteer token is never sent over plain HTTP.
 type secureCookies struct {
@@ -107,6 +104,9 @@ func (s *secureCookies) WriteHeader(code int) { s.fix(); s.ResponseWriter.WriteH
 func (s *secureCookies) Write(b []byte) (int, error) { s.fix(); return s.ResponseWriter.Write(b) }
 
 func (s *secureCookies) Unwrap() http.ResponseWriter { return s.ResponseWriter }
+
+// maxBuckets bounds the memory used by the rate limiter.
+const maxBuckets = 50000
 
 // limiter is a per-IP token bucket.
 type limiter struct {

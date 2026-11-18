@@ -198,7 +198,8 @@ func dateFR(s string) string {
 	return dayFR(t) + " " + strconv.Itoa(t.Year())
 }
 
-func statusLabel(status string) string {
+// fillLabel is the French name of a slot's fill status (model.Fill*).
+func fillLabel(status string) string {
 	switch status {
 	case model.FillEmpty:
 		return "personne"
@@ -212,14 +213,15 @@ func statusLabel(status string) string {
 	return status
 }
 
+// eventStatusLabel is the French name of an event status.
 func eventStatusLabel(status string) string {
 	switch status {
 	case model.StatusDraft:
-		return "Brouillon (non visible)"
+		return "Brouillon"
 	case model.StatusOpen:
-		return "Inscriptions ouvertes"
+		return "Ouvert"
 	case model.StatusClosed:
-		return "Inscriptions closes"
+		return "Clos"
 	}
 	return status
 }
@@ -234,24 +236,17 @@ func todoURL(base string, todo bool) string {
 
 func templateFuncs() template.FuncMap {
 	return template.FuncMap{
-		"hm":      hm,
-		"day":     dayFR,
-		"date":    dateFR,
-		"span":    func(a, b time.Time) string { return hm(a) + " – " + hm(b) },
-		"dur":     durationFR,
-		"pub":     model.DisplayName,
-		"label":   statusLabel,
-		"evlabel": eventStatusLabel,
-		"todoURL": todoURL,
-		"timeVal": func(t time.Time) string { return t.Format("15:04") },
-		"dateVal": func(t time.Time) string { return t.Format(model.DateLayout) },
-		"add":     func(a, b int) int { return a + b },
-		"seq": func(n int) []int {
-			if n < 0 {
-				n = 0
-			}
-			return make([]int, n)
-		},
+		"hm":        hm,
+		"day":       dayFR,
+		"date":      dateFR,
+		"span":      func(a, b time.Time) string { return hm(a) + " – " + hm(b) },
+		"dur":       durationFR,
+		"pub":       model.DisplayName,
+		"fillLabel": fillLabel,
+		"evlabel":   eventStatusLabel,
+		"todoURL":   todoURL,
+		"timeVal":   func(t time.Time) string { return t.Format("15:04") },
+		"dateVal":   func(t time.Time) string { return t.Format(model.DateLayout) },
 		"pct": func(a, b int) int {
 			if b <= 0 {
 				return 100

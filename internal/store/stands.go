@@ -7,11 +7,6 @@ import (
 	"benevole-ape/internal/model"
 )
 
-type querier interface {
-	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
-	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
-}
-
 func listStands(ctx context.Context, q querier, eventID int64) ([]model.Stand, error) {
 	rows, err := q.QueryContext(ctx,
 		`SELECT id, event_id, name, description, position, color FROM stands WHERE event_id = ? ORDER BY position, id`, eventID)

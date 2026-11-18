@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -21,6 +22,16 @@ type env struct {
 	t     *testing.T
 	ts    *httptest.Server
 	store *store.Store
+
+	mu    sync.Mutex
+	clock time.Time // the server's clock
+}
+
+// setClock moves the server's clock.
+func (e *env) setClock(t time.Time) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.clock = t
 }
 
 func newEnv(t *testing.T, cfg Config) *env {
@@ -31,8 +42,12 @@ func newEnv(t *testing.T, cfg Config) *env {
 	}
 	// The tests use fixed dates in June 2026: validate them against a fixed
 	// clock so they keep passing in the future.
-	now = func() time.Time { return time.Date(2026, 5, 1, 12, 0, 0, 0, time.UTC) }
-	t.Cleanup(func() { now = time.Now })
+	e := &env{t: t, store: st, clock: time.Date(2026, 5, 1, 12, 0, 0, 0, time.UTC)}
+	cfg.Now = func() time.Time {
+		e.mu.Lock()
+		defer e.mu.Unlock()
+		return e.clock
+	}
 	cfg.Logger = slog.New(slog.NewTextHandler(io.Discard, nil))
 	if cfg.PostsPerMinute == 0 {
 		cfg.PostsPerMinute = 10000
@@ -41,9 +56,9 @@ func newEnv(t *testing.T, cfg Config) *env {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ts := httptest.NewServer(srv.Handler())
-	t.Cleanup(func() { ts.Close(); st.Close() })
-	return &env{t: t, ts: ts, store: st}
+	e.ts = httptest.NewServer(srv.Handler())
+	t.Cleanup(func() { e.ts.Close(); st.Close() })
+	return e
 }
 
 // client returns a browser-like client with its own cookie jar that does
@@ -170,106 +185,128 @@ func openEventWithSlot(t *testing.T, e *env, admin *http.Client, form url.Values
 	return adminPath, pub, slot
 }
 
-func TestFullFlow(t *testing.T) {
-	e := newEnv(t, Config{})
-	admin := e.client()
-	adminPath, pub, slots := setupEvent(t, e, admin)
+// signUp signs c up on a slot and returns the redirect target.
+func (e *env) signUp(c *http.Client, pub, slot, name string) string {
+	e.t.Helper()
+	r := e.post(c, pub+"/slots/"+slot+"/signup", url.Values{"name": {name}, "phone": {"07 11 22 33 44"}})
+	expect(e.t, r, http.StatusSeeOther)
+	return r.location
+}
 
+func TestSignup(t *testing.T) {
+	e := newEnv(t, Config{})
+	_, pub, slots := setupEvent(t, e, e.client())
 	marie := e.client()
-	// Sign-up form, as an htmx partial and as a full page.
+
+	// The form, as an htmx dialog and as a full page; only the name is required.
 	expect(t, e.do(marie, "GET", pub+"/slots/"+slots[0]+"/signup", nil, map[string]string{"HX-Request": "true"}), 200, "<dialog", "Je m'inscris")
 	expect(t, e.get(marie, pub+"/slots/"+slots[0]+"/signup"), 200, "<!doctype html>", "Prénom et nom")
-
-	// Volunteers are not asked for an e-mail; only the name is required.
-	if strings.Contains(e.get(marie, pub+"/slots/"+slots[0]+"/signup").body, `name="email"`) {
-		t.Error("the sign-up form still has an e-mail field")
-	}
 	expect(t, e.post(marie, pub+"/slots/"+slots[0]+"/signup", url.Values{"name": {" "}}), 400, "votre nom")
 
-	// First sign-up: redirected to the personal page with welcome message.
-	// An e-mail sent anyway is ignored.
-	r := e.post(marie, pub+"/slots/"+slots[0]+"/signup", url.Values{"name": {"Marie Dupont"}, "phone": {"07 11 22 33 44"}, "email": {"marie@example.org"}})
-	expect(t, r, http.StatusSeeOther)
-	if !strings.Contains(r.location, "/me/") || !strings.Contains(r.location, "welcome=1") {
-		t.Fatalf("unexpected redirect %q", r.location)
+	// First sign-up: the personal page, with a welcome message.
+	loc := e.signUp(marie, pub, slots[0], "Marie Dupont")
+	if !strings.Contains(loc, "/me/") || !strings.HasSuffix(loc, "?welcome=1") {
+		t.Fatalf("unexpected redirect %q", loc)
 	}
-	mePath := strings.TrimSuffix(r.location, "?welcome=1")
-	expect(t, e.get(marie, r.location), 200, "Merci Marie Dupont", "Mes créneaux", "14h – 15h")
+	expect(t, e.get(marie, loc), 200, "Merci Marie Dupont", "Mes créneaux", "14h – 15h")
 
-	// Public page shows "Marie D." and never the e-mail.
-	r = e.get(e.client(), pub)
+	// The public page shows "Marie D." only.
+	r := e.get(e.client(), pub)
 	expect(t, r, 200, "Marie D.", "1/2", "st-partial")
-	if strings.Contains(r.body, "marie@example.org") || strings.Contains(r.body, "Dupont") {
+	if strings.Contains(r.body, "Dupont") || strings.Contains(r.body, "07 11 22 33 44") {
 		t.Fatal("public page leaks personal data")
 	}
 
-	// Second sign-up by Marie (cookie): flash + back to the planning.
-	r = e.post(marie, pub+"/slots/"+slots[1]+"/signup", url.Values{"name": {"Marie Dupont"}, "phone": {"07 11 22 33 44"}})
-	expect(t, r, http.StatusSeeOther)
-	if r.location != pub {
-		t.Fatalf("expected a redirect to the planning, got %q", r.location)
+	// Next sign-up (the browser remembers Marie): back to the planning.
+	if loc := e.signUp(marie, pub, slots[1], "Marie Dupont"); loc != pub {
+		t.Fatalf("expected a redirect to the planning, got %q", loc)
 	}
-	expect(t, e.get(marie, r.location), 200, "C&#39;est noté", `<span class="cell-me">Vous</span>`)
+	expect(t, e.get(marie, pub), 200, "C&#39;est noté", `<span class="cell-me">Vous</span>`)
+}
 
-	// Duplicate on same slot is refused.
-	expect(t, e.post(marie, pub+"/slots/"+slots[0]+"/signup", url.Values{"name": {"Marie Dupont"}, "phone": {"07 11 22 33 44"}}), 409, "déjà inscrit")
+func TestSignupRefused(t *testing.T) {
+	e := newEnv(t, Config{})
+	admin := e.client()
+	adminPath, pub, slots := setupEvent(t, e, admin) // 2 people max per slot
+	marie := e.client()
+	e.signUp(marie, pub, slots[0], "Marie Dupont")
 
-	// Paul fills slot 0; Léa is refused (max 2).
-	expect(t, e.post(e.client(), pub+"/slots/"+slots[0]+"/signup", url.Values{"name": {"Paul Martin"}, "phone": {"06 12 34 56 78"}}), http.StatusSeeOther)
-	expect(t, e.post(e.client(), pub+"/slots/"+slots[0]+"/signup", url.Values{"name": {"Léa"}, "phone": {"0600000000"}}), 409, "complet")
+	// Twice on the same slot.
+	expect(t, e.post(marie, pub+"/slots/"+slots[0]+"/signup", url.Values{"name": {"Marie Dupont"}}), 409, "déjà inscrit")
+	// A full slot.
+	e.signUp(e.client(), pub, slots[0], "Paul Martin")
+	expect(t, e.post(e.client(), pub+"/slots/"+slots[0]+"/signup", url.Values{"name": {"Léa"}}), 409, "complet")
 	expect(t, e.get(e.client(), pub), 200, "2/2", "st-full")
+	// A closed event, where the organiser can still add someone.
+	expect(t, e.post(admin, adminPath+"/status", url.Values{"status": {"closed"}}), http.StatusSeeOther)
+	expect(t, e.post(e.client(), pub+"/slots/"+slots[2]+"/signup", url.Values{"name": {"Zoé"}}), 409, "pas ouvertes")
+	expect(t, e.get(e.client(), pub), 200, "Les inscriptions sont closes")
+	expect(t, e.post(admin, adminPath+"/signups", url.Values{"slot": {slots[2]}, "name": {"Grand-père Jules"}}), http.StatusSeeOther)
+	expect(t, e.get(admin, adminPath), 200, "Grand-père Jules a été inscrit")
+}
 
-	// Stand tab and filter.
-	r = e.get(e.client(), pub+"?todo=1")
-	expect(t, r, 200, "Créneaux à compléter")
-
-	// Admin sees contact details; CSV and print view work.
-	r = e.get(admin, adminPath)
-	expect(t, r, 200, "07 11 22 33 44", "06 12 34 56 78", "Marie Dupont")
-	if strings.Contains(r.body, "marie@example.org") {
-		t.Error("an e-mail posted by a volunteer was stored")
+func TestTodoFilter(t *testing.T) {
+	e := newEnv(t, Config{})
+	_, pub, slots := setupEvent(t, e, e.client())
+	e.signUp(e.client(), pub, slots[0], "Marie Dupont")
+	e.signUp(e.client(), pub, slots[0], "Paul Martin")
+	r := e.get(e.client(), pub+"?todo=1")
+	expect(t, r, 200, `aria-checked="true"`)
+	if strings.Contains(r.body, "/slots/"+slots[0]+"/signup") || strings.Contains(r.body, "Paul M.") {
+		t.Error("a complete slot is shown with the filter on")
 	}
-	r = e.get(admin, adminPath+"/export.csv")
+}
+
+func TestOrganiserViews(t *testing.T) {
+	e := newEnv(t, Config{})
+	admin := e.client()
+	adminPath, pub, slots := setupEvent(t, e, admin)
+	e.signUp(e.client(), pub, slots[0], "Marie Dupont")
+
+	expect(t, e.get(admin, adminPath), 200, "Marie Dupont", "07 11 22 33 44")
+	r := e.get(admin, adminPath+"/export.csv")
 	expect(t, r, 200, "Stand;Date;Début;Fin;Nom;Téléphone;Commentaire", "Pêche aux canards;20/06/2026;14:00;15:00;Marie Dupont;07 11 22 33 44", "(place libre)")
-	if strings.Contains(r.body, "E-mail") {
-		t.Error("the CSV still has an e-mail column")
-	}
 	if !strings.HasPrefix(r.body, "\ufeff") || r.header.Get("Content-Type") != "text/csv; charset=utf-8" {
 		t.Error("CSV must start with a BOM and have the right content type")
 	}
-	expect(t, e.get(admin, adminPath+"/print"), 200, "Pêche aux canards", "Paul Martin", "class=\"page\"")
+	expect(t, e.get(admin, adminPath+"/print"), 200, "Pêche aux canards", "Marie Dupont", `class="page"`, `rowspan="2"`)
+}
 
-	// Marie cancels her second slot from her personal page.
-	r = e.get(marie, mePath)
+func TestCancelFromPersonalPage(t *testing.T) {
+	e := newEnv(t, Config{})
+	_, pub, slots := setupEvent(t, e, e.client())
+	marie := e.client()
+	mePath := strings.TrimSuffix(e.signUp(marie, pub, slots[0], "Marie Dupont"), "?welcome=1")
+	e.signUp(marie, pub, slots[1], "Marie Dupont")
+
 	// Each cell is in the table and in the phone timeline: count distinct forms.
-	var m []string
-	for _, f := range regexp.MustCompile(`action="(`+regexp.QuoteMeta(mePath)+`/signups/\d+/delete)"`).FindAllStringSubmatch(r.body, -1) {
-		if !slices.Contains(m, f[1]) {
-			m = append(m, f[1])
+	var forms []string
+	for _, f := range regexp.MustCompile(`action="(`+regexp.QuoteMeta(mePath)+`/signups/\d+/delete)"`).FindAllStringSubmatch(e.get(marie, mePath).body, -1) {
+		if !slices.Contains(forms, f[1]) {
+			forms = append(forms, f[1])
 		}
 	}
-	if len(m) != 2 {
-		t.Fatalf("want 2 cancel forms, got %d", len(m))
+	if len(forms) != 2 {
+		t.Fatalf("want 2 cancel forms, got %d", len(forms))
 	}
-	expect(t, e.post(marie, m[1], nil), http.StatusSeeOther)
+	expect(t, e.post(marie, forms[1], nil), http.StatusSeeOther)
 	expect(t, e.get(marie, mePath), 200, "Votre inscription a été annulée")
+	// Nobody can cancel Marie's sign-up without her link.
+	expect(t, e.post(e.client(), strings.Replace(forms[0], mePath, pub+"/me/not-a-token", 1), nil), 404)
+}
 
-	// Someone else cannot cancel Marie's sign-up through their own link.
-	expect(t, e.post(e.client(), strings.Replace(m[0], mePath, pub+"/me/not-a-token", 1), nil), 404)
-
-	// Closing the event blocks sign-ups.
-	expect(t, e.post(admin, adminPath+"/status", url.Values{"status": {"closed"}}), http.StatusSeeOther)
-	expect(t, e.post(e.client(), pub+"/slots/"+slots[2]+"/signup", url.Values{"name": {"Zoé"}, "phone": {"0600000000"}}), 409, "pas ouvertes")
-	expect(t, e.get(e.client(), pub), 200, "Les inscriptions sont closes")
-
-	// Admin can still add someone manually.
-	expect(t, e.post(admin, adminPath+"/signups", url.Values{"slot": {slots[2]}, "name": {"Grand-père Jules"}}), http.StatusSeeOther)
-	expect(t, e.get(admin, adminPath), 200, "Grand-père Jules a été inscrit")
-
-	// Purge removes everybody.
+func TestPurge(t *testing.T) {
+	e := newEnv(t, Config{})
+	admin := e.client()
+	adminPath, pub, slots := setupEvent(t, e, admin)
+	for i, name := range []string{"Marie Dupont", "Paul Martin", "Léa"} {
+		e.signUp(e.client(), pub, slots[i], name)
+	}
+	expect(t, e.post(admin, adminPath+"/purge", nil), http.StatusSeeOther) // no confirmation: refused
+	expect(t, e.get(admin, adminPath), 200, "Marie Dupont")
 	expect(t, e.post(admin, adminPath+"/purge", url.Values{"confirm": {"yes"}}), http.StatusSeeOther)
-	r = e.get(admin, adminPath)
-	expect(t, r, 200, "Données personnelles effacées (3 bénévole(s))")
+	r := e.get(admin, adminPath)
+	expect(t, r, 200, "Données personnelles effacées (3 bénévole(s))", "Pêche aux canards")
 	if strings.Contains(r.body, "Marie Dupont") {
 		t.Error("purge left personal data")
 	}
@@ -350,22 +387,15 @@ func TestDuplicateAndDelete(t *testing.T) {
 	expect(t, e.get(c, adminPath), 404)
 }
 
-func TestMisc(t *testing.T) {
+func TestErrorPagesAndStatic(t *testing.T) {
 	e := newEnv(t, Config{})
 	c := e.client()
-	expect(t, e.get(c, "/healthz"), 200, "ok")
 	expect(t, e.get(c, "/nope"), 404, "n&#39;existe pas")
 	expect(t, e.get(c, "/e/unknown"), 404)
 	r := e.get(c, "/static/app.css")
 	expect(t, r, 200, "--primary")
 	if !strings.Contains(r.header.Get("Content-Security-Policy"), "default-src 'self'") {
 		t.Error("missing CSP")
-	}
-	if got := redactPath("/a/SECRET/stands"); got != "/a/***/stands" {
-		t.Errorf("redact admin: %s", got)
-	}
-	if got := redactPath("/e/fete-x/me/SECRET/signups/1/delete"); got != "/e/fete-x/me/***/signups/1/delete" {
-		t.Errorf("redact me: %s", got)
 	}
 }
 

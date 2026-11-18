@@ -199,104 +199,6 @@ func TestValidEmail(t *testing.T) {
 	}
 }
 
-func TestDateLimits(t *testing.T) {
-	e := newEnv(t, Config{RetentionDays: 60}) // clock fixed at 2026-05-01
-	c := e.client()
-	expect(t, e.post(c, "/events", url.Values{"admin_email": {"orga@example.org"}, "title": {"Far"}, "date": {"9999-12-31"}}), http.StatusBadRequest, "date hors limites")
-	expect(t, e.post(c, "/events", url.Values{"admin_email": {"orga@example.org"}, "title": {"Old"}, "date": {"2025-04-30"}}), http.StatusBadRequest, "date hors limites")
-	expect(t, e.post(c, "/events", url.Values{"admin_email": {"orga@example.org"}, "title": {"Soon"}, "date": {"2028-05-01"}}), http.StatusSeeOther)
-
-	admin := e.client()
-	adminPath, _, _ := setupEvent(t, e, admin)
-	r := e.get(admin, adminPath)
-	standID := regexp.MustCompile(`id="stand-(\d+)"`).FindStringSubmatch(r.body)[1]
-	e.post(admin, adminPath+"/stands/"+standID+"/slots", url.Values{
-		"date": {"2099-06-20"}, "from": {"10:00"}, "to": {"11:00"}, "step": {"60"}, "min": {"1"},
-	})
-	expect(t, e.get(admin, adminPath), 200, "date hors limites")
-}
-
-func TestOverlapWarningAndMyPlanning(t *testing.T) {
-	e := newEnv(t, Config{})
-	admin := e.client()
-	adminPath, publicPath, slots := setupEvent(t, e, admin) // 14h, 15h, 16h on one stand
-	marie := e.client()
-	form := url.Values{"name": {"Marie Dupont"}, "email": {"m@example.org"}}
-	r := e.post(marie, publicPath+"/slots/"+slots[0]+"/signup", form)
-	expect(t, r, http.StatusSeeOther)
-	meLink := strings.TrimSuffix(r.location, "?welcome=1")
-
-	// "Mes créneaux" shows the overview table, restricted to my stands.
-	r = e.get(marie, meLink)
-	expect(t, r, 200, "Mon planning", "1 créneau · 1 h · 1 stand", `<table class="grid">`, `<span class="cell-me">Vous</span>`)
-	// Only my slots: the stand's 15h and 16h slots are not shown, and mine
-	// can be cancelled from the table.
-	if mine := r.body[strings.Index(r.body, "Mon planning"):]; strings.Contains(mine, "15h<small>") || strings.Contains(mine, "16h<small>") {
-		t.Error("slots I am not signed up for are in my planning")
-	}
-	expect(t, r, 200, `class="cell-cancel"`, "Annuler votre inscription : Pêche aux canards, 14h – 15h ?")
-	// The next slot does not overlap: no warning.
-	if strings.Contains(e.get(marie, publicPath+"/slots/"+slots[1]+"/signup").body, "même horaire") {
-		t.Error("warning shown for a non-overlapping slot")
-	}
-	expect(t, e.post(marie, publicPath+"/slots/"+slots[1]+"/signup", form), http.StatusSeeOther)
-	expect(t, e.get(marie, meLink), 200, "Mon planning", "2 créneaux · 2 h · 1 stand")
-
-	// A second stand with a 14:30-15:30 slot, overlapping both.
-	expect(t, e.post(admin, adminPath+"/stands", url.Values{"name": {"Buvette"}}), http.StatusSeeOther)
-	ids := regexp.MustCompile(`id="stand-(\d+)"`).FindAllStringSubmatch(e.get(admin, adminPath).body, -1)
-	buvette := ids[len(ids)-1][1]
-	expect(t, e.post(admin, adminPath+"/stands/"+buvette+"/slots", url.Values{
-		"date": {"2026-06-20"}, "from": {"14:30"}, "to": {"15:30"}, "step": {"0"}, "min": {"1"},
-	}), http.StatusSeeOther)
-	newest := 0 // the Buvette slot is the most recent one
-	for _, m := range regexp.MustCompile(`/slots/(\d+)/signup`).FindAllStringSubmatch(e.get(marie, publicPath).body, -1) {
-		if n, _ := strconv.Atoi(m[1]); n > newest {
-			newest = n
-		}
-	}
-	buvetteSlot := strconv.Itoa(newest)
-	r = e.get(marie, publicPath+"/slots/"+buvetteSlot+"/signup")
-	expect(t, r, 200, "même horaire", "Pêche aux canards", "14h – 15h", "15h – 16h", "M'inscrire quand même")
-
-	// Warn, never block: the sign-up goes through, and the grid flags it.
-	expect(t, e.post(marie, publicPath+"/slots/"+buvetteSlot+"/signup", form), http.StatusSeeOther)
-	r = e.get(marie, meLink)
-	expect(t, r, 200, "3 créneaux", "2 stands", "créneaux en même temps", "mine clash", "Vous ⚠")
-	// Only my stands: a third stand where I am not signed up is not shown.
-	expect(t, e.post(admin, adminPath+"/stands", url.Values{"name": {"Tombola"}}), http.StatusSeeOther)
-	ids = regexp.MustCompile(`id="stand-(\d+)"`).FindAllStringSubmatch(e.get(admin, adminPath).body, -1)
-	expect(t, e.post(admin, adminPath+"/stands/"+ids[len(ids)-1][1]+"/slots", url.Values{
-		"date": {"2026-06-20"}, "from": {"10:00"}, "to": {"11:00"}, "step": {"0"}, "min": {"1"},
-	}), http.StatusSeeOther)
-	r = e.get(marie, meLink)
-	if mine := r.body[strings.Index(r.body, "Mon planning"):]; strings.Contains(mine, "Tombola") {
-		t.Error("a stand without my sign-up is in my planning")
-	}
-	expect(t, e.get(marie, publicPath), 200, "Tombola")
-}
-
-func TestDurationFR(t *testing.T) {
-	for d, want := range map[time.Duration]string{45 * time.Minute: "45 min", 2 * time.Hour: "2 h", 150 * time.Minute: "2 h 30"} {
-		if got := durationFR(d); got != want {
-			t.Errorf("durationFR(%v) = %q, want %q", d, got, want)
-		}
-	}
-}
-
-// With automatic deletion disabled, past dates stay editable (old events are
-// kept), but absurd future dates are still refused.
-func TestDateLimitsKeepForever(t *testing.T) {
-	e := newEnv(t, Config{RetentionDays: 0}) // clock fixed at 2026-05-01
-	c := e.client()
-	expect(t, e.post(c, "/events", url.Values{"admin_email": {"orga@example.org"}, "title": {"Old"}, "date": {"2019-06-15"}}), http.StatusSeeOther)
-	expect(t, e.post(c, "/events", url.Values{"admin_email": {"orga@example.org"}, "title": {"Far"}, "date": {"9999-12-31"}}), http.StatusBadRequest, "date hors limites")
-
-	// A long retention also widens the past window (here 3 years).
-	e = newEnv(t, Config{RetentionDays: 3 * 365})
-	expect(t, e.post(e.client(), "/events", url.Values{"admin_email": {"orga@example.org"}, "title": {"Old"}, "date": {"2024-01-15"}}), http.StatusSeeOther)
-}
-
 // A panic in a handler gives a 500 page and a log line without the
 // secret token of the URL.
 func TestRecoverPanics(t *testing.T) {
@@ -381,4 +283,17 @@ func TestNoScriptInjection(t *testing.T) {
 	// The texts are really there, escaped (not dropped).
 	expect(t, pages["admin"], 200, `&lt;script&gt;alert(1)&lt;/script&gt;`, `&#34;&gt;&lt;img src=x onerror=alert(1)&gt;`)
 	expect(t, pages["stand dialog"], 200, `&lt;svg onload=alert(1)&gt;`)
+}
+
+// Secret tokens never reach the logs.
+func TestRedactPath(t *testing.T) {
+	for in, want := range map[string]string{
+		"/a/SECRET/stands":                     "/a/***/stands",
+		"/e/fete-x/me/SECRET/signups/1/delete": "/e/fete-x/me/***/signups/1/delete",
+		"/e/fete-x/slots/3/signup":             "/e/fete-x/slots/3/signup",
+	} {
+		if got := redactPath(in); got != want {
+			t.Errorf("redactPath(%q) = %q, want %q", in, got, want)
+		}
+	}
 }

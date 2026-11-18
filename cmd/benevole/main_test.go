@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -98,5 +99,42 @@ func TestCleanupLoop(t *testing.T) {
 	case <-done:
 	case <-time.After(5 * time.Second):
 		t.Fatal("cleanupLoop did not stop")
+	}
+}
+
+func TestLoadConfig(t *testing.T) {
+	for _, k := range []string{"ADDR", "DB", "BASE_URL", "TRUST_PROXY", "RETENTION_DAYS", "CREATE_PASSWORD", "OPEN_CREATION", "SMTP_HOST",
+		"MAIL_CREATED_PER_ADDRESS_PER_DAY", "MAIL_CREATED_PER_HOUR", "MAIL_SIGNUPS_PER_EVENT_PER_HOUR", "MAIL_PER_HOUR"} {
+		t.Setenv("BENEVOLE_"+k, "")
+	}
+	c, err := loadConfig(nil)
+	if err != nil || c.addr != ":8080" || c.dbPath != "benevole.db" || c.trustProxy || c.retentionDays != 60 || c.smtp != nil {
+		t.Fatalf("defaults: %+v %v", c, err)
+	}
+
+	// Environment, then flags over it.
+	t.Setenv("BENEVOLE_TRUST_PROXY", "true")
+	t.Setenv("BENEVOLE_BASE_URL", "https://jeviensaider.fr/")
+	t.Setenv("BENEVOLE_RETENTION_DAYS", "off")
+	c, err = loadConfig([]string{"-addr", "127.0.0.1:9000"})
+	if err != nil || !c.trustProxy || c.baseURL != "https://jeviensaider.fr" || c.retentionDays != 0 || c.addr != "127.0.0.1:9000" {
+		t.Fatalf("environment and flags: %+v %v", c, err)
+	}
+
+	// Invalid values are errors, never a silent default.
+	for key, bad := range map[string]string{
+		"BENEVOLE_TRUST_PROXY":   "yes please",
+		"BENEVOLE_OPEN_CREATION": "maybe",
+		"BENEVOLE_MAIL_PER_HOUR": "lots",
+	} {
+		t.Run(key, func(t *testing.T) {
+			t.Setenv(key, bad)
+			if key == "BENEVOLE_OPEN_CREATION" {
+				t.Setenv("BENEVOLE_SMTP_HOST", "smtp.example.org")
+			}
+			if _, err := loadConfig(nil); err == nil || !strings.Contains(err.Error(), key) {
+				t.Errorf("%s=%q: %v", key, bad, err)
+			}
+		})
 	}
 }

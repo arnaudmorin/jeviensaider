@@ -75,14 +75,19 @@ func (s *Store) CreateSlots(ctx context.Context, eventID, standID int64, slots [
 			return ErrTooManySlots
 		}
 		for _, sl := range slots {
-			if _, err := tx.ExecContext(ctx,
-				`INSERT INTO slots (stand_id, starts_at, ends_at, min_people, max_people) VALUES (?, ?, ?, ?, ?)`,
-				standID, fmtTime(sl.StartsAt), fmtTime(sl.EndsAt), sl.MinPeople, nullInt(sl.MaxPeople)); err != nil {
+			if err := insertSlot(ctx, tx, standID, sl); err != nil {
 				return err
 			}
 		}
 		return nil
 	})
+}
+
+func insertSlot(ctx context.Context, q querier, standID int64, sl model.Slot) error {
+	_, err := q.ExecContext(ctx,
+		`INSERT INTO slots (stand_id, starts_at, ends_at, min_people, max_people) VALUES (?, ?, ?, ?, ?)`,
+		standID, fmtTime(sl.StartsAt), fmtTime(sl.EndsAt), sl.MinPeople, nullInt(sl.MaxPeople))
+	return err
 }
 
 // UpdateSlot saves times and capacities of a slot of the event.

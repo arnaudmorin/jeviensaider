@@ -14,8 +14,13 @@ type SlotView struct {
 	Status  string // one of the Fill* constants
 	Missing int
 	Full    bool
-	Mine    bool // the current volunteer is signed up
-	Clash   bool // Mine, and overlaps another slot of the current volunteer
+	// For the current volunteer (Planning.MyID):
+	Mine       bool  // signed up on this slot
+	MySignupID int64 // their sign-up on it, 0 if none (to cancel it)
+	Clash      bool  // Mine, and overlaps another of their slots
+	// CanSignUp: the event is open, the slot is not full and the current
+	// visitor is not on it yet.
+	CanSignUp bool
 }
 
 // StandView is a stand with its slots, in chronological order.
@@ -55,26 +60,126 @@ type Planning struct {
 	Missing  int
 	Needed   int
 	Count    int
-	MySlots  []*SlotView
-	MyID     int64 // the current volunteer, 0 if unknown
+	Open     bool        // the event accepts sign-ups
+	MyID     int64       // the current volunteer, 0 if unknown
+	MySlots  []*SlotView // their slots, chronologically
+	HasClash bool        // two of their slots overlap
+
+	columnIndex map[Column]int // position of each column in Columns
 }
 
 // BuildPlanning assembles stands, slots and sign-ups into a Planning.
-// stands must be in display order. myVolunteerID may be 0.
-func BuildPlanning(stands []Stand, slots []Slot, signups []SignupRow, myVolunteerID int64) *Planning {
-	p := &Planning{MyID: myVolunteerID}
+// stands must be in display order. myVolunteerID may be 0; open says
+// whether the event accepts sign-ups.
+func BuildPlanning(stands []Stand, slots []Slot, signups []SignupRow, myVolunteerID int64, open bool) *Planning {
+	p := &Planning{MyID: myVolunteerID, Open: open, columnIndex: map[Column]int{}}
+	byStand := p.addStands(stands)
+	views := p.addSlots(byStand, chronological(slots), signupsBySlot(signups))
+	p.buildRows()
+	p.buildGroups(views)
+	p.markClashes()
+	p.MultiDay = spansSeveralDays(p.Columns)
+	return p
+}
+
+// addStands creates the stand views and returns them by ID.
+func (p *Planning) addStands(stands []Stand) map[int64]*StandView {
 	byStand := make(map[int64]*StandView, len(stands))
 	for i := range stands {
 		sv := &StandView{Stand: stands[i]}
 		p.Stands = append(p.Stands, sv)
 		byStand[sv.ID] = sv
 	}
+	return byStand
+}
 
-	bySlot := make(map[int64][]SignupRow)
-	for _, su := range signups {
-		bySlot[su.SlotID] = append(bySlot[su.SlotID], su)
+// addSlots creates the slot views (in the given order), adds them to their
+// stand, sums the totals and collects the distinct time columns.
+func (p *Planning) addSlots(byStand map[int64]*StandView, slots []Slot, bySlot map[int64][]SignupRow) []*SlotView {
+	var views []*SlotView
+	for _, sl := range slots {
+		st := byStand[sl.StandID]
+		if st == nil {
+			continue
+		}
+		v := p.newSlotView(sl, &st.Stand, bySlot[sl.ID])
+		st.Slots = append(st.Slots, v)
+		st.Missing += v.Missing
+		st.Needed += sl.MinPeople
+		st.Count += v.Count
+		p.Missing += v.Missing
+		p.Needed += sl.MinPeople
+		p.Count += v.Count
+		if v.Mine {
+			p.MySlots = append(p.MySlots, v)
+		}
+		c := Column{StartsAt: sl.StartsAt, EndsAt: sl.EndsAt}
+		if _, ok := p.columnIndex[c]; !ok {
+			p.columnIndex[c] = len(p.Columns)
+			p.Columns = append(p.Columns, c)
+		}
+		views = append(views, v)
 	}
+	return views
+}
 
+func (p *Planning) newSlotView(sl Slot, stand *Stand, signups []SignupRow) *SlotView {
+	v := &SlotView{Slot: sl, Stand: stand, Signups: signups, Count: len(signups)}
+	v.Status = sl.FillStatus(v.Count)
+	v.Missing = sl.Missing(v.Count)
+	v.Full = sl.IsFull(v.Count)
+	for _, su := range signups {
+		if p.MyID != 0 && su.VolunteerID == p.MyID {
+			v.Mine, v.MySignupID = true, su.ID
+		}
+	}
+	v.CanSignUp = p.Open && !v.Full && !v.Mine
+	return v
+}
+
+// buildRows lays out each stand's slots in the grid columns.
+func (p *Planning) buildRows() {
+	for _, st := range p.Stands {
+		row := Row{Stand: st, Cells: make([][]*SlotView, len(p.Columns))}
+		for _, v := range st.Slots {
+			i := p.column(v)
+			row.Cells[i] = append(row.Cells[i], v)
+		}
+		p.Rows = append(p.Rows, row)
+	}
+}
+
+// buildGroups lists, for each column, its slots of every stand.
+func (p *Planning) buildGroups(views []*SlotView) {
+	p.Groups = make([]TimeGroup, len(p.Columns))
+	for i, c := range p.Columns {
+		p.Groups[i].Column = c
+	}
+	for _, v := range views {
+		i := p.column(v)
+		p.Groups[i].Slots = append(p.Groups[i].Slots, v)
+	}
+}
+
+func (p *Planning) column(v *SlotView) int {
+	return p.columnIndex[Column{StartsAt: v.StartsAt, EndsAt: v.EndsAt}]
+}
+
+// markClashes flags the current volunteer's slots that overlap each other.
+func (p *Planning) markClashes() {
+	for i, a := range p.MySlots {
+		for _, b := range p.MySlots[i+1:] {
+			if a.Overlaps(b.Slot) {
+				a.Clash, b.Clash = true, true
+				p.HasClash = true
+			}
+		}
+	}
+}
+
+// chronological returns a copy of slots sorted by start, then end. The sort
+// is stable, so slots at the same time keep their order (the stands').
+func chronological(slots []Slot) []Slot {
 	sorted := append([]Slot(nil), slots...)
 	sort.SliceStable(sorted, func(i, j int) bool {
 		if !sorted[i].StartsAt.Equal(sorted[j].StartsAt) {
@@ -82,80 +187,26 @@ func BuildPlanning(stands []Stand, slots []Slot, signups []SignupRow, myVoluntee
 		}
 		return sorted[i].EndsAt.Before(sorted[j].EndsAt)
 	})
+	return sorted
+}
 
-	colIndex := map[Column]int{}
-	var all []*SlotView
-	for _, sl := range sorted {
-		st := byStand[sl.StandID]
-		if st == nil {
-			continue
-		}
-		v := &SlotView{Slot: sl, Stand: &st.Stand, Signups: bySlot[sl.ID]}
-		v.Count = len(v.Signups)
-		v.Status = sl.FillStatus(v.Count)
-		v.Missing = sl.Missing(v.Count)
-		v.Full = sl.IsFull(v.Count)
-		for _, su := range v.Signups {
-			if myVolunteerID != 0 && su.VolunteerID == myVolunteerID {
-				v.Mine = true
-			}
-		}
-		st.Slots = append(st.Slots, v)
-		st.Missing += v.Missing
-		st.Needed += sl.MinPeople
-		st.Count += v.Count
-		all = append(all, v)
-		if v.Mine {
-			p.MySlots = append(p.MySlots, v)
-		}
+func signupsBySlot(signups []SignupRow) map[int64][]SignupRow {
+	bySlot := make(map[int64][]SignupRow)
+	for _, su := range signups {
+		bySlot[su.SlotID] = append(bySlot[su.SlotID], su)
+	}
+	return bySlot
+}
 
-		c := Column{StartsAt: sl.StartsAt, EndsAt: sl.EndsAt}
-		if _, ok := colIndex[c]; !ok {
-			colIndex[c] = len(p.Columns)
-			p.Columns = append(p.Columns, c)
+// spansSeveralDays reports whether the columns are not all on the same day
+// (the views then show the day next to the times).
+func spansSeveralDays(cols []Column) bool {
+	for _, c := range cols {
+		if c.StartsAt.YearDay() != cols[0].StartsAt.YearDay() || c.StartsAt.Year() != cols[0].StartsAt.Year() {
+			return true
 		}
 	}
-
-	for _, st := range p.Stands {
-		p.Missing += st.Missing
-		p.Needed += st.Needed
-		p.Count += st.Count
-		row := Row{Stand: st, Cells: make([][]*SlotView, len(p.Columns))}
-		for _, v := range st.Slots {
-			i := colIndex[Column{StartsAt: v.StartsAt, EndsAt: v.EndsAt}]
-			row.Cells[i] = append(row.Cells[i], v)
-		}
-		p.Rows = append(p.Rows, row)
-	}
-
-	groups := make([]TimeGroup, len(p.Columns))
-	for i, c := range p.Columns {
-		groups[i].Column = c
-	}
-	for _, v := range all {
-		i := colIndex[Column{StartsAt: v.StartsAt, EndsAt: v.EndsAt}]
-		groups[i].Slots = append(groups[i].Slots, v)
-	}
-	p.Groups = groups
-
-	for i, a := range p.MySlots {
-		for _, b := range p.MySlots[i+1:] {
-			if a.Overlaps(b.Slot) {
-				a.Clash, b.Clash = true, true
-			}
-		}
-	}
-
-	if len(p.Columns) > 0 {
-		first := p.Columns[0].StartsAt
-		for _, c := range p.Columns {
-			if c.StartsAt.YearDay() != first.YearDay() || c.StartsAt.Year() != first.Year() {
-				p.MultiDay = true
-				break
-			}
-		}
-	}
-	return p
+	return false
 }
 
 // Slot returns the slot view with the given id, or nil.
@@ -190,7 +241,7 @@ func (p *Planning) Mine() *Planning {
 			signups = append(signups, v.Signups...)
 		}
 	}
-	return BuildPlanning(stands, slots, signups, p.MyID)
+	return BuildPlanning(stands, slots, signups, p.MyID, p.Open)
 }
 
 // MyOverlaps returns the current volunteer's other slots that overlap v.

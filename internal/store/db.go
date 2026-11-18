@@ -24,13 +24,15 @@ import (
 //go:embed migrations/*.sql
 var migrationsFS embed.FS
 
+// Errors returned by the store. The web package turns them into messages
+// for users (web.userMessage).
 var (
-	ErrNotFound      = errors.New("introuvable")
-	ErrSlotFull      = errors.New("ce créneau est déjà complet")
-	ErrAlreadySigned = errors.New("vous êtes déjà inscrit·e sur ce créneau")
-	ErrEventNotOpen  = errors.New("les inscriptions ne sont pas ouvertes pour cet événement")
-	ErrTooManyStands = fmt.Errorf("un événement ne peut pas avoir plus de %d stands", MaxStands)
-	ErrTooManySlots  = fmt.Errorf("un événement ne peut pas avoir plus de %d créneaux", MaxSlots)
+	ErrNotFound      = errors.New("not found")
+	ErrSlotFull      = errors.New("slot is full")
+	ErrAlreadySigned = errors.New("already signed up for this slot")
+	ErrEventNotOpen  = errors.New("event is not open for sign-ups")
+	ErrTooManyStands = fmt.Errorf("event has the maximum of %d stands", MaxStands)
+	ErrTooManySlots  = fmt.Errorf("event has the maximum of %d slots", MaxSlots)
 )
 
 // Per-event limits. They keep the planning page to a reasonable size: without
@@ -39,6 +41,14 @@ const (
 	MaxStands = 50
 	MaxSlots  = 500
 )
+
+// querier is what queries need: a *sql.DB, or a *sql.Tx inside a
+// transaction. Helpers take one so that both can share the same SQL.
+type querier interface {
+	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
+	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
+	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
+}
 
 // Store wraps the SQLite database.
 type Store struct {
