@@ -1,0 +1,18 @@
+{{define "content"}}
+<section class="hero">
+  <h1>Retrouver mes liens</h1>
+  <p>Vous avez perdu le lien d'administration d'un événement ? Indiquez l'adresse e-mail de l'organisateur : nous y envoyons les liens de ses événements.</p>
+</section>
+
+<div class="card narrow">
+  {{with .Error}}<div class="callout error" role="alert">{{.}}</div>{{end}}
+  <form method="post" action="/recover" class="stack">
+    <label>Votre e-mail (organisateur)
+      <input type="email" name="email" value="{{.Email}}" required maxlength="120" autocomplete="email">
+      <span class="hint">L'adresse saisie à la création de l'événement. Les liens ne sont jamais affichés ici, seulement envoyés à cette adresse.</span>
+    </label>
+    <button type="submit" class="btn block">Envoyer mes liens</button>
+    <p class="hint"><a href="/">Retour à l'accueil</a></p>
+  </form>
+</div>
+{{end}}

@@ -87,6 +87,39 @@ func (s *Store) EventByAdminToken(ctx context.Context, token string) (*model.Eve
 	return scanEvent(s.db.QueryRowContext(ctx, `SELECT `+eventCols+` FROM events WHERE admin_token = ?`, token))
 }
 
+// EventsByAdminEmail returns the events whose organiser e-mail is email, the
+// one with the latest last day first (see lastDayExpr). The match ignores
+// case and spaces around the address, and it is exact: there is no partial
+// match. SQLite changes the case of ASCII letters only, which is enough for
+// the addresses that the app accepts. limit 0 means no limit. An empty
+// address matches nothing, even the events that have no address.
+func (s *Store) EventsByAdminEmail(ctx context.Context, email string, limit int) ([]model.Event, error) {
+	email = strings.ToLower(strings.TrimSpace(email))
+	if email == "" {
+		return nil, nil
+	}
+	q := `SELECT ` + eventCols + ` FROM events e WHERE lower(e.admin_email) = ? ORDER BY ` + lastDayExpr + ` DESC, e.id DESC`
+	args := []any{email}
+	if limit > 0 {
+		q += ` LIMIT ?`
+		args = append(args, limit)
+	}
+	rows, err := s.db.QueryContext(ctx, q, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []model.Event
+	for rows.Next() {
+		e, err := scanEvent(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, *e)
+	}
+	return out, rows.Err()
+}
+
 // UpdateEvent saves the editable fields of e (title, description, location,
 // date, status, organiser e-mail and notification setting).
 func (s *Store) UpdateEvent(ctx context.Context, e *model.Event) error {

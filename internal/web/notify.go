@@ -49,6 +49,23 @@ Vous recevrez un e-mail à chaque inscription ou désinscription. Vous pouvez le
 Je viens aider
 {{end}}
 
+{{define "recover"}}Bonjour,
+
+Quelqu'un a demandé à retrouver les liens d'administration des événements créés avec cette adresse e-mail sur Je viens aider.
+{{range .Events}}
+« {{.Title}} »{{with .Date}}, le {{date .}}{{end}}
+{{.URL}}
+{{end}}
+{{if .More}}Seuls les {{.Max}} événements les plus récents sont listés.
+
+{{end}}Ces liens sont les seules clés pour gérer les événements : ne les partagez qu'avec les autres organisateurs.
+
+Si vous n'avez pas fait cette demande, ignorez simplement ce message. Ces liens ne sont envoyés qu'à l'adresse de l'organisateur.
+
+--
+Je viens aider
+{{end}}
+
 {{define "signup"}}Bonjour,
 
 {{.Name}} {{if .Cancel}}s'est désinscrit·e de{{else}}s'est inscrit·e sur{{end}} « {{.Slot.Stand.Name}} », {{day .Slot.StartsAt}}, {{span .Slot.StartsAt .Slot.EndsAt}}.

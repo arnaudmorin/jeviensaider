@@ -18,6 +18,7 @@ type homePage struct {
 	Common
 	NeedPassword bool
 	MailEnabled  bool
+	CanRecover   bool // the page that e-mails the admin links again exists
 	Error        string
 	Form         model.Event
 }
@@ -27,6 +28,7 @@ func (s *Server) home(w http.ResponseWriter, r *http.Request) {
 		Common:       s.common(w, r, "Je viens aider"),
 		NeedPassword: s.cfg.CreatePassword != "",
 		MailEnabled:  s.cfg.MailEnabled,
+		CanRecover:   s.recoverEnabled(),
 		Form:         model.Event{NotifySignups: true},
 	})
 }
@@ -38,7 +40,7 @@ func (s *Server) createEvent(w http.ResponseWriter, r *http.Request) {
 	}
 	if err != nil {
 		s.render(w, r, http.StatusBadRequest, "home", homePage{
-			Common: Common{Title: "Je viens aider"}, NeedPassword: s.cfg.CreatePassword != "", MailEnabled: s.cfg.MailEnabled, Error: err.Error(), Form: ev,
+			Common: Common{Title: "Je viens aider"}, NeedPassword: s.cfg.CreatePassword != "", MailEnabled: s.cfg.MailEnabled, CanRecover: s.recoverEnabled(), Error: err.Error(), Form: ev,
 		})
 		return
 	}

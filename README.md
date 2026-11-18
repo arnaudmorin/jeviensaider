@@ -20,6 +20,10 @@ in a single SQLite file.
   **sent again** from the admin page (a lost e-mail, or a new address).
 - Get an **e-mail for each sign-up or cancellation** (who, which slot, what
   is still missing), which can be turned off per event.
+- Get a lost admin link again by e-mail. The organiser types their address on
+  the "Retrouver mes liens" page. The app then sends them the links of their
+  events. The page gives the same answer for every address, so it does not
+  show who is an organiser.
 - Add stands, with a description of what volunteers do there, then generate
   their slots in one step: start, end, slot length and number of people.
 - Follow progress on a dashboard that shows who is signed up, with their
@@ -121,9 +125,42 @@ limit; an invalid value stops the server:
 | `BENEVOLE_MAIL_CREATED_PER_HOUR` | `30` | Mails with an event's links to all addresses, per hour |
 | `BENEVOLE_MAIL_SIGNUPS_PER_EVENT_PER_HOUR` | `20` | Sign-up notifications for one event, per hour; past it the organiser gets one "notifications en pause" message |
 | `BENEVOLE_MAIL_PER_HOUR` | `300` | All mails, per hour |
+| `BENEVOLE_MAIL_RECOVER_PER_ADDRESS_PER_DAY` | `3` | "Lost admin links" mails to one address, per day |
+| `BENEVOLE_MAIL_RECOVER_PER_ADDRESS_PER_CLIENT_PER_DAY` | `1` | "Lost admin links" mails to one address, from one client, per day |
+| `BENEVOLE_MAIL_RECOVER_PER_HOUR` | `30` | "Lost admin links" mails to all addresses, per hour |
+| `BENEVOLE_MAIL_RECOVER_PER_IP_PER_HOUR` | `10` | Requests to the "lost admin links" page from one client, per hour |
 
 The counters are kept in memory and start again from zero when the server
 restarts.
+
+**Lost admin links.** When e-mails are enabled, the home page links to
+`/recover`. The links in the e-mail use `BENEVOLE_BASE_URL`, never the host of
+the request. The page does not exist without that URL. An organiser types the address that they gave when they created
+their events. The app sends the admin links of the 20 most recent events of
+that address, in one e-mail. The e-mail goes to the address stored with the
+event, not to the text of the form. The page shows the same message for every
+valid address, so a visitor cannot find out which addresses are organisers.
+The server looks up the address and queues the mail after it answers, so the
+answer takes the same time for every address. The server does this for at most
+8 requests at once. It drops the other requests and writes that in its log.
+The "lost admin links" mails have their own limits, and they also count in
+`BENEVOLE_MAIL_PER_HOUR`. With the default values, they use at most 30 of the
+300 mails of the hour. The other mails keep the rest. Every request counts for
+the limit of its client, even a request with an invalid address. When that
+limit is reached, the page answers with the error 429. The other limits do not
+change the message, and the server writes them in its log.
+
+The limits per address have a cost. Anyone who knows an organiser address can
+ask for a mail to that address. One client can use only 1 of the 3 daily mails
+of an address. To use the whole quota, a person needs 3 clients with different
+IP addresses. The organiser then gets the mails that these requests caused,
+and these mails hold the real links. The organiser can look in the spam folder
+and in the mails of earlier today. An organiser who asks twice from the same IP
+address on the same day gets no second mail.
+
+The limit per hour does not change. With the default values, a person who knows
+10 organiser addresses and has 3 IP addresses can use the 30 recovery mails of
+an hour. No other recovery mail leaves until the next hour.
 
 To check the settings, send a test e-mail. It reads the same variables and
 prints the SMTP server's error if sending fails:

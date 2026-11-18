@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"benevole-ape/internal/store"
@@ -50,6 +51,8 @@ type Server struct {
 	limiter      *limiter
 	mails        *mailBudget
 	now          func() time.Time
+	bg           sync.WaitGroup // jobs that handlers run in the background
+	bgSlots      chan struct{}  // one place per job that can run now
 }
 
 // New builds a Server and parses its templates.
@@ -61,7 +64,7 @@ func New(st *store.Store, cfg Config) (*Server, error) {
 		cfg.PostsPerMinute = 60
 	}
 	cfg.BaseURL = strings.TrimRight(cfg.BaseURL, "/")
-	s := &Server{store: st, cfg: cfg, log: cfg.Logger, limiter: newLimiter(cfg.PostsPerMinute)}
+	s := &Server{store: st, cfg: cfg, log: cfg.Logger, limiter: newLimiter(cfg.PostsPerMinute), bgSlots: make(chan struct{}, maxBackground)}
 	limits := DefaultMailLimits()
 	if cfg.MailLimits != nil {
 		limits = *cfg.MailLimits
@@ -83,6 +86,8 @@ func (s *Server) Handler() http.Handler {
 
 	mux.HandleFunc("GET /{$}", s.home)
 	mux.HandleFunc("POST /events", s.createEvent)
+	mux.HandleFunc("GET /recover", s.recoverForm)
+	mux.HandleFunc("POST /recover", s.recoverSubmit)
 	mux.HandleFunc("GET /healthz", s.healthz)
 	mux.Handle("GET /static/", s.staticHandler())
 

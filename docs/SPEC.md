@@ -139,6 +139,8 @@ Derived notions (computed, not stored):
 - On creation and duplication: the admin and public links. The organiser can
   have them sent again from the admin page ("Renvoyer les liens par e-mail"),
   to the current organiser address; this counts in the same limits.
+- On request from the `/recover` page: the admin links of the events of an
+  address (§4.8).
 - On each sign-up and cancellation, if the organiser asked: who, which slot,
   phone and comment, and what is still missing.
 - Sent in the background through SMTP (STARTTLS required by default, or
@@ -167,12 +169,28 @@ Derived notions (computed, not stored):
   settings and print the server's error.
 - `benevole -healthcheck` — for container health checks.
 
+### 4.8 Lost admin links (`/recover`)
+
+- The page needs two things: e-mail enabled and `BENEVOLE_BASE_URL` set.
+  Without them, the page answers 404 and the home page does not link to it.
+- The organiser types an address. The app e-mails one message with the admin
+  links of the 20 most recent events of that address. The match ignores case
+  and spaces around the address. The mail goes to the address stored with the
+  events, never to the text of the form.
+- The answer is the same for every valid address, so a visitor cannot find
+  out which addresses are organisers. The look-up and the mail run after the
+  answer, at most 8 at once. The app drops the other requests and logs them.
+  This way, the time of the answer does not depend on the address.
+- Limits (§6): every request counts for the limit of its client, even a
+  request with an invalid address. The other limits do not change the answer.
+  The server writes them in its log.
+
 ## 5. Configuration
 
 Flags and environment variables, documented in the README and
 `.env.example`: listen address, database file, public URL, trust proxy
 headers, retention, creation password, SMTP settings, "open creation"
-opt-out, and the four e-mail limits. An empty variable counts as unset.
+opt-out, and the e-mail limits. An empty variable counts as unset.
 Invalid values stop the program at startup with a clear message; nothing
 silently falls back to a default.
 
@@ -194,6 +212,15 @@ silently falls back to a default.
   resend) per address per day, 30 per hour in total,
   20 sign-up notifications per event per hour (then one "paused" notice),
   300 mails per hour overall. No CR/LF in headers.
+- **Lost-link page abuse**: the `/recover` page has its own limits. Its mails
+  also count in the 300 mails per hour. Anyone can ask for the mail of any
+  address, so the page limits four things. A client can send 10 requests per
+  hour, and invalid addresses count. A client can use 1 mail per address per
+  day. An address gets 3 mails per day. The page sends 30 mails per hour in
+  total. One client cannot use up the quota of an address. A person who knows
+  10 organiser addresses and has 3 IP addresses can still use the 30 mails of
+  an hour. A counter that holds too many keys drops the key with the oldest
+  window. This way, a full counter does not stop new visitors.
 - **Privacy**: public pages show "Prénom N." only; phones are visible to the
   organiser and the volunteer only; `noindex`; personal data is erased on
   request and deleted with the event.
@@ -224,6 +251,8 @@ internal/web/        HTTP handlers, middleware, templates, static files
   server.go          routes and middleware chain
   public.go          home, event page, sign-up, volunteer self-service
   admin.go           organiser pages
+  recover.go         lost admin links page
+  background.go      jobs that a handler runs after it answers
   forms.go           reading and validating forms; userMessage turns
                      errors into French sentences for users
   render.go          template loading and helpers, flash messages

@@ -116,6 +116,7 @@ func serve(cfg *config) int {
 	if err := httpSrv.Shutdown(shutdownCtx); err != nil {
 		logger.Error("shutdown", "err", err)
 	}
+	srv.Wait()                   // let the recovery mails that are being prepared reach the queue
 	mailQueue.Close(shutdownCtx) // send what is queued, within the same 10 s
 	return 0
 }

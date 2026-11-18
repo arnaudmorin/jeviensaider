@@ -30,5 +30,6 @@
     <button type="submit" class="btn block">Créer l'événement</button>
     <p class="hint">Vous obtiendrez un lien d'administration secret pour gérer l'événement.</p>
   </form>
+  {{if .CanRecover}}<p class="hint">Un lien d'administration perdu ? <a href="/recover">Le recevoir de nouveau par e-mail</a>.</p>{{end}}
 </div>
 {{end}}

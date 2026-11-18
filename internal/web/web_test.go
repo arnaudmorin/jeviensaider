@@ -21,6 +21,7 @@ import (
 type env struct {
 	t     *testing.T
 	ts    *httptest.Server
+	srv   *Server
 	store *store.Store
 
 	mu    sync.Mutex
@@ -56,8 +57,9 @@ func newEnv(t *testing.T, cfg Config) *env {
 	if err != nil {
 		t.Fatal(err)
 	}
+	e.srv = srv
 	e.ts = httptest.NewServer(srv.Handler())
-	t.Cleanup(func() { e.ts.Close(); st.Close() })
+	t.Cleanup(func() { e.ts.Close(); srv.Wait(); st.Close() })
 	return e
 }
 
@@ -94,6 +96,9 @@ func (e *env) do(c *http.Client, method, path string, form url.Values, hdr map[s
 	}
 	defer res.Body.Close()
 	b, _ := io.ReadAll(res.Body)
+	// Work that a handler leaves running in the background (the recovery
+	// mail) must end before the test goes on: it reads the clock and the mails.
+	e.srv.Wait()
 	return resp{code: res.StatusCode, body: string(b), location: res.Header.Get("Location"), header: res.Header}
 }
 
