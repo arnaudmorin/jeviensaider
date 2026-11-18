@@ -11,7 +11,7 @@
     {{if .P.Needed}}
     <div class="summary">
       {{template "progress" .P}}
-      <p>{{if .P.Missing}}<span class="missing">Il manque encore {{.P.Missing}} {{plural .P.Missing "personne" "personnes"}}</span> · {{.P.Count}} sur {{.P.Needed}}{{else}}Tous les créneaux sont couverts, merci !{{end}}</p>
+      <p>{{if .P.Missing}}<span class="missing">Il reste encore {{.P.Missing}} {{plural .P.Missing "place" "places"}}&nbsp;!</span> · {{.P.Count}} sur {{.P.Needed}}{{else}}Tous les créneaux sont couverts, merci !{{end}}</p>
     </div>
     {{end}}
   {{end}}

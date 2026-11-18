@@ -130,7 +130,7 @@ func setupEvent(t *testing.T, e *env, admin *http.Client) (adminPath, publicPath
 	expect(t, e.post(admin, adminPath+"/status", url.Values{"status": {"open"}}), http.StatusSeeOther)
 
 	r = e.get(e.client(), publicPath)
-	expect(t, r, 200, "Pêche aux canards", "0/2", "manque encore 6 personnes", "st-empty")
+	expect(t, r, 200, "Pêche aux canards", "0/2", "Il reste encore 6 places&nbsp;!", "st-empty")
 	for _, m := range slotLinkRe.FindAllStringSubmatch(r.body, -1) {
 		if len(slots) == 0 || slots[len(slots)-1] != m[1] {
 			slots = append(slots, m[1])
