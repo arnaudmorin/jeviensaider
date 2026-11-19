@@ -1,4 +1,4 @@
-module benevole-ape
+module jeviensaider
 
 go 1.26.0
 

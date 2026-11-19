@@ -7,8 +7,8 @@ import (
 	"strings"
 	"text/template"
 
-	"benevole-ape/internal/mail"
-	"benevole-ape/internal/model"
+	"jeviensaider/internal/mail"
+	"jeviensaider/internal/model"
 )
 
 // Mailer queues e-mails for background delivery.

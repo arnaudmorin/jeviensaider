@@ -6,11 +6,12 @@ written here, in the place written here, and nothing much more.
 
 ## 1. Purpose
 
-A parents' association (APE) organises school events (*fête de l'école*,
-*marché de Noël*). It needs volunteers on **stands** (bar, crêpes, games…),
+An association, a school, a club or a group of neighbours organises an event
+(*fête de l'école*, *fest-noz*, *vide-grenier*, *marché de Noël*). It needs
+volunteers on **stands** (bar, crêpes, games…),
 each stand split into **time slots** that need a minimum number of people.
 
-The app lets organisers publish the planning, and parents sign up for slots
+The app lets organisers publish the planning, and volunteers sign up for slots
 in a few seconds, without creating an account. It is a small, self-hosted
 alternative to Doodle or Framadate, specialised for this job.
 
@@ -27,8 +28,8 @@ secret links (random 256-bit tokens, base64url).
 | **Visitor** | nothing | see an open event's planning, sign up |
 | **Volunteer** | personal link `/e/<slug>/me/<token>`, also kept in a cookie (`v<eventID>`, path `/e/<slug>`, HttpOnly, SameSite=Lax, 1 year) | see and cancel their slots, change their name and phone, replace their link |
 | **Organiser** | admin link `/a/<token>` | everything about one event |
-| **Super-admin** | shell access to the server | list, show and delete any event (`benevole events`) |
-| **Creator** | the creation password, if `BENEVOLE_CREATE_PASSWORD` is set | create (or duplicate) events |
+| **Super-admin** | shell access to the server | list, show and delete any event (`jeviensaider events`) |
+| **Creator** | the creation password, if `JEVIENSAIDER_CREATE_PASSWORD` is set | create (or duplicate) events |
 
 ## 3. Domain
 
@@ -183,7 +184,7 @@ Derived notions (computed, not stored):
   permanent (5xx) failures are not retried.
 - Without SMTP configured, messages are only logged (recipient and subject,
   never the body, which holds secret links).
-- Links in e-mails always come from `BENEVOLE_BASE_URL` (required when SMTP
+- Links in e-mails always come from `JEVIENSAIDER_BASE_URL` (required when SMTP
   is set), never from the request. Links shown on pages fall back to the
   request's host when it is not set.
 
@@ -191,36 +192,36 @@ Derived notions (computed, not stored):
 
 - Every hour, events whose last day (latest of: date, last slot, creation)
   is more than their number of days ago are deleted with everything in them.
-  The number is the one the organiser chose, or `BENEVOLE_RETENTION_DAYS`
-  (default 60) when they chose none. `0`/`off` for `BENEVOLE_RETENTION_DAYS`
+  The number is the one the organiser chose, or `JEVIENSAIDER_RETENTION_DAYS`
+  (default 60) when they chose none. `0`/`off` for `JEVIENSAIDER_RETENTION_DAYS`
   keeps events forever, whatever number an event stores. Then the field is
   hidden.
 - The organiser sets the number when they create or edit the event. The field
   is optional: empty (the default shown as a placeholder) stores nothing, so
-  the event follows `BENEVOLE_RETENTION_DAYS`, even when it changes. Otherwise
-  it is a whole number from 1 to `BENEVOLE_RETENTION_MAX_DAYS` (0 or unset:
-  180, or `BENEVOLE_RETENTION_DAYS` if that is longer). The server refuses a
+  the event follows `JEVIENSAIDER_RETENTION_DAYS`, even when it changes. Otherwise
+  it is a whole number from 1 to `JEVIENSAIDER_RETENTION_MAX_DAYS` (0 or unset:
+  180, or `JEVIENSAIDER_RETENTION_DAYS` if that is longer). The server refuses a
   higher number, and the database refuses 0 and anything above 3650 days (ten
   years, `store.CeilingRetentionDays`), so nobody can keep an event forever.
 - The cleanup cuts a stored number at the maximum. If the operator lowers the
   maximum, events that chose more days are deleted after the new maximum.
 - Events created before this feature store no number and follow
-  `BENEVOLE_RETENTION_DAYS`. A duplicate keeps the number of its source.
+  `JEVIENSAIDER_RETENTION_DAYS`. A duplicate keeps the number of its source.
   The edit form shows the event's own number (the maximum if it stores more),
   or an empty field; saving it stores what it shows, and emptying it goes back
   to the default.
-- If both values are set and `BENEVOLE_RETENTION_DAYS` is above
-  `BENEVOLE_RETENTION_MAX_DAYS`, the program does not start.
+- If both values are set and `JEVIENSAIDER_RETENTION_DAYS` is above
+  `JEVIENSAIDER_RETENTION_MAX_DAYS`, the program does not start.
 - Dates are accepted up to two years ahead and, when deletion is on, back to
   max(365, maximum retention) days.
 
 ### 4.7 Command line
 
-- `benevole` — run the web server.
-- `benevole events list|show|delete` — super-admin tool on the database.
-- `benevole mail-test <address>` — send one test e-mail with the SMTP
+- `jeviensaider` — run the web server.
+- `jeviensaider events list|show|delete` — super-admin tool on the database.
+- `jeviensaider mail-test <address>` — send one test e-mail with the SMTP
   settings and print the server's error.
-- `benevole -healthcheck` — for container health checks.
+- `jeviensaider -healthcheck` — for container health checks.
 
 ## 5. Configuration
 
@@ -248,7 +249,7 @@ silently falls back to a default.
   IPv6; behind a trusted proxy, the last `X-Forwarded-For` entry); 50 stands
   and 500 slots per event; bounded memory for every in-memory counter.
 - **E-mail abuse**: with SMTP on, the server refuses to start without a
-  creation password (unless `BENEVOLE_OPEN_CREATION=true`). Limits, all
+  creation password (unless `JEVIENSAIDER_OPEN_CREATION=true`). Limits, all
   configurable: 3 mails with an event's links (creation, duplication or
   resend) per address per day, 30 per hour in total,
   20 sign-up notifications per event per hour (then one "paused" notice),
@@ -266,7 +267,7 @@ for dialogs and partial updates; every feature also works without
 JavaScript.
 
 ```
-cmd/benevole/        main.go: wiring, server lifecycle, background loops
+cmd/jeviensaider/    main.go: wiring, server lifecycle, background loops
                      config.go, smtp.go, retention.go, maillimits.go: reading
                      flags and environment
                      events.go, mailtest.go: the CLI subcommands
@@ -340,6 +341,6 @@ The code should stay small and readable by one person in an afternoon.
 
 - User accounts, logins, roles beyond the secret links.
 - E-mails or SMS to volunteers.
-- Several organisations or tenants; any APE runs its own instance.
+- Several organisations or tenants; each organisation runs its own instance.
 - Translations: the interface is French only.
 - A JavaScript front-end framework or a build step.

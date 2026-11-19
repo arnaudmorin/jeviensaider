@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"benevole-ape/internal/store"
+	"jeviensaider/internal/store"
 )
 
 var testCtx = context.Background()

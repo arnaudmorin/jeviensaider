@@ -2,8 +2,9 @@
 
 [![build](https://github.com/arnaudmorin/jeviensaider/actions/workflows/build.yml/badge.svg?branch=master)](https://github.com/arnaudmorin/jeviensaider/actions/workflows/build.yml)
 
-A small web app that helps a parents' association (APE) find volunteers for
-school events such as the *fête de l'école* or the *marché de Noël*.
+A small web app that helps associations, schools, clubs and other organisers
+find volunteers for their events: *fête de l'école*, *fest-noz*,
+*vide-grenier*, *marché de Noël*…
 
 It works like a simpler Doodle or Framadate, organised by **stand** and
 **time slot**. For example, *Pêche aux canards* from 14:00 to 17:00 with
@@ -37,7 +38,7 @@ in a single SQLite file.
   page shows the deletion date. A private instance can turn this off and keep
   its events forever.
 
-**For parents**
+**For volunteers**
 - **"Tous les créneaux"**: the whole event as a table of stands × hours,
   shown as a list grouped by hour on phones. Each slot says in words where it
   stands ("Il reste 2 places", "Assez de monde, vous pouvez venir",
@@ -68,10 +69,13 @@ Requires Go ≥ 1.26; with an older Go, the `go` command downloads the right
 toolchain by itself. No C toolchain is needed: the SQLite driver is pure Go.
 
 ```sh
-make run      # http://localhost:8080, database ./benevole.db
-make test     # unit + HTTP tests
-make build    # ./benevole, a static binary
+make run      # http://localhost:8080, database ./jeviensaider.db
+make test     # unit + HTTP tests (make race: with the race detector)
+make vet      # go vet
+make fmt      # gofmt and templ fmt
+make build    # ./jeviensaider, a static binary
 make generate # generate the pages' Go code (the other targets do it first)
+make backup   # hot copy of the database to backup-<date>.db
 ```
 
 Pages are written with [templ](https://templ.guide). Their generated Go code
@@ -93,33 +97,35 @@ as downloadable artifacts. They can also be built locally with
 
 | Flag | Environment variable | Default | Purpose |
 |---|---|---|---|
-| `-addr` | `BENEVOLE_ADDR` | `:8080` | Listen address |
-| `-db` | `BENEVOLE_DB` | `benevole.db` | SQLite file, created if missing |
-| `-base-url` | `BENEVOLE_BASE_URL` | *(from request)* | Public URL used in shareable links, e.g. `https://jeviensaider.fr` |
-| `-trust-proxy` | `BENEVOLE_TRUST_PROXY` | `false` | Trust `X-Forwarded-*` headers when behind Caddy or nginx |
-| `-retention-days` | `BENEVOLE_RETENTION_DAYS` | `60` | Delete events this many days after they end, unless the organiser chose another number; `0` or `off` keeps them forever |
-| `-retention-max-days` | `BENEVOLE_RETENTION_MAX_DAYS` | `0` (180) | Longest number of days that an organiser can choose for one event; `0` or empty means 180, or `BENEVOLE_RETENTION_DAYS` if longer (see below) |
-| — | `BENEVOLE_CREATE_PASSWORD` | *(none)* | Password required to create an event |
+| `-addr` | `JEVIENSAIDER_ADDR` | `:8080` | Listen address |
+| `-db` | `JEVIENSAIDER_DB` | `jeviensaider.db` | SQLite file, created if missing |
+| `-base-url` | `JEVIENSAIDER_BASE_URL` | *(from request)* | Public URL used in shareable links, e.g. `https://jeviensaider.fr` |
+| `-trust-proxy` | `JEVIENSAIDER_TRUST_PROXY` | `false` | Trust `X-Forwarded-*` headers when behind Caddy or nginx |
+| `-retention-days` | `JEVIENSAIDER_RETENTION_DAYS` | `60` | Delete events this many days after they end, unless the organiser chose another number; `0` or `off` keeps them forever |
+| `-retention-max-days` | `JEVIENSAIDER_RETENTION_MAX_DAYS` | `0` (180) | Longest number of days that an organiser can choose for one event; `0` or empty means 180, or `JEVIENSAIDER_RETENTION_DAYS` if longer (see below) |
+| — | `JEVIENSAIDER_CREATE_PASSWORD` | *(none)* | Password required to create an event |
 
-On a public server, set `BENEVOLE_CREATE_PASSWORD` so that only the APE can
-create events. It is read from the environment only, so it never shows up in
-`ps` output. It is also asked for when an organiser duplicates an event.
+On a public server, set `JEVIENSAIDER_CREATE_PASSWORD` so that only the
+organisers can create events. It is read from the environment only, so it
+never shows up in `ps` output. It is also asked for when an organiser
+duplicates an event.
 
 **E-mails.** The app e-mails organisers: the admin link when an event is
-created or duplicated, or when they ask for it again, then, unless they turn it off, one message per sign-up
-or cancellation. Volunteers never receive e-mails. Configure an SMTP server
+created or duplicated, or when they ask for it again, then, unless they turn
+it off, one message per sign-up or cancellation. Volunteers never receive
+e-mails. Configure an SMTP server
 with these variables (environment only):
 
 | Environment variable | Default | Purpose |
 |---|---|---|
-| `BENEVOLE_SMTP_HOST` | *(none)* | SMTP server; empty disables sending (messages are only logged, without their content) |
-| `BENEVOLE_SMTP_PORT` | `587` | `587` (STARTTLS) or `465` (TLS) |
-| `BENEVOLE_SMTP_TLS` | `starttls`, or `tls` on 465 | `starttls`, `tls`, or `none` for a relay on this machine or a private network, without authentication |
-| `BENEVOLE_SMTP_USERNAME` / `BENEVOLE_SMTP_PASSWORD` | *(none)* | Credentials, if the server requires them |
-| `BENEVOLE_SMTP_FROM` | `Je viens aider <noreply@…>` | Sender, by default on the domain of `BENEVOLE_BASE_URL` |
-| `BENEVOLE_OPEN_CREATION` | `false` | Allow e-mails without `BENEVOLE_CREATE_PASSWORD` (see below) |
+| `JEVIENSAIDER_SMTP_HOST` | *(none)* | SMTP server; empty disables sending (messages are only logged, without their content) |
+| `JEVIENSAIDER_SMTP_PORT` | `587` | `587` (STARTTLS) or `465` (TLS) |
+| `JEVIENSAIDER_SMTP_TLS` | `starttls`, or `tls` on 465 | `starttls`, `tls`, or `none` for a relay on this machine or a private network, without authentication |
+| `JEVIENSAIDER_SMTP_USERNAME` / `JEVIENSAIDER_SMTP_PASSWORD` | *(none)* | Credentials, if the server requires them |
+| `JEVIENSAIDER_SMTP_FROM` | `Je viens aider <noreply@…>` | Sender, by default on the domain of `JEVIENSAIDER_BASE_URL` |
+| `JEVIENSAIDER_OPEN_CREATION` | `false` | Allow e-mails without `JEVIENSAIDER_CREATE_PASSWORD` (see below) |
 
-With SMTP enabled, `BENEVOLE_BASE_URL` is required: links in e-mails are
+With SMTP enabled, `JEVIENSAIDER_BASE_URL` is required: links in e-mails are
 built from it, never from the request. The connection is always encrypted
 (STARTTLS is required, not optional) unless `none` is chosen, and a password
 is never sent over an unencrypted connection. `none` is refused unless the
@@ -131,17 +137,17 @@ startup.
 
 Creating an event sends a mail to the address the visitor types. So with
 e-mails enabled, the server refuses to start without
-`BENEVOLE_CREATE_PASSWORD`; otherwise anybody could use it to e-mail anyone.
-On a private network, `BENEVOLE_OPEN_CREATION=true` lifts this. Mails are
-limited in any case. Each limit is a number, or `0` / `unlimited` for no
-limit; an invalid value stops the server:
+`JEVIENSAIDER_CREATE_PASSWORD`; otherwise anybody could use it to e-mail
+anyone. On a private network, `JEVIENSAIDER_OPEN_CREATION=true` lifts this.
+Mails are limited in any case. Each limit is a number, or `0` / `unlimited`
+for no limit; an invalid value stops the server:
 
 | Environment variable | Default | Limit |
 |---|---|---|
-| `BENEVOLE_MAIL_CREATED_PER_ADDRESS_PER_DAY` | `3` | Mails with an event's links (creation, duplication, resend) to one address, per day |
-| `BENEVOLE_MAIL_CREATED_PER_HOUR` | `30` | Mails with an event's links to all addresses, per hour |
-| `BENEVOLE_MAIL_SIGNUPS_PER_EVENT_PER_HOUR` | `20` | Sign-up notifications for one event, per hour; past it the organiser gets one "notifications en pause" message |
-| `BENEVOLE_MAIL_PER_HOUR` | `300` | All mails, per hour |
+| `JEVIENSAIDER_MAIL_CREATED_PER_ADDRESS_PER_DAY` | `3` | Mails with an event's links (creation, duplication, resend) to one address, per day |
+| `JEVIENSAIDER_MAIL_CREATED_PER_HOUR` | `30` | Mails with an event's links to all addresses, per hour |
+| `JEVIENSAIDER_MAIL_SIGNUPS_PER_EVENT_PER_HOUR` | `20` | Sign-up notifications for one event, per hour; past it the organiser gets one "notifications en pause" message |
+| `JEVIENSAIDER_MAIL_PER_HOUR` | `300` | All mails, per hour |
 
 The counters are kept in memory and start again from zero when the server
 restarts.
@@ -150,14 +156,14 @@ To check the settings, send a test e-mail. It reads the same variables and
 prints the SMTP server's error if sending fails:
 
 ```sh
-benevole mail-test you@example.org
-docker compose exec app benevole mail-test you@example.org   # with Docker
+jeviensaider mail-test you@example.org
+docker compose exec app jeviensaider mail-test you@example.org   # with Docker
 ```
 
 **Keeping events forever.** By default, events and their volunteers'
 contact details are deleted 60 days after the event, which suits a public
 instance. For a private instance that wants to keep its history, set
-`BENEVOLE_RETENTION_DAYS=0` (or `off`) in `.env`: nothing is deleted
+`JEVIENSAIDER_RETENTION_DAYS=0` (or `off`) in `.env`: nothing is deleted
 automatically, the admin page no longer announces a deletion date, and old
 events stay editable. Organisers can still delete an event or erase its
 personal data from the admin page. An invalid value stops the server with an
@@ -165,21 +171,22 @@ error rather than falling back to 60 days.
 
 **Choosing how long an event is kept.** The creation form and the "Modifier
 l'événement" form of the admin page have a field for the number of days
-before deletion. Left empty (it shows `BENEVOLE_RETENTION_DAYS` as a hint),
+before deletion. Left empty (it shows `JEVIENSAIDER_RETENTION_DAYS` as a hint),
 the event follows the server default, even if you change it later. A number
-from 1 to `BENEVOLE_RETENTION_MAX_DAYS` fixes the event's own period. The
+from 1 to `JEVIENSAIDER_RETENTION_MAX_DAYS` fixes the event's own period. The
 server refuses a higher number, and the database refuses 0 and anything above
 3650 days (ten years). So an organiser cannot keep an event forever. A
 duplicate of an event keeps the number of its source. Events that existed
-before this feature store no number, so they follow `BENEVOLE_RETENTION_DAYS`.
+before this feature store no number, so they follow
+`JEVIENSAIDER_RETENTION_DAYS`.
 
-If you do not set `BENEVOLE_RETENTION_MAX_DAYS`, the maximum is 180 days. If
-`BENEVOLE_RETENTION_DAYS` is longer than 180 days, the maximum is equal to it.
-So a server that already runs with a long retention still starts after an
+If you do not set `JEVIENSAIDER_RETENTION_MAX_DAYS`, the maximum is 180 days.
+If `JEVIENSAIDER_RETENTION_DAYS` is longer than 180 days, the maximum is equal
+to it. So a server that already runs with a long retention still starts after an
 upgrade. If you set both values and the default is above the maximum, the
 server stops at startup with an error. The cleanup applies the maximum to every
 event. If you lower it, the events that chose more days are deleted after the
-new maximum. When `BENEVOLE_RETENTION_DAYS` is `0` or `off`, the field is
+new maximum. When `JEVIENSAIDER_RETENTION_DAYS` is `0` or `off`, the field is
 hidden and the maximum is not used.
 
 ## Super-admin command line
@@ -189,14 +196,14 @@ database, for example to delete one before it expires. Anyone who can run it
 on the server can see and delete all events, so there is no password.
 
 ```sh
-benevole events list                  # all events, with counts and expiry date
-benevole events show <event>          # details, public and admin links
-benevole events delete <event>...     # delete events and all their data (asks first; -y to skip)
+jeviensaider events list                  # all events, with counts and expiry date
+jeviensaider events show <event>          # details, public and admin links
+jeviensaider events delete <event>...     # delete events and all their data (asks first; -y to skip)
 ```
 
 `<event>` is a slug (as in `/e/<slug>`) or an ID from `list`. The tool reads
-`BENEVOLE_DB`, `BENEVOLE_BASE_URL`, `BENEVOLE_RETENTION_DAYS` and
-`BENEVOLE_RETENTION_MAX_DAYS` like the server, or the `-db`, `-base-url`,
+`JEVIENSAIDER_DB`, `JEVIENSAIDER_BASE_URL`, `JEVIENSAIDER_RETENTION_DAYS` and
+`JEVIENSAIDER_RETENTION_MAX_DAYS` like the server, or the `-db`, `-base-url`,
 `-retention-days` and `-retention-max-days` flags. Use the same retention
 values as the server, because they decide the expiry dates that `list` and
 `show` print. The tool is safe to use while the server is running.
@@ -204,8 +211,8 @@ values as the server, because they decide the expiry dates that `list` and
 With Docker:
 
 ```sh
-docker compose exec app benevole events list
-docker compose exec app benevole events delete fete-de-l-ecole-ab12cd34
+docker compose exec app jeviensaider events list
+docker compose exec app jeviensaider events delete fete-de-l-ecole-ab12cd34
 ```
 
 `show` prints the admin link, which is handy when an organiser has lost it.
@@ -213,7 +220,7 @@ docker compose exec app benevole events delete fete-de-l-ecole-ab12cd34
 ## Docker
 
 ```sh
-cp .env.example .env          # set BENEVOLE_BASE_URL and BENEVOLE_CREATE_PASSWORD
+cp .env.example .env          # set JEVIENSAIDER_BASE_URL and JEVIENSAIDER_CREATE_PASSWORD
 docker compose pull && docker compose up -d   # prebuilt image
 # or: docker compose up -d --build            # build it locally
 ```
@@ -224,15 +231,15 @@ commit's short SHA (`sha-xxxxxxx`) for pinning a version.
 
 - The app listens on `127.0.0.1:8080` (change `PORT` in `.env`). Put a reverse
   proxy in front of it for HTTPS.
-- The database is stored in the `data` volume, at `/data/benevole.db`.
-- The image is small (about 15 MB) and based on distroless. It runs as a non-root user
-  with a read-only root filesystem, and has a built-in health check
-  (`benevole -healthcheck`).
+- The database is stored in the `data` volume, at `/data/jeviensaider.db`.
+- The image is small (about 15 MB) and based on distroless. It runs as a
+  non-root user with a read-only root filesystem, and has a built-in health
+  check (`jeviensaider -healthcheck`).
 
 To back up the database from the volume:
 
 ```sh
-docker compose cp app:/data/benevole.db ./backup-$(date +%F).db
+docker compose cp app:/data/jeviensaider.db ./backup-$(date +%F).db
 ```
 
 Stop the app first (`docker compose stop`) to be sure the copy is consistent,
@@ -240,13 +247,15 @@ or use the `sqlite3 .backup` command below on the host.
 
 ## Deployment without Docker
 
-1. Copy the binary to the server as `/usr/local/bin/benevole`.
-2. Install the [systemd unit](deploy/benevole.service) and set
-   `BENEVOLE_BASE_URL` in it.
+1. Copy the binary to the server as `/usr/local/bin/jeviensaider`.
+2. Install the [systemd unit](deploy/jeviensaider.service) as its header
+   explains (system user, data directory in `/var/lib/jeviensaider`), set
+   `JEVIENSAIDER_BASE_URL` in it, and put secrets such as
+   `JEVIENSAIDER_CREATE_PASSWORD` in `/etc/jeviensaider.env` (mode 600).
 3. Put a reverse proxy in front of the app for HTTPS: [Caddy](deploy/Caddyfile)
    (automatic certificates) or [nginx](deploy/nginx.conf) (with certbot).
-   Either way, set `BENEVOLE_TRUST_PROXY=true` and keep the app listening on
-   `127.0.0.1` only.
+   Either way, set `JEVIENSAIDER_TRUST_PROXY=true` and keep the app listening
+   on `127.0.0.1` only.
 
 The nginx template forwards the client's address and protocol, redirects
 HTTP to HTTPS, and keeps the secret admin and personal links out of its
@@ -257,13 +266,41 @@ contain them, is not logged).
 consistent copy while the server is running, for example from a daily cron job:
 
 ```sh
-sqlite3 /var/lib/benevole/benevole.db ".backup '/var/backups/benevole-$(date +%F).db'"
+sqlite3 /var/lib/jeviensaider/jeviensaider.db ".backup '/var/backups/jeviensaider-$(date +%F).db'"
 ```
+
+## Upgrading from the `benevole` names
+
+The binary, its variables and its database file were renamed after the
+project. An instance installed before the rename needs, once:
+
+1. Stop the app.
+2. Rename every `BENEVOLE_*` variable to `JEVIENSAIDER_*`: in `.env`, in the
+   systemd unit and in `/etc/benevole.env` (now `/etc/jeviensaider.env`).
+3. Rename the database, with its `-wal` and `-shm` files if present:
+   `benevole.db` → `jeviensaider.db`. With Docker, the image has no shell, so
+   use a throwaway container on the `data` volume (`docker volume ls` shows
+   its full name, usually `<directory>_data`):
+
+   ```sh
+   docker run --rm -v jeviensaider_data:/data busybox sh -c 'cd /data && for f in benevole.db*; do mv "$f" "jeviensaider${f#benevole}"; done'
+   ```
+
+4. Without Docker: `systemctl disable benevole`, install the binary as
+   `/usr/local/bin/jeviensaider` and the new
+   [unit](deploy/jeviensaider.service), and move `/var/lib/benevole` to
+   `/var/lib/jeviensaider`, owned by the new `jeviensaider` user.
+5. Start the app.
+
+The app refuses to start while a non-empty `BENEVOLE_*` variable is set, or
+while it finds a `benevole.db` but no `jeviensaider.db`, so a forgotten step
+cannot silently drop a setting such as the creation password or open an
+empty database.
 
 ## Under the hood
 
 ```
-cmd/benevole/      entry point: configuration, server, CLI subcommands
+cmd/jeviensaider/  entry point: configuration, server, CLI subcommands
 internal/model/    domain types and rules, fill status, planning view
 internal/slotgen/  splits a time range into slots
 internal/store/    SQLite access, embedded migrations, sign-up transaction
@@ -271,6 +308,8 @@ internal/mail/     SMTP sender and background queue
 internal/ical/     iCalendar writer (escaping, line folding) for the .ics file
 internal/web/      handlers, middleware, CSV, PDF and calendar exports,
                    pages as templ components (*.templ), static files (htmx)
+deploy/            systemd unit, Caddy and nginx templates
+docs/SPEC.md       what the app does and where in the code
 ```
 
 [`docs/SPEC.md`](docs/SPEC.md) describes in detail what the app does and how
@@ -300,11 +339,11 @@ the code is organised.
 - **Automatic cleanup.** At startup and then every hour, the app deletes
   every event whose last day is more than its number of days ago, together
   with its stands, slots and volunteers. This number is the one that the
-  organiser chose, or `BENEVOLE_RETENTION_DAYS` when they chose none. It is
-  never more than `BENEVOLE_RETENTION_MAX_DAYS`. An event's last day is the
-  latest of its date, its last slot and its creation date, so an event that
-  is still being prepared is never deleted.
-- **E-mails.** Links come from `BENEVOLE_BASE_URL`, so a forged `Host`
+  organiser chose, or `JEVIENSAIDER_RETENTION_DAYS` when they chose none. It
+  is never more than `JEVIENSAIDER_RETENTION_MAX_DAYS`. An event's last day is
+  the latest of its date, its last slot and its creation date, so an event
+  that is still being prepared is never deleted.
+- **E-mails.** Links come from `JEVIENSAIDER_BASE_URL`, so a forged `Host`
   header cannot turn them into links to another site. Headers are encoded
   and line breaks refused, so names cannot inject headers. E-mails require a
   creation password (or an explicit opt-out), and every kind of mail is

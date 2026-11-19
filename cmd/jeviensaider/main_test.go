@@ -14,8 +14,8 @@ import (
 	"testing"
 	"time"
 
-	"benevole-ape/internal/model"
-	"benevole-ape/internal/store"
+	"jeviensaider/internal/model"
+	"jeviensaider/internal/store"
 )
 
 func TestCheckHealth(t *testing.T) {
@@ -50,7 +50,7 @@ func TestCheckHealth(t *testing.T) {
 }
 
 func TestCleanupLoop(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "benevole.db")
+	path := filepath.Join(t.TempDir(), "jeviensaider.db")
 	st, err := store.Open(path)
 	if err != nil {
 		t.Fatal(err)
@@ -105,17 +105,17 @@ func TestCleanupLoop(t *testing.T) {
 func TestLoadConfig(t *testing.T) {
 	for _, k := range []string{"ADDR", "DB", "BASE_URL", "TRUST_PROXY", "RETENTION_DAYS", "RETENTION_MAX_DAYS", "CREATE_PASSWORD", "OPEN_CREATION", "SMTP_HOST",
 		"MAIL_CREATED_PER_ADDRESS_PER_DAY", "MAIL_CREATED_PER_HOUR", "MAIL_SIGNUPS_PER_EVENT_PER_HOUR", "MAIL_PER_HOUR"} {
-		t.Setenv("BENEVOLE_"+k, "")
+		t.Setenv("JEVIENSAIDER_"+k, "")
 	}
 	c, err := loadConfig(nil)
-	if err != nil || c.addr != ":8080" || c.dbPath != "benevole.db" || c.trustProxy || c.retention.DefaultDays != 60 || c.smtp != nil {
+	if err != nil || c.addr != ":8080" || c.dbPath != "jeviensaider.db" || c.trustProxy || c.retention.DefaultDays != 60 || c.smtp != nil {
 		t.Fatalf("defaults: %+v %v", c, err)
 	}
 
 	// Environment, then flags over it.
-	t.Setenv("BENEVOLE_TRUST_PROXY", "true")
-	t.Setenv("BENEVOLE_BASE_URL", "https://jeviensaider.fr/")
-	t.Setenv("BENEVOLE_RETENTION_DAYS", "off")
+	t.Setenv("JEVIENSAIDER_TRUST_PROXY", "true")
+	t.Setenv("JEVIENSAIDER_BASE_URL", "https://jeviensaider.fr/")
+	t.Setenv("JEVIENSAIDER_RETENTION_DAYS", "off")
 	c, err = loadConfig([]string{"-addr", "127.0.0.1:9000"})
 	if err != nil || !c.trustProxy || c.baseURL != "https://jeviensaider.fr" || c.retention.DefaultDays != 0 || c.addr != "127.0.0.1:9000" {
 		t.Fatalf("environment and flags: %+v %v", c, err)
@@ -123,15 +123,15 @@ func TestLoadConfig(t *testing.T) {
 
 	// Invalid values are errors, never a silent default.
 	for key, bad := range map[string]string{
-		"BENEVOLE_TRUST_PROXY":        "yes please",
-		"BENEVOLE_OPEN_CREATION":      "maybe",
-		"BENEVOLE_MAIL_PER_HOUR":      "lots",
-		"BENEVOLE_RETENTION_MAX_DAYS": "off",
+		"JEVIENSAIDER_TRUST_PROXY":        "yes please",
+		"JEVIENSAIDER_OPEN_CREATION":      "maybe",
+		"JEVIENSAIDER_MAIL_PER_HOUR":      "lots",
+		"JEVIENSAIDER_RETENTION_MAX_DAYS": "off",
 	} {
 		t.Run(key, func(t *testing.T) {
 			t.Setenv(key, bad)
-			if key == "BENEVOLE_OPEN_CREATION" {
-				t.Setenv("BENEVOLE_SMTP_HOST", "smtp.example.org")
+			if key == "JEVIENSAIDER_OPEN_CREATION" {
+				t.Setenv("JEVIENSAIDER_SMTP_HOST", "smtp.example.org")
 			}
 			if _, err := loadConfig(nil); err == nil || !strings.Contains(err.Error(), key) {
 				t.Errorf("%s=%q: %v", key, bad, err)
@@ -144,7 +144,7 @@ func TestLoadConfig(t *testing.T) {
 // variable.
 func TestLoadConfigRetention(t *testing.T) {
 	for _, k := range []string{"RETENTION_DAYS", "RETENTION_MAX_DAYS"} {
-		t.Setenv("BENEVOLE_"+k, "")
+		t.Setenv("JEVIENSAIDER_"+k, "")
 	}
 	c, err := loadConfig(nil)
 	if err != nil || c.retention != (store.Retention{DefaultDays: 60, MaxDays: 180}) {
@@ -153,14 +153,14 @@ func TestLoadConfigRetention(t *testing.T) {
 
 	// A long default with no maximum set still starts (upgrade of an old
 	// deployment), with a maximum equal to the default.
-	t.Setenv("BENEVOLE_RETENTION_DAYS", "365")
+	t.Setenv("JEVIENSAIDER_RETENTION_DAYS", "365")
 	if c, err = loadConfig(nil); err != nil || c.retention != (store.Retention{DefaultDays: 365, MaxDays: 365}) {
 		t.Fatalf("long default: %+v %v", c, err)
 	}
 
 	// Both values set and in conflict: no start.
-	t.Setenv("BENEVOLE_RETENTION_DAYS", "90")
-	t.Setenv("BENEVOLE_RETENTION_MAX_DAYS", "30")
+	t.Setenv("JEVIENSAIDER_RETENTION_DAYS", "90")
+	t.Setenv("JEVIENSAIDER_RETENTION_MAX_DAYS", "30")
 	if _, err = loadConfig(nil); err == nil || !strings.Contains(err.Error(), "maximum") {
 		t.Fatalf("a default above the maximum was accepted: %v", err)
 	}
@@ -171,11 +171,11 @@ func TestLoadConfigRetention(t *testing.T) {
 	}
 
 	// 0 means the default maximum, from the variable as from the flag.
-	t.Setenv("BENEVOLE_RETENTION_MAX_DAYS", "0")
+	t.Setenv("JEVIENSAIDER_RETENTION_MAX_DAYS", "0")
 	if c, err = loadConfig(nil); err != nil || c.retention != (store.Retention{DefaultDays: 90, MaxDays: 180}) {
 		t.Fatalf("maximum 0 from the environment: %+v %v", c, err)
 	}
-	t.Setenv("BENEVOLE_RETENTION_MAX_DAYS", "30")
+	t.Setenv("JEVIENSAIDER_RETENTION_MAX_DAYS", "30")
 	if c, err = loadConfig([]string{"-retention-max-days", "0"}); err != nil || c.retention != (store.Retention{DefaultDays: 90, MaxDays: 180}) {
 		t.Fatalf("maximum 0 from the flag: %+v %v", c, err)
 	}
@@ -184,10 +184,10 @@ func TestLoadConfigRetention(t *testing.T) {
 	if _, err = loadConfig([]string{"-retention-max-days", "3651"}); err == nil {
 		t.Fatal("a maximum above 3650 days was accepted")
 	}
-	t.Setenv("BENEVOLE_RETENTION_MAX_DAYS", "")
+	t.Setenv("JEVIENSAIDER_RETENTION_MAX_DAYS", "")
 
 	// Deletion off: nothing to cap.
-	t.Setenv("BENEVOLE_RETENTION_DAYS", "off")
+	t.Setenv("JEVIENSAIDER_RETENTION_DAYS", "off")
 	if c, err = loadConfig(nil); err != nil || c.retention.Enabled() {
 		t.Fatalf("deletion off: %+v %v", c, err)
 	}

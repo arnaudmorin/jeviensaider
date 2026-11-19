@@ -15,7 +15,7 @@ import (
 	"testing"
 	"time"
 
-	"benevole-ape/internal/store"
+	"jeviensaider/internal/store"
 )
 
 type env struct {

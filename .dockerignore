@@ -4,7 +4,7 @@
 *.db-shm
 *.db-wal
 backup-*.db
-benevole
-benevole-linux-*
+jeviensaider
+jeviensaider-linux-*
 .env
 deploy

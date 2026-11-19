@@ -9,12 +9,12 @@ import (
 	"strings"
 	"time"
 
-	"benevole-ape/internal/store"
+	"jeviensaider/internal/store"
 )
 
 // Config tunes the server.
 type Config struct {
-	// BaseURL is the public origin (e.g. "https://benevoles.ape-ecole.fr"),
+	// BaseURL is the public origin (e.g. "https://jeviensaider.example.org"),
 	// used to display shareable links. Empty: derived from each request.
 	BaseURL string
 	// CreatePassword, if set, is required to create a new event.

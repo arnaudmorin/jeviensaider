@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"benevole-ape/internal/model"
+	"jeviensaider/internal/model"
 )
 
 func TestSlotStatusWords(t *testing.T) {

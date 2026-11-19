@@ -11,11 +11,11 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	"benevole-ape/internal/model"
-	"benevole-ape/internal/store"
+	"jeviensaider/internal/model"
+	"jeviensaider/internal/store"
 )
 
-const eventsUsage = `Usage: benevole events <command> [flags] [args]
+const eventsUsage = `Usage: jeviensaider events <command> [flags] [args]
 
 Super-admin tool. It works directly on the SQLite database, so it can see and
 change every event; it is safe to run while the server is running.
@@ -28,12 +28,12 @@ Commands:
 <event> is an event's slug (as in /e/<slug>) or its ID from "list".
 
 Flags:
-  -db FILE              SQLite database (env BENEVOLE_DB, default benevole.db)
-  -base-url URL         public URL used to print links (env BENEVOLE_BASE_URL)
+  -db FILE              SQLite database (env JEVIENSAIDER_DB, default jeviensaider.db)
+  -base-url URL         public URL used to print links (env JEVIENSAIDER_BASE_URL)
   -retention-days N     days before an event is deleted when its organiser chose none, 0 = kept forever
-                        (env BENEVOLE_RETENTION_DAYS, default 60)
+                        (env JEVIENSAIDER_RETENTION_DAYS, default 60)
   -retention-max-days N longest period an organiser can choose; 0 = 180 days, or
-                        -retention-days if longer (env BENEVOLE_RETENTION_MAX_DAYS, default 0)
+                        -retention-days if longer (env JEVIENSAIDER_RETENTION_MAX_DAYS, default 0)
   -y                    delete: do not ask for confirmation
 
 Use the same retention values as the server: they decide the expiry dates.
@@ -48,7 +48,7 @@ type eventsCmd struct {
 	yes     bool
 }
 
-// runEvents implements "benevole events ..." and returns the exit code.
+// runEvents implements "jeviensaider events ..." and returns the exit code.
 func runEvents(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	c := &eventsCmd{stdin: bufio.NewReader(stdin), out: stdout}
 	if len(args) == 0 || args[0] == "help" || args[0] == "-h" || args[0] == "-help" || args[0] == "--help" {
@@ -60,11 +60,11 @@ func runEvents(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	}
 	sub, rest := args[0], args[1:]
 
-	fs := flag.NewFlagSet("benevole events "+sub, flag.ContinueOnError)
+	fs := flag.NewFlagSet("jeviensaider events "+sub, flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	fs.Usage = func() { fmt.Fprint(stderr, eventsUsage) }
-	fs.StringVar(&c.db, "db", env("BENEVOLE_DB", "benevole.db"), "")
-	fs.StringVar(&c.baseURL, "base-url", env("BENEVOLE_BASE_URL", ""), "")
+	fs.StringVar(&c.db, "db", env("JEVIENSAIDER_DB", "jeviensaider.db"), "")
+	fs.StringVar(&c.baseURL, "base-url", env("JEVIENSAIDER_BASE_URL", ""), "")
 	retention, err := retentionFromEnv()
 	if err != nil {
 		fmt.Fprintln(stderr, err)
@@ -102,6 +102,10 @@ func runEvents(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return 2
 	}
 
+	if err := checkLegacyDB(c.db); err != nil {
+		fmt.Fprintln(stderr, err)
+		return 1
+	}
 	st, err := store.Open(c.db)
 	if err != nil {
 		fmt.Fprintf(stderr, "open %s: %v\n", c.db, err)
@@ -181,7 +185,7 @@ func (c *eventsCmd) list(ctx context.Context, st *store.Store, args []string) er
 
 func (c *eventsCmd) show(ctx context.Context, st *store.Store, args []string) error {
 	if len(args) != 1 {
-		return fmt.Errorf("usage: benevole events show <event>")
+		return fmt.Errorf("usage: jeviensaider events show <event>")
 	}
 	events, err := st.ListEventSummaries(ctx)
 	if err != nil {
@@ -214,7 +218,7 @@ func (c *eventsCmd) show(ctx context.Context, st *store.Store, args []string) er
 
 func (c *eventsCmd) delete(ctx context.Context, st *store.Store, args []string) error {
 	if len(args) == 0 {
-		return errors.New("usage: benevole events delete [-y] <event> [<event> ...]")
+		return errors.New("usage: jeviensaider events delete [-y] <event> [<event> ...]")
 	}
 	events, err := st.ListEventSummaries(ctx)
 	if err != nil {
@@ -263,7 +267,7 @@ func find(events []store.EventSummary, ref string) (store.EventSummary, error) {
 			return e, nil
 		}
 	}
-	return store.EventSummary{}, fmt.Errorf("no event %q (use a slug or an ID from \"benevole events list\")", ref)
+	return store.EventSummary{}, fmt.Errorf("no event %q (use a slug or an ID from \"jeviensaider events list\")", ref)
 }
 
 func truncate(s string, n int) string {

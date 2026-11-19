@@ -1,7 +1,7 @@
 package web
 
 import (
-	"benevole-ape/internal/store"
+	"jeviensaider/internal/store"
 	"net/http"
 	"net/url"
 	"regexp"

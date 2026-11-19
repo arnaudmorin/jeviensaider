@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql"
 
-	"benevole-ape/internal/model"
+	"jeviensaider/internal/model"
 )
 
 func listStands(ctx context.Context, q querier, eventID int64) ([]model.Stand, error) {

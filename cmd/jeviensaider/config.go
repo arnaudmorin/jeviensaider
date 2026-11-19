@@ -7,9 +7,9 @@ import (
 	"strconv"
 	"strings"
 
-	"benevole-ape/internal/mail"
-	"benevole-ape/internal/store"
-	"benevole-ape/internal/web"
+	"jeviensaider/internal/mail"
+	"jeviensaider/internal/store"
+	"jeviensaider/internal/web"
 )
 
 // config is the server's configuration, read from flags and environment
@@ -27,9 +27,9 @@ type config struct {
 }
 
 const usage = `Usage:
-  benevole [flags]           run the web server
-  benevole events <command>  super-admin tool: list, show, delete events (see "benevole events help")
-  benevole mail-test <addr>  send a test e-mail with the SMTP settings
+  jeviensaider [flags]           run the web server
+  jeviensaider events <command>  super-admin tool: list, show, delete events (see "jeviensaider events help")
+  jeviensaider mail-test <addr>  send a test e-mail with the SMTP settings
 
 Flags:
 `
@@ -37,7 +37,7 @@ Flags:
 // loadConfig reads the server's configuration. Any invalid value is an
 // error: nothing silently falls back to a default.
 func loadConfig(args []string) (*config, error) {
-	trustProxy, err := boolFromEnv("BENEVOLE_TRUST_PROXY", false)
+	trustProxy, err := boolFromEnv("JEVIENSAIDER_TRUST_PROXY", false)
 	if err != nil {
 		return nil, err
 	}
@@ -52,17 +52,17 @@ func loadConfig(args []string) (*config, error) {
 
 	c := &config{}
 	var retentionDays, retentionMaxDays int
-	fs := flag.NewFlagSet("benevole", flag.ExitOnError)
+	fs := flag.NewFlagSet("jeviensaider", flag.ExitOnError)
 	fs.Usage = func() {
 		fmt.Fprint(fs.Output(), usage)
 		fs.PrintDefaults()
 	}
-	fs.StringVar(&c.addr, "addr", env("BENEVOLE_ADDR", ":8080"), "listen address (env BENEVOLE_ADDR)")
-	fs.StringVar(&c.dbPath, "db", env("BENEVOLE_DB", "benevole.db"), "SQLite database file (env BENEVOLE_DB)")
-	fs.StringVar(&c.baseURL, "base-url", env("BENEVOLE_BASE_URL", ""), "public URL, e.g. https://benevoles.example.org (env BENEVOLE_BASE_URL)")
-	fs.BoolVar(&c.trustProxy, "trust-proxy", trustProxy, "trust X-Forwarded-* headers from a reverse proxy (env BENEVOLE_TRUST_PROXY)")
-	fs.IntVar(&retentionDays, "retention-days", retention, "delete events this many days after their last day of activity when the organiser chose none, 0 to keep them forever (env BENEVOLE_RETENTION_DAYS)")
-	fs.IntVar(&retentionMaxDays, "retention-max-days", retentionMax, "longest period an organiser can choose; 0: 180 days, or -retention-days if that is longer (env BENEVOLE_RETENTION_MAX_DAYS)")
+	fs.StringVar(&c.addr, "addr", env("JEVIENSAIDER_ADDR", ":8080"), "listen address (env JEVIENSAIDER_ADDR)")
+	fs.StringVar(&c.dbPath, "db", env("JEVIENSAIDER_DB", "jeviensaider.db"), "SQLite database file (env JEVIENSAIDER_DB)")
+	fs.StringVar(&c.baseURL, "base-url", env("JEVIENSAIDER_BASE_URL", ""), "public URL, e.g. https://jeviensaider.example.org (env JEVIENSAIDER_BASE_URL)")
+	fs.BoolVar(&c.trustProxy, "trust-proxy", trustProxy, "trust X-Forwarded-* headers from a reverse proxy (env JEVIENSAIDER_TRUST_PROXY)")
+	fs.IntVar(&retentionDays, "retention-days", retention, "delete events this many days after their last day of activity when the organiser chose none, 0 to keep them forever (env JEVIENSAIDER_RETENTION_DAYS)")
+	fs.IntVar(&retentionMaxDays, "retention-max-days", retentionMax, "longest period an organiser can choose; 0: 180 days, or -retention-days if that is longer (env JEVIENSAIDER_RETENTION_MAX_DAYS)")
 	fs.BoolVar(&c.healthcheck, "healthcheck", false, "query /healthz on the listen address and exit 0 if healthy (for container health checks)")
 	fs.Parse(args)
 	c.baseURL = strings.TrimRight(c.baseURL, "/")
@@ -72,7 +72,7 @@ func loadConfig(args []string) (*config, error) {
 
 	// The passwords are only read from the environment, so that they never
 	// show up in `ps` output.
-	c.createPassword = os.Getenv("BENEVOLE_CREATE_PASSWORD")
+	c.createPassword = os.Getenv("JEVIENSAIDER_CREATE_PASSWORD")
 	if c.smtp, err = smtpFromEnv(c.baseURL); err != nil {
 		return nil, err
 	}

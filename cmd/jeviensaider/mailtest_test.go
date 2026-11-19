@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"benevole-ape/internal/mail"
+	"jeviensaider/internal/mail"
 )
 
 type recordSender struct {
@@ -29,17 +29,17 @@ func (r *recordSender) Send(_ context.Context, m mail.Message) error {
 func setSMTPEnv(t *testing.T, host, port string) {
 	t.Helper()
 	for _, k := range []string{"PORT", "TLS", "USERNAME", "PASSWORD", "FROM"} {
-		t.Setenv("BENEVOLE_SMTP_"+k, "")
+		t.Setenv("JEVIENSAIDER_SMTP_"+k, "")
 	}
-	t.Setenv("BENEVOLE_SMTP_HOST", host)
-	t.Setenv("BENEVOLE_SMTP_PORT", port)
-	t.Setenv("BENEVOLE_BASE_URL", "https://jeviensaider.fr")
+	t.Setenv("JEVIENSAIDER_SMTP_HOST", host)
+	t.Setenv("JEVIENSAIDER_SMTP_PORT", port)
+	t.Setenv("JEVIENSAIDER_BASE_URL", "https://jeviensaider.fr")
 }
 
 func TestMailTest(t *testing.T) {
 	setSMTPEnv(t, "smtp.example.org", "")
-	t.Setenv("BENEVOLE_SMTP_USERNAME", "apikey")
-	t.Setenv("BENEVOLE_SMTP_PASSWORD", "s3cret")
+	t.Setenv("JEVIENSAIDER_SMTP_USERNAME", "apikey")
+	t.Setenv("JEVIENSAIDER_SMTP_PASSWORD", "s3cret")
 	rec := &recordSender{}
 	newSender := func(cfg mail.Config) (mail.Sender, error) { return rec, nil }
 
@@ -74,9 +74,9 @@ func TestMailTest(t *testing.T) {
 			t.Errorf("%q: exit %d, want 2", args, code)
 		}
 	}
-	t.Setenv("BENEVOLE_SMTP_HOST", "")
+	t.Setenv("JEVIENSAIDER_SMTP_HOST", "")
 	errb.Reset()
-	if code := mailTest([]string{"a@b.fr"}, io.Discard, &errb, newSender); code != 2 || !strings.Contains(errb.String(), "BENEVOLE_SMTP_HOST") {
+	if code := mailTest([]string{"a@b.fr"}, io.Discard, &errb, newSender); code != 2 || !strings.Contains(errb.String(), "JEVIENSAIDER_SMTP_HOST") {
 		t.Errorf("no SMTP: exit %d, %q", code, errb.String())
 	}
 }
@@ -127,7 +127,7 @@ func TestMailTestSMTP(t *testing.T) {
 
 	host, port, _ := net.SplitHostPort(ln.Addr().String())
 	setSMTPEnv(t, host, port)
-	t.Setenv("BENEVOLE_SMTP_TLS", "none")
+	t.Setenv("JEVIENSAIDER_SMTP_TLS", "none")
 	var out, errb bytes.Buffer
 	if code := runMailTest([]string{"orga@example.org"}, &out, &errb); code != 0 {
 		t.Fatalf("exit %d: %s", code, errb.String())

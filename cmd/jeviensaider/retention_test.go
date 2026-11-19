@@ -6,23 +6,23 @@ import (
 	"strings"
 	"testing"
 
-	"benevole-ape/internal/model"
-	"benevole-ape/internal/store"
+	"jeviensaider/internal/model"
+	"jeviensaider/internal/store"
 )
 
 func TestRetentionMaxFromEnv(t *testing.T) {
 	// Empty and 0 mean the default maximum: compose.yaml passes an empty
 	// string when the variable is missing from .env, and the flag takes 0.
 	for v, want := range map[string]int{"": 0, "  ": 0, "0": 0, "90": 90, " 365 ": 365} {
-		t.Setenv("BENEVOLE_RETENTION_MAX_DAYS", v)
+		t.Setenv("JEVIENSAIDER_RETENTION_MAX_DAYS", v)
 		if got, err := retentionMaxFromEnv(); err != nil || got != want {
 			t.Errorf("%q: got %d, %v; want %d", v, got, err, want)
 		}
 	}
 	// "off" is refused: a maximum that allows anything is no maximum.
 	for _, v := range []string{"off", "forever", "-1", "abc", "1.5"} {
-		t.Setenv("BENEVOLE_RETENTION_MAX_DAYS", v)
-		if _, err := retentionMaxFromEnv(); err == nil || !strings.Contains(err.Error(), "BENEVOLE_RETENTION_MAX_DAYS") {
+		t.Setenv("JEVIENSAIDER_RETENTION_MAX_DAYS", v)
+		if _, err := retentionMaxFromEnv(); err == nil || !strings.Contains(err.Error(), "JEVIENSAIDER_RETENTION_MAX_DAYS") {
 			t.Errorf("%q accepted or the error does not name the variable: %v", v, err)
 		}
 	}
@@ -53,9 +53,9 @@ func TestEventsCommandUsesTheRetentionOfEachEvent(t *testing.T) {
 	}
 	raw.Close()
 
-	t.Setenv("BENEVOLE_DB", dbPath)
-	t.Setenv("BENEVOLE_RETENTION_DAYS", "60")
-	t.Setenv("BENEVOLE_RETENTION_MAX_DAYS", "180")
+	t.Setenv("JEVIENSAIDER_DB", dbPath)
+	t.Setenv("JEVIENSAIDER_RETENTION_DAYS", "60")
+	t.Setenv("JEVIENSAIDER_RETENTION_MAX_DAYS", "180")
 	run := func(args ...string) (int, string, string) {
 		var out, errOut strings.Builder
 		code := runEvents(args, strings.NewReader(""), &out, &errOut)
@@ -105,8 +105,8 @@ func TestEventsCommandUsesTheRetentionOfEachEvent(t *testing.T) {
 
 func TestEventsCommandRejectsConflictingRetention(t *testing.T) {
 	for name, env := range map[string]map[string]string{
-		"a default above the maximum": {"BENEVOLE_RETENTION_DAYS": "90", "BENEVOLE_RETENTION_MAX_DAYS": "30"},
-		"a bad maximum":               {"BENEVOLE_RETENTION_MAX_DAYS": "off"},
+		"a default above the maximum": {"JEVIENSAIDER_RETENTION_DAYS": "90", "JEVIENSAIDER_RETENTION_MAX_DAYS": "30"},
+		"a bad maximum":               {"JEVIENSAIDER_RETENTION_MAX_DAYS": "off"},
 	} {
 		for k, v := range env {
 			t.Setenv(k, v)
@@ -116,20 +116,20 @@ func TestEventsCommandRejectsConflictingRetention(t *testing.T) {
 		if code != 2 || !strings.Contains(errOut.String(), "MAX_DAYS") && !strings.Contains(errOut.String(), "maximum") {
 			t.Errorf("%s: exit %d, stderr %q", name, code, errOut.String())
 		}
-		t.Setenv("BENEVOLE_RETENTION_DAYS", "")
-		t.Setenv("BENEVOLE_RETENTION_MAX_DAYS", "")
+		t.Setenv("JEVIENSAIDER_RETENTION_DAYS", "")
+		t.Setenv("JEVIENSAIDER_RETENTION_MAX_DAYS", "")
 	}
 }
 
 func TestRetentionFromEnv(t *testing.T) {
 	for v, want := range map[string]int{"": 60, "0": 0, "off": 0, " Never ": 0, "forever": 0, "90": 90} {
-		t.Setenv("BENEVOLE_RETENTION_DAYS", v)
+		t.Setenv("JEVIENSAIDER_RETENTION_DAYS", v)
 		if got, err := retentionFromEnv(); err != nil || got != want {
 			t.Errorf("%q: got %d, %v; want %d", v, got, err, want)
 		}
 	}
 	for _, v := range []string{"-1", "sixty", "60d", "1.5"} {
-		t.Setenv("BENEVOLE_RETENTION_DAYS", v)
+		t.Setenv("JEVIENSAIDER_RETENTION_DAYS", v)
 		if _, err := retentionFromEnv(); err == nil {
 			t.Errorf("%q accepted", v)
 		}
@@ -137,9 +137,9 @@ func TestRetentionFromEnv(t *testing.T) {
 }
 
 func TestEventsCommandRejectsBadRetention(t *testing.T) {
-	t.Setenv("BENEVOLE_RETENTION_DAYS", "jamais")
+	t.Setenv("JEVIENSAIDER_RETENTION_DAYS", "jamais")
 	var out, errOut strings.Builder
-	if code := runEvents([]string{"list"}, strings.NewReader(""), &out, &errOut); code != 2 || !strings.Contains(errOut.String(), "BENEVOLE_RETENTION_DAYS") {
+	if code := runEvents([]string{"list"}, strings.NewReader(""), &out, &errOut); code != 2 || !strings.Contains(errOut.String(), "JEVIENSAIDER_RETENTION_DAYS") {
 		t.Errorf("exit %d, stderr %q", code, errOut.String())
 	}
 }
@@ -155,8 +155,8 @@ func TestEventsListKeptForever(t *testing.T) {
 	}
 	st.Close()
 
-	t.Setenv("BENEVOLE_DB", db)
-	t.Setenv("BENEVOLE_RETENTION_DAYS", "off")
+	t.Setenv("JEVIENSAIDER_DB", db)
+	t.Setenv("JEVIENSAIDER_RETENTION_DAYS", "off")
 	var out, errOut strings.Builder
 	if code := runEvents([]string{"list"}, strings.NewReader(""), &out, &errOut); code != 0 {
 		t.Fatalf("exit %d: %s", code, errOut.String())

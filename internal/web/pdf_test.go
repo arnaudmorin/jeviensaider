@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"benevole-ape/internal/model"
+	"jeviensaider/internal/model"
 )
 
 // planningWith builds a planning with one stand per entry of slotsPerStand,
