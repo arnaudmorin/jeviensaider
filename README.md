@@ -36,18 +36,21 @@ in a single SQLite file.
   A private instance can turn this off and keep its events forever.
 
 **For parents**
-- One **overview** of the whole event: a table of stands × hours, coloured
-  red / orange / green, shown as a list grouped by hour on phones, and
-  "Il reste encore N places !" at the top. A filter shows only the slots
-  still to fill.
+- **"Tous les créneaux"**: the whole event as a table of stands × hours,
+  shown as a list grouped by hour on phones. Each slot says in words where it
+  stands ("Il reste 2 places", "Assez de monde, vous pouvez venir",
+  "Complet") and who is there; a dashed border means people are still
+  needed. At the top: "Il reste N places", a progress bar, and the slots that
+  need help most. A switch shows only the places still to take.
 - Each stand's description under its name, cut after two lines; "Voir plus"
   opens the whole text. The sign-up form shows it too.
 - Sign up in a few seconds with just a name; a phone number is optional, and
   no e-mail is asked or stored. There is no account: the browser remembers
   them, and a personal link lets them manage their slots from another device.
   A link shared by mistake can be replaced with a new one.
-- **"Mes créneaux"**: the same table with only their own slots, an "Annuler"
-  button on each, and a warning when two of them are at the same time.
+- **"Mes créneaux"**: their own slots as cards (day, time, stand, who else
+  is there), "Je ne peux plus venir" on each, and a warning when two of them
+  are at the same time.
 - An **"Ajouter à mon agenda"** button that downloads their slots as an
   `.ics` file for any calendar app. Each entry has a reminder one day and one
   hour before. The file does not contain the personal link, and it is not

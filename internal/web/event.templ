@@ -20,12 +20,16 @@ templ eventView(d eventPage) {
 			<div id="planning">
 				if d.Me != nil {
 					<nav class="tabs" aria-label="Vues">
-						<a class={ "tab", templ.KV("active", d.Tab != "me") } href={ templ.SafeURL(todoURL(d.EventURL, d.TodoOnly)) }
+						<a
+							class={ "tab", templ.KV("active", d.Tab != "me") }
+							href={ templ.SafeURL(todoURL(d.EventURL, d.TodoOnly)) }
 							if d.Tab != "me" {
 								aria-current="page"
 							}
 						>Tous les créneaux</a>
-						<a class={ "tab", templ.KV("active", d.Tab == "me") } href={ templ.SafeURL(d.MeURL) }
+						<a
+							class={ "tab", templ.KV("active", d.Tab == "me") }
+							href={ templ.SafeURL(d.MeURL) }
 							if d.Tab == "me" {
 								aria-current="page"
 							}
@@ -171,25 +175,28 @@ templ slotCell(d eventPage, s *model.SlotView, showStand bool) {
 	if !d.TodoOnly || s.Missing > 0 {
 		if s.CanSignUp {
 			<a class={ "slot", slotKind(s), "st-" + s.Status } href={ signupURL(d.EventURL, s) } hx-get={ string(signupURL(d.EventURL, s)) } hx-target="#modal" style={ standStyle(s.Stand.Color) }>
-				@slotBody(s, showStand)
+				@slotBody(d.P, s, showStand)
 				<span class="slot-cta">Je m'inscris</span>
 			</a>
 		} else {
 			<div class={ "slot", slotKind(s), "st-" + s.Status, templ.KV("mine", s.Mine), templ.KV("clash", s.Clash) } style={ standStyle(s.Stand.Color) }>
-				@slotBody(s, showStand)
+				@slotBody(d.P, s, showStand)
 			</div>
 		}
 	}
 }
 
-templ slotBody(s *model.SlotView, showStand bool) {
+templ slotBody(p *model.Planning, s *model.SlotView, showStand bool) {
 	// The grid's row and column headers, and the list's time heading, are
-	// not read with a link: say which slot it is.
+	// not read with a link: say which slot it is, with its day when the
+	// event spans several. The hidden full stops keep the parts apart when
+	// the whole slot is read as one link.
 	if showStand {
-		<span class="sr-only">{ timeRange(s.StartsAt, s.EndsAt) },</span>
+		<span class="sr-only">{ slotWhen(p, s) },</span>
 		<span class="slot-stand"><span class="dot"></span>{ s.Stand.Name }</span>
+		<span class="sr-only">:</span>
 	} else {
-		<span class="sr-only">{ s.Stand.Name }, { timeRange(s.StartsAt, s.EndsAt) } :</span>
+		<span class="sr-only">{ s.Stand.Name }, { slotWhen(p, s) } :</span>
 	}
 	if s.Mine {
 		<span class="slot-me">
@@ -201,8 +208,10 @@ templ slotBody(s *model.SlotView, showStand bool) {
 	} else {
 		<span class="slot-status">{ slotStatus(s) }</span>
 	}
+	<span class="sr-only">.</span>
 	if len(s.Signups) > 0 {
 		<span class="slot-names">{ publicNames(s.Signups) }</span>
+		<span class="sr-only">.</span>
 	}
 }
 

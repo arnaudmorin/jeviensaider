@@ -230,11 +230,7 @@ func (d *pdfDoc) table(blocks []pdfBlock, y, rowH float64, multiDay bool) {
 	for _, b := range blocks {
 		h := float64(len(b.Lines)) * rowH
 		// The slot's time, in a cell as tall as its lines.
-		when := hm(b.Slot.StartsAt) + " – " + hm(b.Slot.EndsAt)
-		if multiDay {
-			when = dayFR(b.Slot.StartsAt) + ", " + when
-		}
-		d.text(margin+6, y, timeColW-12, min(rowH, h), when, true, size, colText)
+		d.text(margin+6, y, timeColW-12, min(rowH, h), when(multiDay, b.Slot.StartsAt, b.Slot.EndsAt), true, size, colText)
 		d.strokeRect(margin, y, timeColW, h)
 		for _, su := range b.Lines {
 			d.strokeRect(xName, y, nameColW, rowH)

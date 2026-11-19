@@ -86,7 +86,7 @@ templ iconPlus() {
 
 // progress is the fill bar of a planning or a stand.
 templ progress(count, needed int) {
-	<div class="progress" role="img" aria-label={ itoa(count) + " places prises sur " + itoa(needed) }>
+	<div class="progress" role="img" aria-label={ itoa(count) + " " + plural(count, "place prise", "places prises") + " sur " + itoa(needed) }>
 		<div class="progress-bar" style={ templ.SafeCSS("width: " + itoa(pct(count, needed)) + "%") }></div>
 	</div>
 }

@@ -164,7 +164,7 @@ func (s *Server) notifySignup(ctx context.Context, r *http.Request, ev *model.Ev
 	}
 	s.sendMail(mail.Message{
 		To:      ev.AdminEmail,
-		Subject: verb + " : " + vol.Name + " – " + sv.Stand.Name + ", " + hm(sv.StartsAt) + " – " + hm(sv.EndsAt),
+		Subject: verb + " : " + vol.Name + " – " + sv.Stand.Name + ", " + timeRange(sv.StartsAt, sv.EndsAt),
 		Body: renderMail("signup", map[string]any{
 			"Name":     vol.Name,
 			"Phone":    vol.Phone,

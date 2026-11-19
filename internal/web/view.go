@@ -174,12 +174,18 @@ func lower(s string) string {
 // timeRange is a time span the French way: "14h – 15h30".
 func timeRange(from, to time.Time) string { return hm(from) + " – " + hm(to) }
 
+// when is a time span with its day in front when the event spans several
+// days: "samedi 19 juin, 14h – 15h", or just "14h – 15h".
+func when(multiDay bool, from, to time.Time) string {
+	if multiDay {
+		return dayFR(from) + ", " + timeRange(from, to)
+	}
+	return timeRange(from, to)
+}
+
 // groupWhen is the heading of a group of slots that share a time.
 func groupWhen(p *model.Planning, c model.Column) string {
-	if p.MultiDay {
-		return dayFR(c.StartsAt) + ", " + timeRange(c.StartsAt, c.EndsAt)
-	}
-	return timeRange(c.StartsAt, c.EndsAt)
+	return when(p.MultiDay, c.StartsAt, c.EndsAt)
 }
 
 // capitalize upper-cases the first letter: "samedi 19 juin" -> "Samedi 19 juin".
@@ -202,11 +208,7 @@ func signupURL(eventURL string, s *model.SlotView) templ.SafeURL {
 
 // slotWhen is a slot's time, with its day when the event spans several.
 func slotWhen(p *model.Planning, s *model.SlotView) string {
-	t := timeRange(s.StartsAt, s.EndsAt)
-	if p.MultiDay {
-		return dayFR(s.StartsAt) + ", " + t
-	}
-	return t
+	return when(p.MultiDay, s.StartsAt, s.EndsAt)
 }
 
 // urgentText encourages the first volunteers of an empty slot.

@@ -1,6 +1,8 @@
 package web
 
 import (
+	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -47,6 +49,41 @@ func TestLowerFirstLetter(t *testing.T) {
 	for in, want := range map[string]string{"Il reste": "il reste", "Équipe": "équipe", "": "", "x": "x"} {
 		if got := lower(in); got != want {
 			t.Errorf("lower(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+// A slot link says which day it is on a multi-day event, and its parts are
+// kept apart for screen readers.
+func TestSlotBodySpokenText(t *testing.T) {
+	sat := time.Date(2027, 6, 19, 14, 0, 0, 0, time.Local)
+	sv := &model.SlotView{
+		Slot:    model.Slot{StartsAt: sat, EndsAt: sat.Add(time.Hour), MinPeople: 2},
+		Stand:   &model.Stand{Name: "Buvette"},
+		Signups: []model.SignupRow{{Name: "Marie Durand"}},
+		Count:   1, Missing: 1,
+	}
+	var b strings.Builder
+	if err := slotBody(&model.Planning{MultiDay: true}, sv, false).Render(context.Background(), &b); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(b.String(), "Buvette, samedi 19 juin, 14h – 15h :") {
+		t.Errorf("slot text lacks its day: %s", b.String())
+	}
+	// A full stop after the status and after the names.
+	if n := strings.Count(b.String(), `<span class="sr-only">.</span>`); n != 2 {
+		t.Errorf("%d spoken full stops, want 2: %s", n, b.String())
+	}
+}
+
+func TestProgressLabel(t *testing.T) {
+	for n, want := range map[int]string{1: `"1 place prise sur 6"`, 2: `"2 places prises sur 6"`} {
+		var b strings.Builder
+		if err := progress(n, 6).Render(context.Background(), &b); err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(b.String(), want) {
+			t.Errorf("progress(%d, 6) = %s, want label %s", n, b.String(), want)
 		}
 	}
 }

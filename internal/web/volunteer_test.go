@@ -171,7 +171,7 @@ func TestVolunteerSelfService(t *testing.T) {
 	theirs := regexp.MustCompile(`/signups/(\d+)/delete`).FindStringSubmatch(e.get(e.client(), other).body)[1]
 	expect(t, e.post(v, me+"/signups/"+theirs+"/delete", nil), 404)
 
-	// "Ce n'est pas moi": the device forgets me, the link still works.
+	// "Oublier sur cet appareil": the device forgets me, the link still works.
 	expect(t, e.get(v, pub), 200, "Mes créneaux")
 	expect(t, e.post(v, pub+"/forget", nil), http.StatusSeeOther)
 	if body := e.get(v, pub).body; strings.Contains(body, me) {
@@ -212,7 +212,7 @@ func TestStandDescriptions(t *testing.T) {
 	expect(t, e.post(admin, adminPath+"/status", url.Values{"status": {"open"}}), http.StatusSeeOther)
 
 	// The views bar only appears for a known volunteer.
-	if strings.Contains(r.body, "Vue d&#39;ensemble") || strings.Contains(r.body, "Vue d'ensemble") {
+	if strings.Contains(e.get(e.client(), pub).body, `class="tabs"`) {
 		t.Error("views bar shown to an unknown visitor")
 	}
 }
@@ -239,8 +239,8 @@ func TestOverlapWarningAndMyPlanning(t *testing.T) {
 	// The active tab is announced as the current page; tabs reload the whole
 	// page, so the header and layout follow.
 	expect(t, r, 200, `aria-current="page">`)
-	if strings.Contains(r.body, `hx-select="#planning" hx-swap="outerHTML"><a class="tab`) {
-		t.Error("tabs only swap part of the page")
+	if nav := tabsNav(r.body); nav == "" || strings.Contains(nav, "hx-") {
+		t.Errorf("tabs missing or only swap part of the page: %s", nav)
 	}
 	// The next slot does not overlap: no warning.
 	if strings.Contains(e.get(marie, publicPath+"/slots/"+slots[1]+"/signup").body, "même horaire") {
@@ -295,4 +295,9 @@ func mySlotsHTML(body string) string {
 		body = body[:j]
 	}
 	return body
+}
+
+// tabsNav is the opening tag of the views bar, "" when there is none.
+func tabsNav(body string) string {
+	return regexp.MustCompile(`<nav class="tabs"[^>]*>`).FindString(body)
 }
