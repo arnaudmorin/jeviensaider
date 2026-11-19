@@ -16,7 +16,8 @@ func at(s string) time.Time {
 func TestDisplayName(t *testing.T) {
 	cases := map[string]string{
 		"Marie Dupont":            "Marie D.",
-		"  jean   de la fontaine": "jean F.",
+		"Julien Le Jeune":         "Julien LJ.",
+		"  jean   de la fontaine": "jean DLF.",
 		"Zoé":                     "Zoé",
 		"Anne élodie":             "Anne É.",
 		"":                        "",

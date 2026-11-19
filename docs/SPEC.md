@@ -54,7 +54,9 @@ Derived notions (computed, not stored):
 - **Missing**: people still needed to reach the minimum, per slot, stand and
   event.
 - **Overlap**: two slots whose time ranges intersect.
-- **Public name**: "Marie Dupont" is shown as "Marie D." on public pages.
+- **Public name**: public pages show the first word of the name, then the
+  initial of each other word. "Marie Dupont" becomes "Marie D." and "Julien Le
+  Jeune" becomes "Julien LJ.".
 
 ## 4. Features
 
