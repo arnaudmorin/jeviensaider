@@ -8,3 +8,4 @@ jeviensaider
 jeviensaider-linux-*
 .env
 deploy
+dist

@@ -18,6 +18,9 @@ import (
 	"jeviensaider/internal/web"
 )
 
+// version is set at build time (-ldflags "-X main.version=...").
+var version = "dev"
+
 // env returns an environment variable, or def when it is unset or empty
 // (compose files often pass empty values for unset ones).
 func env(key, def string) string {
@@ -110,7 +113,7 @@ func serve(cfg *config) int {
 		logger.Info("automatic deletion of events is disabled: events are kept forever")
 	}
 	go func() {
-		logger.Info("listening", "addr", cfg.addr, "db", cfg.dbPath, "create_password", cfg.createPassword != "", "retention_days", cfg.retention.DefaultDays, "retention_max_days", cfg.retention.Max())
+		logger.Info("listening", "version", version, "addr", cfg.addr, "db", cfg.dbPath, "create_password", cfg.createPassword != "", "retention_days", cfg.retention.DefaultDays, "retention_max_days", cfg.retention.Max())
 		if err := httpSrv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			logger.Error("listen", "err", err)
 			stop()
