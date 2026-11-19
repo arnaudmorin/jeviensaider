@@ -184,7 +184,7 @@ func TestPlantedPersonalLink(t *testing.T) {
 }
 
 func TestValidEmail(t *testing.T) {
-	for _, ok := range []string{"marie@example.org", "marie.dupont+ape@ecole.fr", "o'brien@mail.co.uk", "a-b_c@sub-domain.example.fr"} {
+	for _, ok := range []string{"marie@example.org", "marie.dupont+fete@ecole.fr", "o'brien@mail.co.uk", "a-b_c@sub-domain.example.fr"} {
 		if !validEmail(ok) {
 			t.Errorf("%q refused", ok)
 		}

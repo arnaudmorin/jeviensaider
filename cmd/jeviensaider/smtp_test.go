@@ -30,9 +30,9 @@ func TestSMTPFromEnv(t *testing.T) {
 	t.Setenv("BENEVOLE_SMTP_PORT", "465")
 	t.Setenv("BENEVOLE_SMTP_USERNAME", "apikey")
 	t.Setenv("BENEVOLE_SMTP_PASSWORD", "s3cret")
-	t.Setenv("BENEVOLE_SMTP_FROM", "APE <ape@ecole.fr>")
+	t.Setenv("BENEVOLE_SMTP_FROM", "Asso <asso@example.org>")
 	cfg, err = smtpFromEnv("https://jeviensaider.fr")
-	if err != nil || cfg.TLS != "tls" || cfg.Username != "apikey" || cfg.Password != "s3cret" || cfg.From != `"APE" <ape@ecole.fr>` {
+	if err != nil || cfg.TLS != "tls" || cfg.Username != "apikey" || cfg.Password != "s3cret" || cfg.From != `"Asso" <asso@example.org>` {
 		t.Errorf("explicit: %+v %v", cfg, err)
 	}
 

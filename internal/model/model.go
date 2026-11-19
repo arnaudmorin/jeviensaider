@@ -11,7 +11,7 @@ import (
 )
 
 // TimeLayout is how slot times are stored in SQLite: local wall-clock time,
-// without timezone (an APE event happens in one place, one timezone).
+// without timezone (an event happens in one place, one timezone).
 const TimeLayout = "2006-01-02 15:04"
 
 // DateLayout is the layout of Event.Date.

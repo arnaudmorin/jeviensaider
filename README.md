@@ -2,8 +2,9 @@
 
 [![build](https://github.com/arnaudmorin/jeviensaider/actions/workflows/build.yml/badge.svg?branch=master)](https://github.com/arnaudmorin/jeviensaider/actions/workflows/build.yml)
 
-A small web app that helps a parents' association (APE) find volunteers for
-school events such as the *fête de l'école* or the *marché de Noël*.
+A small web app that helps associations, schools, clubs and other organisers
+find volunteers for their events: *fête de l'école*, *fest-noz*,
+*vide-grenier*, *marché de Noël*…
 
 It works like a simpler Doodle or Framadate, organised by **stand** and
 **time slot**. For example, *Pêche aux canards* from 14:00 to 17:00 with
@@ -101,7 +102,7 @@ as downloadable artifacts. They can also be built locally with
 | `-retention-max-days` | `BENEVOLE_RETENTION_MAX_DAYS` | `0` (180) | Longest number of days that an organiser can choose for one event; `0` or empty means 180, or `BENEVOLE_RETENTION_DAYS` if longer (see below) |
 | — | `BENEVOLE_CREATE_PASSWORD` | *(none)* | Password required to create an event |
 
-On a public server, set `BENEVOLE_CREATE_PASSWORD` so that only the APE can
+On a public server, set `BENEVOLE_CREATE_PASSWORD` so that only the organisers can
 create events. It is read from the environment only, so it never shows up in
 `ps` output. It is also asked for when an organiser duplicates an event.
 

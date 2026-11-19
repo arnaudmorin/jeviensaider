@@ -6,8 +6,9 @@ written here, in the place written here, and nothing much more.
 
 ## 1. Purpose
 
-A parents' association (APE) organises school events (*fête de l'école*,
-*marché de Noël*). It needs volunteers on **stands** (bar, crêpes, games…),
+An association, a school, a club or a group of neighbours organises an event
+(*fête de l'école*, *fest-noz*, *vide-grenier*, *marché de Noël*). It needs
+volunteers on **stands** (bar, crêpes, games…),
 each stand split into **time slots** that need a minimum number of people.
 
 The app lets organisers publish the planning, and parents sign up for slots
@@ -338,6 +339,6 @@ The code should stay small and readable by one person in an afternoon.
 
 - User accounts, logins, roles beyond the secret links.
 - E-mails or SMS to volunteers.
-- Several organisations or tenants; any APE runs its own instance.
+- Several organisations or tenants; each organisation runs its own instance.
 - Translations: the interface is French only.
 - A JavaScript front-end framework or a build step.

@@ -1,4 +1,4 @@
-# systemd unit for the APE volunteer sign-up app.
+# systemd unit for the volunteer sign-up app.
 #
 #   sudo useradd --system --home /var/lib/jeviensaider --create-home jeviensaider
 #   sudo install -m 0755 jeviensaider /usr/local/bin/jeviensaider
