@@ -298,3 +298,5 @@ form.inline { display: inline; margin: 0; }
 .myplan { margin: 4px 0 24px; }
 .myplan-title { font-size: 1.1rem; font-weight: 500; margin: 0 0 2px; }
 .myplan .meta { color: var(--muted); margin: 0 0 12px; }
+.agenda { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 12px 0 16px; }
+.agenda .hint { margin: 0; }

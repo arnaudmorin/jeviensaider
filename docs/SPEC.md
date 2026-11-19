@@ -88,6 +88,15 @@ Derived notions (computed, not stored):
   - "Mon planning": the same table, restricted to the volunteer's own slots,
     with a summary (number of slots, total time, stands, overlap warning) and
     an "Annuler" button in each cell (while the event is open).
+  - "Ajouter à mon agenda" (`/e/<slug>/me/<token>/agenda.ics`), when the
+    volunteer has at least one slot: an iCalendar file with one entry per
+    slot (stand and event names, the stand description, the location and the
+    public event link) and two reminders, one day and one hour before. Times
+    are written without a time zone, like the stored times. Each entry has a
+    stable UID (event, slot, volunteer), so a second import updates the
+    entries that still exist. A cancelled or deleted slot stays in the
+    calendar app. Not available for a draft event (404), like the sign-up
+    form; a closed event still gives its file.
   - Personal link with "Copier" and "Changer de lien".
   - "Mes coordonnées": change name and phone (while the event is open).
   - "Ce n'est pas moi": forget this browser's cookie.
@@ -181,6 +190,10 @@ silently falls back to a default.
 - **Secrets**: admin and personal tokens are never logged (paths are
   redacted), never sent in Referer (`Referrer-Policy: same-origin`), and
   pages that show them are `Cache-Control: no-store`.
+- **Calendar file**: the `.ics` file of a volunteer holds no token and no
+  data about volunteers (no name, phone or comment). Text fields are escaped
+  and control characters and line breaks are removed, so a text typed by an
+  organiser cannot add a calendar property. The response is `no-store`.
 - **CSRF**: cross-site POSTs are refused (`Sec-Fetch-Site`, else `Origin`).
 - **XSS**: all output goes through `html/template`; user text is never marked
   as trusted HTML. Strict CSP (`script-src 'self'`). The JavaScript never
@@ -220,6 +233,7 @@ internal/store/      SQLite access: one file per table group (events,
                      deletion, embedded migrations tracked with
                      PRAGMA user_version
 internal/mail/       SMTP sender, message formatting, background queue
+internal/ical/       iCalendar writer: text escaping, line folding, reminders
 internal/web/        HTTP handlers, middleware, templates, static files
   server.go          routes and middleware chain
   public.go          home, event page, sign-up, volunteer self-service
@@ -231,6 +245,7 @@ internal/web/        HTTP handlers, middleware, templates, static files
   notify.go          organiser e-mails
   mailbudget.go      e-mail limits
   export.go          CSV export
+  agenda.go          the personal calendar file (.ics) of a volunteer
   pdf.go             planning PDF (layout, then drawing with gopdf)
   templates/, static/
 deploy/              systemd unit, Caddy and nginx examples

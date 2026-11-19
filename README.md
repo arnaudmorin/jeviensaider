@@ -48,6 +48,14 @@ in a single SQLite file.
   A link shared by mistake can be replaced with a new one.
 - **"Mes créneaux"**: the same table with only their own slots, an "Annuler"
   button on each, and a warning when two of them are at the same time.
+- An **"Ajouter à mon agenda"** button that downloads their slots as an
+  `.ics` file for any calendar app. Each entry has a reminder one day and one
+  hour before. The file does not contain the personal link, and it is not
+  available while the event is a draft. Importing it again updates the
+  entries of the slots that still exist and does not add copies. A slot that
+  the volunteer cancels, or that an organiser deletes, stays in the calendar
+  app until the volunteer removes it there. The times have no time zone, so a
+  calendar shows the same clock time as the event page.
 
 ## Quick start
 
@@ -226,7 +234,8 @@ internal/model/    domain types and rules, fill status, planning view
 internal/slotgen/  splits a time range into slots
 internal/store/    SQLite access, embedded migrations, sign-up transaction
 internal/mail/     SMTP sender and background queue
-internal/web/      handlers, middleware, CSV and PDF exports,
+internal/ical/     iCalendar writer (escaping, line folding) for the .ics file
+internal/web/      handlers, middleware, CSV, PDF and calendar exports,
                    embedded templates and static files (htmx)
 ```
 

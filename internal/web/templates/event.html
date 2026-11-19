@@ -59,7 +59,10 @@
       </section>
       {{end}}{{end}}
 
-      {{if not .P.MySlots}}
+      {{if .P.MySlots}}
+      <p class="agenda"><a class="btn small" href="{{.MeURL}}/agenda.ics" download>Ajouter à mon agenda</a>
+        <span class="hint">Un fichier .ics avec vos créneaux et un rappel la veille et une heure avant. Si vous annulez un créneau, supprimez-le aussi de votre agenda.</span></p>
+      {{else}}
       <p class="empty">Vous n'êtes inscrit·e sur aucun créneau. <a href="{{.EventURL}}">Voir le planning</a></p>
       {{end}}
 

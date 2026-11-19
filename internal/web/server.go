@@ -96,6 +96,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /e/{slug}/me/{token}", s.withVolunteer(s.meUpdate))
 	mux.HandleFunc("POST /e/{slug}/me/{token}/signups/{id}/delete", s.withVolunteer(s.meCancel))
 	mux.HandleFunc("POST /e/{slug}/me/{token}/renew", s.withVolunteer(s.meRenew))
+	mux.HandleFunc("GET /e/{slug}/me/{token}/agenda.ics", s.withVolunteer(s.meCalendar))
 
 	// Admin, the token is the credential.
 	mux.HandleFunc("GET /a/{token}", s.withAdmin(s.adminPage))
