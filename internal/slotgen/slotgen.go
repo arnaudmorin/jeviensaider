@@ -5,7 +5,7 @@ import (
 	"errors"
 	"time"
 
-	"benevole-ape/internal/model"
+	"jeviensaider/internal/model"
 )
 
 // ErrTooMany is returned when a generation would exceed MaxSlots.

@@ -13,9 +13,9 @@ import (
 	"syscall"
 	"time"
 
-	"benevole-ape/internal/mail"
-	"benevole-ape/internal/store"
-	"benevole-ape/internal/web"
+	"jeviensaider/internal/mail"
+	"jeviensaider/internal/store"
+	"jeviensaider/internal/web"
 )
 
 // env returns an environment variable, or def when it is unset or empty

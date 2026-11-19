@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"benevole-ape/internal/model"
+	"jeviensaider/internal/model"
 )
 
 // A browser that remembers Mallory (her personal link was shared) must not

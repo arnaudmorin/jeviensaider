@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"benevole-ape/internal/model"
-	"benevole-ape/internal/store"
+	"jeviensaider/internal/model"
+	"jeviensaider/internal/store"
 )
 
 func TestRetentionMaxFromEnv(t *testing.T) {

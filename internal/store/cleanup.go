@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"benevole-ape/internal/model"
+	"jeviensaider/internal/model"
 )
 
 // lastDayExpr is the last day ("YYYY-MM-DD") an event is relevant: the latest

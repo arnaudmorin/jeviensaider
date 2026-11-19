@@ -9,7 +9,7 @@ import (
 
 	"golang.org/x/text/unicode/norm"
 
-	"benevole-ape/internal/model"
+	"jeviensaider/internal/model"
 )
 
 const eventCols = `id, slug, title, description, location, date, admin_token, status, created_at, admin_email, notify_signups, COALESCE(retention_days, 0)`

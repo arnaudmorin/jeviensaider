@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql"
 
-	"benevole-ape/internal/model"
+	"jeviensaider/internal/model"
 )
 
 const slotCols = `sl.id, sl.stand_id, sl.starts_at, sl.ends_at, sl.min_people, COALESCE(sl.max_people, 0)`

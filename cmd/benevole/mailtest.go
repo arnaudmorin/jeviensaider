@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"benevole-ape/internal/mail"
+	"jeviensaider/internal/mail"
 )
 
 const mailTestUsage = `Usage: benevole mail-test [-base-url URL] <address>

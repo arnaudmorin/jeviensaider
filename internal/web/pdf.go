@@ -10,7 +10,7 @@ import (
 	"golang.org/x/image/font/gofont/gobold"
 	"golang.org/x/image/font/gofont/goregular"
 
-	"benevole-ape/internal/model"
+	"jeviensaider/internal/model"
 )
 
 // The planning PDF: one A4 page per stand, with a table of its slots. Each

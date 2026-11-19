@@ -7,9 +7,9 @@ import (
 	"strconv"
 	"strings"
 
-	"benevole-ape/internal/mail"
-	"benevole-ape/internal/store"
-	"benevole-ape/internal/web"
+	"jeviensaider/internal/mail"
+	"jeviensaider/internal/store"
+	"jeviensaider/internal/web"
 )
 
 // config is the server's configuration, read from flags and environment

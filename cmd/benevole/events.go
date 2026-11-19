@@ -11,8 +11,8 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	"benevole-ape/internal/model"
-	"benevole-ape/internal/store"
+	"jeviensaider/internal/model"
+	"jeviensaider/internal/store"
 )
 
 const eventsUsage = `Usage: benevole events <command> [flags] [args]

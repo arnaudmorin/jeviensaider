@@ -3,7 +3,7 @@ package main
 import (
 	"testing"
 
-	"benevole-ape/internal/web"
+	"jeviensaider/internal/web"
 )
 
 func TestMailLimitsFromEnv(t *testing.T) {

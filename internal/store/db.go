@@ -16,7 +16,7 @@ import (
 	"strings"
 	"time"
 
-	"benevole-ape/internal/model"
+	"jeviensaider/internal/model"
 
 	_ "modernc.org/sqlite"
 )

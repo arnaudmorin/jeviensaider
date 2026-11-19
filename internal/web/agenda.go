@@ -5,9 +5,9 @@ import (
 	"net/http"
 	"time"
 
-	"benevole-ape/internal/ical"
-	"benevole-ape/internal/model"
-	"benevole-ape/internal/store"
+	"jeviensaider/internal/ical"
+	"jeviensaider/internal/model"
+	"jeviensaider/internal/store"
 )
 
 // reminders are the alarms added to each calendar entry: the day before, to

@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"strings"
 
-	"benevole-ape/internal/model"
+	"jeviensaider/internal/model"
 )
 
 const volunteerCols = `id, event_id, name, phone, edit_token, created_at`

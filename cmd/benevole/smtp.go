@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"benevole-ape/internal/mail"
+	"jeviensaider/internal/mail"
 )
 
 // smtpFromEnv reads the SMTP settings. It returns nil when

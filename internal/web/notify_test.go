@@ -8,7 +8,7 @@ import (
 	"sync"
 	"testing"
 
-	"benevole-ape/internal/mail"
+	"jeviensaider/internal/mail"
 )
 
 // fakeMailer records the messages instead of sending them.

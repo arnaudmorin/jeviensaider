@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"benevole-ape/internal/model"
-	"benevole-ape/internal/slotgen"
+	"jeviensaider/internal/model"
+	"jeviensaider/internal/slotgen"
 )
 
 func day(s string) time.Time {

@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"benevole-ape/internal/store"
+	"jeviensaider/internal/store"
 )
 
 // Config tunes the server.

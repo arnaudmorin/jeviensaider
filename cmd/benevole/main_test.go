@@ -14,8 +14,8 @@ import (
 	"testing"
 	"time"
 
-	"benevole-ape/internal/model"
-	"benevole-ape/internal/store"
+	"jeviensaider/internal/model"
+	"jeviensaider/internal/store"
 )
 
 func TestCheckHealth(t *testing.T) {

@@ -3,7 +3,7 @@ package store
 import (
 	"testing"
 
-	"benevole-ape/internal/model"
+	"jeviensaider/internal/model"
 )
 
 func TestRetentionDays(t *testing.T) {

@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"benevole-ape/internal/mail"
+	"jeviensaider/internal/mail"
 )
 
 func TestSMTPFromEnv(t *testing.T) {

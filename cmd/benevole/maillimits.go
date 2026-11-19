@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"benevole-ape/internal/web"
+	"jeviensaider/internal/web"
 )
 
 // mailLimitsFromEnv reads the e-mail limits. Each variable is a number, or

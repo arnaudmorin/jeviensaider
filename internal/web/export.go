@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"net/http"
 
-	"benevole-ape/internal/model"
-	"benevole-ape/internal/store"
+	"jeviensaider/internal/model"
+	"jeviensaider/internal/store"
 )
 
 // adminExportCSV writes the full planning as CSV: one line per sign-up, plus

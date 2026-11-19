@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"benevole-ape/internal/mail"
+	"jeviensaider/internal/mail"
 )
 
 type recordSender struct {

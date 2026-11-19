@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"benevole-ape/internal/model"
+	"jeviensaider/internal/model"
 )
 
 func at(s string) time.Time {

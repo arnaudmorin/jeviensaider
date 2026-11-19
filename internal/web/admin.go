@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
-	"benevole-ape/internal/model"
-	"benevole-ape/internal/slotgen"
-	"benevole-ape/internal/store"
+	"jeviensaider/internal/model"
+	"jeviensaider/internal/slotgen"
+	"jeviensaider/internal/store"
 )
 
 func (s *Server) withAdmin(h func(http.ResponseWriter, *http.Request, *model.Event)) http.HandlerFunc {

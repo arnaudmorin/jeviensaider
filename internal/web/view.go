@@ -12,7 +12,7 @@ import (
 
 	"github.com/a-h/templ"
 
-	"benevole-ape/internal/model"
+	"jeviensaider/internal/model"
 )
 
 //go:generate go tool templ generate
