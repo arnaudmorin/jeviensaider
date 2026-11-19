@@ -1,6 +1,6 @@
 BINARY  := jeviensaider
 PKG     := ./cmd/jeviensaider
-DB      ?= benevole.db
+DB      ?= jeviensaider.db
 ADDR    ?= :8080
 LDFLAGS := -s -w
 

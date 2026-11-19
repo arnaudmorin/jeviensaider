@@ -28,12 +28,12 @@ Commands:
 <event> is an event's slug (as in /e/<slug>) or its ID from "list".
 
 Flags:
-  -db FILE              SQLite database (env BENEVOLE_DB, default benevole.db)
-  -base-url URL         public URL used to print links (env BENEVOLE_BASE_URL)
+  -db FILE              SQLite database (env JEVIENSAIDER_DB, default jeviensaider.db)
+  -base-url URL         public URL used to print links (env JEVIENSAIDER_BASE_URL)
   -retention-days N     days before an event is deleted when its organiser chose none, 0 = kept forever
-                        (env BENEVOLE_RETENTION_DAYS, default 60)
+                        (env JEVIENSAIDER_RETENTION_DAYS, default 60)
   -retention-max-days N longest period an organiser can choose; 0 = 180 days, or
-                        -retention-days if longer (env BENEVOLE_RETENTION_MAX_DAYS, default 0)
+                        -retention-days if longer (env JEVIENSAIDER_RETENTION_MAX_DAYS, default 0)
   -y                    delete: do not ask for confirmation
 
 Use the same retention values as the server: they decide the expiry dates.
@@ -63,8 +63,8 @@ func runEvents(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("jeviensaider events "+sub, flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	fs.Usage = func() { fmt.Fprint(stderr, eventsUsage) }
-	fs.StringVar(&c.db, "db", env("BENEVOLE_DB", "benevole.db"), "")
-	fs.StringVar(&c.baseURL, "base-url", env("BENEVOLE_BASE_URL", ""), "")
+	fs.StringVar(&c.db, "db", env("JEVIENSAIDER_DB", "jeviensaider.db"), "")
+	fs.StringVar(&c.baseURL, "base-url", env("JEVIENSAIDER_BASE_URL", ""), "")
 	retention, err := retentionFromEnv()
 	if err != nil {
 		fmt.Fprintln(stderr, err)
@@ -102,6 +102,10 @@ func runEvents(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return 2
 	}
 
+	if err := checkLegacyDB(c.db); err != nil {
+		fmt.Fprintln(stderr, err)
+		return 1
+	}
 	st, err := store.Open(c.db)
 	if err != nil {
 		fmt.Fprintf(stderr, "open %s: %v\n", c.db, err)

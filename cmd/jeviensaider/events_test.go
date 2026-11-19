@@ -15,9 +15,9 @@ import (
 func TestEventsCommand(t *testing.T) {
 	ctx := context.Background()
 	db := filepath.Join(t.TempDir(), "test.db")
-	t.Setenv("BENEVOLE_DB", db)
-	t.Setenv("BENEVOLE_BASE_URL", "https://example.org/")
-	t.Setenv("BENEVOLE_RETENTION_DAYS", "60")
+	t.Setenv("JEVIENSAIDER_DB", db)
+	t.Setenv("JEVIENSAIDER_BASE_URL", "https://example.org/")
+	t.Setenv("JEVIENSAIDER_RETENTION_DAYS", "60")
 
 	st, err := store.Open(db)
 	if err != nil {

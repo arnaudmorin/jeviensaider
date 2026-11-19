@@ -6,7 +6,7 @@
 #   sudo systemctl daemon-reload && sudo systemctl enable --now jeviensaider
 #
 # Optional secrets in /etc/jeviensaider.env (chmod 600), e.g.:
-#   BENEVOLE_CREATE_PASSWORD=un-mot-de-passe-pour-creer-des-evenements
+#   JEVIENSAIDER_CREATE_PASSWORD=un-mot-de-passe-pour-creer-des-evenements
 
 [Unit]
 Description=Je viens aider (inscription des bénévoles)
@@ -16,10 +16,10 @@ After=network.target
 User=jeviensaider
 Group=jeviensaider
 WorkingDirectory=/var/lib/jeviensaider
-Environment=BENEVOLE_ADDR=127.0.0.1:8080
-Environment=BENEVOLE_DB=/var/lib/jeviensaider/benevole.db
-Environment=BENEVOLE_BASE_URL=https://jeviensaider.example.org
-Environment=BENEVOLE_TRUST_PROXY=true
+Environment=JEVIENSAIDER_ADDR=127.0.0.1:8080
+Environment=JEVIENSAIDER_DB=/var/lib/jeviensaider/jeviensaider.db
+Environment=JEVIENSAIDER_BASE_URL=https://jeviensaider.example.org
+Environment=JEVIENSAIDER_TRUST_PROXY=true
 EnvironmentFile=-/etc/jeviensaider.env
 ExecStart=/usr/local/bin/jeviensaider
 Restart=on-failure

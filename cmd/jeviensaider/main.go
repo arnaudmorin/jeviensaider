@@ -28,6 +28,10 @@ func env(key, def string) string {
 }
 
 func main() {
+	if err := checkLegacyEnv(os.Environ()); err != nil {
+		fmt.Fprintln(os.Stderr, "configuration:", err)
+		os.Exit(2)
+	}
 	if len(os.Args) > 1 && os.Args[1] == "events" {
 		os.Exit(runEvents(os.Args[2:], os.Stdin, os.Stdout, os.Stderr))
 	}
@@ -59,10 +63,14 @@ func serve(cfg *config) int {
 			"limits", fmt.Sprintf("%d created/address/day, %d created/hour, %d sign-ups/event/hour, %d total/hour (0 = unlimited)",
 				l.CreatedPerAddressPerDay, l.CreatedPerHour, l.SignupsPerEventPerHour, l.PerHour))
 	} else {
-		logger.Warn("e-mails disabled: set BENEVOLE_SMTP_HOST to send them (they are only logged)")
+		logger.Warn("e-mails disabled: set JEVIENSAIDER_SMTP_HOST to send them (they are only logged)")
 	}
 	mailQueue := mail.NewQueue(sender, logger)
 
+	if err := checkLegacyDB(cfg.dbPath); err != nil {
+		logger.Error("open database", "err", err)
+		return 1
+	}
 	st, err := store.Open(cfg.dbPath)
 	if err != nil {
 		logger.Error("open database", "path", cfg.dbPath, "err", err)

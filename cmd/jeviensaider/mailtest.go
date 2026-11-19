@@ -16,11 +16,11 @@ import (
 const mailTestUsage = `Usage: jeviensaider mail-test [-base-url URL] <address>
 
 Sends a test e-mail to <address> with the server's SMTP settings
-(BENEVOLE_SMTP_*), right away and without retries, and prints the SMTP
+(JEVIENSAIDER_SMTP_*), right away and without retries, and prints the SMTP
 server's error if it fails. Use it to check the configuration.
 
 Flags:
-  -base-url URL         public URL (env BENEVOLE_BASE_URL), required with SMTP
+  -base-url URL         public URL (env JEVIENSAIDER_BASE_URL), required with SMTP
 `
 
 // runMailTest implements "jeviensaider mail-test" and returns the exit code.
@@ -32,7 +32,7 @@ func mailTest(args []string, stdout, stderr io.Writer, newSender func(mail.Confi
 	fs := flag.NewFlagSet("jeviensaider mail-test", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	fs.Usage = func() { fmt.Fprint(stderr, mailTestUsage) }
-	baseURL := fs.String("base-url", env("BENEVOLE_BASE_URL", ""), "")
+	baseURL := fs.String("base-url", env("JEVIENSAIDER_BASE_URL", ""), "")
 	pos, err := parseInterspersed(fs, args)
 	if err != nil {
 		if err == flag.ErrHelp {
@@ -56,7 +56,7 @@ func mailTest(args []string, stdout, stderr io.Writer, newSender func(mail.Confi
 		return 2
 	}
 	if cfg == nil {
-		fmt.Fprintln(stderr, "mail-test: BENEVOLE_SMTP_HOST is not set: e-mails are disabled")
+		fmt.Fprintln(stderr, "mail-test: JEVIENSAIDER_SMTP_HOST is not set: e-mails are disabled")
 		return 2
 	}
 	sender, err := newSender(*cfg)

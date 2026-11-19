@@ -23,8 +23,8 @@ COPY --from=build /out/jeviensaider /usr/local/bin/jeviensaider
 # is writable out of the box.
 COPY --from=build --chown=65532:65532 /out/data /data
 
-ENV BENEVOLE_ADDR=:8080 \
-    BENEVOLE_DB=/data/benevole.db \
+ENV JEVIENSAIDER_ADDR=:8080 \
+    JEVIENSAIDER_DB=/data/jeviensaider.db \
     TZ=Europe/Paris
 VOLUME ["/data"]
 EXPOSE 8080

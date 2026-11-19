@@ -38,7 +38,7 @@ func NewRetention(days, maxDays int) (Retention, error) {
 	case maxDays == 0:
 		maxDays = max(DefaultMaxRetentionDays, days)
 	case days > maxDays:
-		return Retention{}, fmt.Errorf("retention of %d days is above the maximum of %d days: raise BENEVOLE_RETENTION_MAX_DAYS (-retention-max-days) or lower BENEVOLE_RETENTION_DAYS (-retention-days)", days, maxDays)
+		return Retention{}, fmt.Errorf("retention of %d days is above the maximum of %d days: raise JEVIENSAIDER_RETENTION_MAX_DAYS (-retention-max-days) or lower JEVIENSAIDER_RETENTION_DAYS (-retention-days)", days, maxDays)
 	}
 	return Retention{DefaultDays: days, MaxDays: maxDays}, nil
 }
