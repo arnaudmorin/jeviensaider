@@ -11,9 +11,9 @@ RUN go mod download
 COPY . .
 # Pages are templ components: generate their Go code (not committed).
 RUN go tool templ generate
-ARG TARGETOS TARGETARCH TARGETVARIANT
+ARG TARGETOS TARGETARCH TARGETVARIANT VERSION=dev
 RUN GOOS=$TARGETOS GOARCH=$TARGETARCH GOARM=${TARGETVARIANT#v} \
-    go build -trimpath -ldflags '-s -w' -o /out/jeviensaider ./cmd/jeviensaider \
+    go build -trimpath -ldflags "-s -w -X main.version=$VERSION" -o /out/jeviensaider ./cmd/jeviensaider \
  && mkdir -p /out/data
 
 # --- Run: distroless, non-root (uid 65532), CA certs and tzdata included ---

@@ -1,0 +1,47 @@
+# Release binaries on each merge to master (see the release job in .github/workflows/build.yml).
+# Check locally: goreleaser release --snapshot --clean
+version: 2
+
+before:
+  hooks:
+    - go tool templ generate # pages are templ components, their Go code is not committed
+
+builds:
+  - main: ./cmd/jeviensaider
+    binary: jeviensaider
+    env: [CGO_ENABLED=0] # pure Go SQLite driver: static binaries, no C toolchain
+    flags: [-trimpath]
+    ldflags: ["-s -w -X main.version={{.Version}}"]
+    mod_timestamp: "{{ .CommitTimestamp }}" # reproducible builds
+    goos: [linux]
+    goarch: [amd64, arm64, arm]
+    goarm: ["7"]
+
+archives:
+  - formats: [tar.gz]
+    files: [README.md, .env.example, deploy/*]
+
+checksum:
+  name_template: checksums.txt
+
+changelog:
+  use: github-native
+
+# The image itself is built and pushed by the docker job of build.yml, with
+# the same version tag (metadata-action strips the "v" like .Version does).
+release:
+  footer: |
+    ## Docker image
+
+    ```sh
+    docker pull ghcr.io/{{ tolower (envOrDefault "GITHUB_REPOSITORY" "arnaudmorin/jeviensaider") }}:{{ .Version }}
+    ```
+
+    ```sh
+    docker run -d --name jeviensaider --restart unless-stopped \
+      -p 127.0.0.1:8080:8080 -v jeviensaider-data:/data \
+      -e JEVIENSAIDER_BASE_URL=https://jeviensaider.example.org \
+      ghcr.io/{{ tolower (envOrDefault "GITHUB_REPOSITORY" "arnaudmorin/jeviensaider") }}:{{ .Version }}
+    ```
+
+    Or with Docker Compose: [`compose.yaml`](https://github.com/{{ envOrDefault "GITHUB_REPOSITORY" "arnaudmorin/jeviensaider" }}/blob/{{ .Tag }}/compose.yaml) and [`.env.example`](https://github.com/{{ envOrDefault "GITHUB_REPOSITORY" "arnaudmorin/jeviensaider" }}/blob/{{ .Tag }}/.env.example).
