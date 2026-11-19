@@ -26,3 +26,22 @@ checksum:
 
 changelog:
   use: github-native
+
+# The image itself is built and pushed by the docker job of build.yml, with
+# the same version tag (metadata-action strips the "v" like .Version does).
+release:
+  footer: |
+    ## Docker image
+
+    ```sh
+    docker pull ghcr.io/{{ tolower (envOrDefault "GITHUB_REPOSITORY" "arnaudmorin/jeviensaider") }}:{{ .Version }}
+    ```
+
+    ```sh
+    docker run -d --name benevole --restart unless-stopped \
+      -p 127.0.0.1:8080:8080 -v benevole-data:/data \
+      -e BENEVOLE_BASE_URL=https://benevoles.example.org \
+      ghcr.io/{{ tolower (envOrDefault "GITHUB_REPOSITORY" "arnaudmorin/jeviensaider") }}:{{ .Version }}
+    ```
+
+    Or with Docker Compose: [`compose.yaml`](https://github.com/{{ envOrDefault "GITHUB_REPOSITORY" "arnaudmorin/jeviensaider" }}/blob/{{ .Tag }}/compose.yaml) and [`.env.example`](https://github.com/{{ envOrDefault "GITHUB_REPOSITORY" "arnaudmorin/jeviensaider" }}/blob/{{ .Tag }}/.env.example).
