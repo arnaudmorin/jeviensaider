@@ -169,8 +169,9 @@ type SignupRow struct {
 	Phone string
 }
 
-// DisplayName returns the public form of a name: first name plus the initial
-// of the last word ("Marie Dupont" -> "Marie D."). Single words are kept.
+// DisplayName returns the public form of a name: the first word, then the
+// initial of every other word ("Marie Dupont" -> "Marie D.", "Julien Le
+// Jeune" -> "Julien LJ."). Single words are kept.
 func DisplayName(name string) string {
 	parts := strings.Fields(name)
 	switch len(parts) {
@@ -179,7 +180,10 @@ func DisplayName(name string) string {
 	case 1:
 		return parts[0]
 	}
-	last := parts[len(parts)-1]
-	r, _ := utf8.DecodeRuneInString(last)
-	return parts[0] + " " + string(unicode.ToUpper(r)) + "."
+	var initials strings.Builder
+	for _, p := range parts[1:] {
+		r, _ := utf8.DecodeRuneInString(p)
+		initials.WriteRune(unicode.ToUpper(r))
+	}
+	return parts[0] + " " + initials.String() + "."
 }
