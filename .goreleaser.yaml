@@ -7,8 +7,8 @@ before:
     - go tool templ generate # pages are templ components, their Go code is not committed
 
 builds:
-  - main: ./cmd/benevole
-    binary: benevole
+  - main: ./cmd/jeviensaider
+    binary: jeviensaider
     env: [CGO_ENABLED=0] # pure Go SQLite driver: static binaries, no C toolchain
     flags: [-trimpath]
     ldflags: ["-s -w -X main.version={{.Version}}"]
@@ -38,9 +38,9 @@ release:
     ```
 
     ```sh
-    docker run -d --name benevole --restart unless-stopped \
-      -p 127.0.0.1:8080:8080 -v benevole-data:/data \
-      -e BENEVOLE_BASE_URL=https://benevoles.example.org \
+    docker run -d --name jeviensaider --restart unless-stopped \
+      -p 127.0.0.1:8080:8080 -v jeviensaider-data:/data \
+      -e JEVIENSAIDER_BASE_URL=https://jeviensaider.example.org \
       ghcr.io/{{ tolower (envOrDefault "GITHUB_REPOSITORY" "arnaudmorin/jeviensaider") }}:{{ .Version }}
     ```
 
