@@ -63,7 +63,7 @@ type SignupRequest struct {
 	Phone     string
 	Comment   string
 	// Admin sign-ups are allowed whatever the event status (an organiser
-	// registering a parent who phoned in). Capacity still applies.
+	// registering a volunteer who phoned in). Capacity still applies.
 	Admin bool
 }
 

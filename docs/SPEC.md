@@ -11,7 +11,7 @@ An association, a school, a club or a group of neighbours organises an event
 volunteers on **stands** (bar, crêpes, games…),
 each stand split into **time slots** that need a minimum number of people.
 
-The app lets organisers publish the planning, and parents sign up for slots
+The app lets organisers publish the planning, and volunteers sign up for slots
 in a few seconds, without creating an account. It is a small, self-hosted
 alternative to Doodle or Framadate, specialised for this job.
 
@@ -265,7 +265,7 @@ for dialogs and partial updates; every feature also works without
 JavaScript.
 
 ```
-cmd/jeviensaider/        main.go: wiring, server lifecycle, background loops
+cmd/jeviensaider/    main.go: wiring, server lifecycle, background loops
                      config.go, smtp.go, retention.go, maillimits.go: reading
                      flags and environment
                      events.go, mailtest.go: the CLI subcommands

@@ -38,7 +38,7 @@ in a single SQLite file.
   page shows the deletion date. A private instance can turn this off and keep
   its events forever.
 
-**For parents**
+**For volunteers**
 - **"Tous les créneaux"**: the whole event as a table of stands × hours,
   shown as a list grouped by hour on phones. Each slot says in words where it
   stands ("Il reste 2 places", "Assez de monde, vous pouvez venir",
@@ -70,9 +70,12 @@ toolchain by itself. No C toolchain is needed: the SQLite driver is pure Go.
 
 ```sh
 make run      # http://localhost:8080, database ./jeviensaider.db
-make test     # unit + HTTP tests
+make test     # unit + HTTP tests (make race: with the race detector)
+make vet      # go vet
+make fmt      # gofmt and templ fmt
 make build    # ./jeviensaider, a static binary
 make generate # generate the pages' Go code (the other targets do it first)
+make backup   # hot copy of the database to backup-<date>.db
 ```
 
 Pages are written with [templ](https://templ.guide). Their generated Go code
@@ -102,13 +105,15 @@ as downloadable artifacts. They can also be built locally with
 | `-retention-max-days` | `JEVIENSAIDER_RETENTION_MAX_DAYS` | `0` (180) | Longest number of days that an organiser can choose for one event; `0` or empty means 180, or `JEVIENSAIDER_RETENTION_DAYS` if longer (see below) |
 | — | `JEVIENSAIDER_CREATE_PASSWORD` | *(none)* | Password required to create an event |
 
-On a public server, set `JEVIENSAIDER_CREATE_PASSWORD` so that only the organisers can
-create events. It is read from the environment only, so it never shows up in
-`ps` output. It is also asked for when an organiser duplicates an event.
+On a public server, set `JEVIENSAIDER_CREATE_PASSWORD` so that only the
+organisers can create events. It is read from the environment only, so it
+never shows up in `ps` output. It is also asked for when an organiser
+duplicates an event.
 
 **E-mails.** The app e-mails organisers: the admin link when an event is
-created or duplicated, or when they ask for it again, then, unless they turn it off, one message per sign-up
-or cancellation. Volunteers never receive e-mails. Configure an SMTP server
+created or duplicated, or when they ask for it again, then, unless they turn
+it off, one message per sign-up or cancellation. Volunteers never receive
+e-mails. Configure an SMTP server
 with these variables (environment only):
 
 | Environment variable | Default | Purpose |
@@ -132,10 +137,10 @@ startup.
 
 Creating an event sends a mail to the address the visitor types. So with
 e-mails enabled, the server refuses to start without
-`JEVIENSAIDER_CREATE_PASSWORD`; otherwise anybody could use it to e-mail anyone.
-On a private network, `JEVIENSAIDER_OPEN_CREATION=true` lifts this. Mails are
-limited in any case. Each limit is a number, or `0` / `unlimited` for no
-limit; an invalid value stops the server:
+`JEVIENSAIDER_CREATE_PASSWORD`; otherwise anybody could use it to e-mail
+anyone. On a private network, `JEVIENSAIDER_OPEN_CREATION=true` lifts this.
+Mails are limited in any case. Each limit is a number, or `0` / `unlimited`
+for no limit; an invalid value stops the server:
 
 | Environment variable | Default | Limit |
 |---|---|---|
@@ -172,11 +177,12 @@ from 1 to `JEVIENSAIDER_RETENTION_MAX_DAYS` fixes the event's own period. The
 server refuses a higher number, and the database refuses 0 and anything above
 3650 days (ten years). So an organiser cannot keep an event forever. A
 duplicate of an event keeps the number of its source. Events that existed
-before this feature store no number, so they follow `JEVIENSAIDER_RETENTION_DAYS`.
+before this feature store no number, so they follow
+`JEVIENSAIDER_RETENTION_DAYS`.
 
-If you do not set `JEVIENSAIDER_RETENTION_MAX_DAYS`, the maximum is 180 days. If
-`JEVIENSAIDER_RETENTION_DAYS` is longer than 180 days, the maximum is equal to it.
-So a server that already runs with a long retention still starts after an
+If you do not set `JEVIENSAIDER_RETENTION_MAX_DAYS`, the maximum is 180 days.
+If `JEVIENSAIDER_RETENTION_DAYS` is longer than 180 days, the maximum is equal
+to it. So a server that already runs with a long retention still starts after an
 upgrade. If you set both values and the default is above the maximum, the
 server stops at startup with an error. The cleanup applies the maximum to every
 event. If you lower it, the events that chose more days are deleted after the
@@ -226,9 +232,9 @@ commit's short SHA (`sha-xxxxxxx`) for pinning a version.
 - The app listens on `127.0.0.1:8080` (change `PORT` in `.env`). Put a reverse
   proxy in front of it for HTTPS.
 - The database is stored in the `data` volume, at `/data/jeviensaider.db`.
-- The image is small (about 15 MB) and based on distroless. It runs as a non-root user
-  with a read-only root filesystem, and has a built-in health check
-  (`jeviensaider -healthcheck`).
+- The image is small (about 15 MB) and based on distroless. It runs as a
+  non-root user with a read-only root filesystem, and has a built-in health
+  check (`jeviensaider -healthcheck`).
 
 To back up the database from the volume:
 
@@ -242,12 +248,14 @@ or use the `sqlite3 .backup` command below on the host.
 ## Deployment without Docker
 
 1. Copy the binary to the server as `/usr/local/bin/jeviensaider`.
-2. Install the [systemd unit](deploy/jeviensaider.service) and set
-   `JEVIENSAIDER_BASE_URL` in it.
+2. Install the [systemd unit](deploy/jeviensaider.service) as its header
+   explains (system user, data directory in `/var/lib/jeviensaider`), set
+   `JEVIENSAIDER_BASE_URL` in it, and put secrets such as
+   `JEVIENSAIDER_CREATE_PASSWORD` in `/etc/jeviensaider.env` (mode 600).
 3. Put a reverse proxy in front of the app for HTTPS: [Caddy](deploy/Caddyfile)
    (automatic certificates) or [nginx](deploy/nginx.conf) (with certbot).
-   Either way, set `JEVIENSAIDER_TRUST_PROXY=true` and keep the app listening on
-   `127.0.0.1` only.
+   Either way, set `JEVIENSAIDER_TRUST_PROXY=true` and keep the app listening
+   on `127.0.0.1` only.
 
 The nginx template forwards the client's address and protocol, redirects
 HTTP to HTTPS, and keeps the secret admin and personal links out of its
@@ -261,10 +269,38 @@ consistent copy while the server is running, for example from a daily cron job:
 sqlite3 /var/lib/jeviensaider/jeviensaider.db ".backup '/var/backups/jeviensaider-$(date +%F).db'"
 ```
 
+## Upgrading from the `benevole` names
+
+The binary, its variables and its database file were renamed after the
+project. An instance installed before the rename needs, once:
+
+1. Stop the app.
+2. Rename every `BENEVOLE_*` variable to `JEVIENSAIDER_*`: in `.env`, in the
+   systemd unit and in `/etc/benevole.env` (now `/etc/jeviensaider.env`).
+3. Rename the database, with its `-wal` and `-shm` files if present:
+   `benevole.db` → `jeviensaider.db`. With Docker, the image has no shell, so
+   use a throwaway container on the `data` volume (`docker volume ls` shows
+   its full name, usually `<directory>_data`):
+
+   ```sh
+   docker run --rm -v jeviensaider_data:/data busybox sh -c 'cd /data && for f in benevole.db*; do mv "$f" "jeviensaider${f#benevole}"; done'
+   ```
+
+4. Without Docker: `systemctl disable benevole`, install the binary as
+   `/usr/local/bin/jeviensaider` and the new
+   [unit](deploy/jeviensaider.service), and move `/var/lib/benevole` to
+   `/var/lib/jeviensaider`, owned by the new `jeviensaider` user.
+5. Start the app.
+
+The app refuses to start while a non-empty `BENEVOLE_*` variable is set, or
+while it finds a `benevole.db` but no `jeviensaider.db`, so a forgotten step
+cannot silently drop a setting such as the creation password or open an
+empty database.
+
 ## Under the hood
 
 ```
-cmd/jeviensaider/      entry point: configuration, server, CLI subcommands
+cmd/jeviensaider/  entry point: configuration, server, CLI subcommands
 internal/model/    domain types and rules, fill status, planning view
 internal/slotgen/  splits a time range into slots
 internal/store/    SQLite access, embedded migrations, sign-up transaction
@@ -272,6 +308,8 @@ internal/mail/     SMTP sender and background queue
 internal/ical/     iCalendar writer (escaping, line folding) for the .ics file
 internal/web/      handlers, middleware, CSV, PDF and calendar exports,
                    pages as templ components (*.templ), static files (htmx)
+deploy/            systemd unit, Caddy and nginx templates
+docs/SPEC.md       what the app does and where in the code
 ```
 
 [`docs/SPEC.md`](docs/SPEC.md) describes in detail what the app does and how
@@ -301,10 +339,10 @@ the code is organised.
 - **Automatic cleanup.** At startup and then every hour, the app deletes
   every event whose last day is more than its number of days ago, together
   with its stands, slots and volunteers. This number is the one that the
-  organiser chose, or `JEVIENSAIDER_RETENTION_DAYS` when they chose none. It is
-  never more than `JEVIENSAIDER_RETENTION_MAX_DAYS`. An event's last day is the
-  latest of its date, its last slot and its creation date, so an event that
-  is still being prepared is never deleted.
+  organiser chose, or `JEVIENSAIDER_RETENTION_DAYS` when they chose none. It
+  is never more than `JEVIENSAIDER_RETENTION_MAX_DAYS`. An event's last day is
+  the latest of its date, its last slot and its creation date, so an event
+  that is still being prepared is never deleted.
 - **E-mails.** Links come from `JEVIENSAIDER_BASE_URL`, so a forged `Host`
   header cannot turn them into links to another site. Headers are encoded
   and line breaks refused, so names cannot inject headers. E-mails require a
