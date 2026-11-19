@@ -1,4 +1,4 @@
-// Command benevole serves the APE volunteer sign-up web app.
+// Command jeviensaider serves the APE volunteer sign-up web app.
 package main
 
 import (

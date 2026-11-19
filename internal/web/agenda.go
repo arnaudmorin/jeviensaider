@@ -54,5 +54,5 @@ func (s *Server) meCalendar(w http.ResponseWriter, r *http.Request, ev *model.Ev
 	}
 	w.Header().Set("Content-Type", "text/calendar; charset=utf-8")
 	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="mes-creneaux-%s.ics"`, store.Slugify(ev.Title)))
-	w.Write(ical.Build("-//jeviensaider//benevole//FR", s.now(), events))
+	w.Write(ical.Build("-//jeviensaider//jeviensaider//FR", s.now(), events))
 }

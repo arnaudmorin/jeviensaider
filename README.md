@@ -70,7 +70,7 @@ toolchain by itself. No C toolchain is needed: the SQLite driver is pure Go.
 ```sh
 make run      # http://localhost:8080, database ./benevole.db
 make test     # unit + HTTP tests
-make build    # ./benevole, a static binary
+make build    # ./jeviensaider, a static binary
 make generate # generate the pages' Go code (the other targets do it first)
 ```
 
@@ -150,8 +150,8 @@ To check the settings, send a test e-mail. It reads the same variables and
 prints the SMTP server's error if sending fails:
 
 ```sh
-benevole mail-test you@example.org
-docker compose exec app benevole mail-test you@example.org   # with Docker
+jeviensaider mail-test you@example.org
+docker compose exec app jeviensaider mail-test you@example.org   # with Docker
 ```
 
 **Keeping events forever.** By default, events and their volunteers'
@@ -189,9 +189,9 @@ database, for example to delete one before it expires. Anyone who can run it
 on the server can see and delete all events, so there is no password.
 
 ```sh
-benevole events list                  # all events, with counts and expiry date
-benevole events show <event>          # details, public and admin links
-benevole events delete <event>...     # delete events and all their data (asks first; -y to skip)
+jeviensaider events list                  # all events, with counts and expiry date
+jeviensaider events show <event>          # details, public and admin links
+jeviensaider events delete <event>...     # delete events and all their data (asks first; -y to skip)
 ```
 
 `<event>` is a slug (as in `/e/<slug>`) or an ID from `list`. The tool reads
@@ -204,8 +204,8 @@ values as the server, because they decide the expiry dates that `list` and
 With Docker:
 
 ```sh
-docker compose exec app benevole events list
-docker compose exec app benevole events delete fete-de-l-ecole-ab12cd34
+docker compose exec app jeviensaider events list
+docker compose exec app jeviensaider events delete fete-de-l-ecole-ab12cd34
 ```
 
 `show` prints the admin link, which is handy when an organiser has lost it.
@@ -227,7 +227,7 @@ commit's short SHA (`sha-xxxxxxx`) for pinning a version.
 - The database is stored in the `data` volume, at `/data/benevole.db`.
 - The image is small (about 15 MB) and based on distroless. It runs as a non-root user
   with a read-only root filesystem, and has a built-in health check
-  (`benevole -healthcheck`).
+  (`jeviensaider -healthcheck`).
 
 To back up the database from the volume:
 
@@ -240,8 +240,8 @@ or use the `sqlite3 .backup` command below on the host.
 
 ## Deployment without Docker
 
-1. Copy the binary to the server as `/usr/local/bin/benevole`.
-2. Install the [systemd unit](deploy/benevole.service) and set
+1. Copy the binary to the server as `/usr/local/bin/jeviensaider`.
+2. Install the [systemd unit](deploy/jeviensaider.service) and set
    `BENEVOLE_BASE_URL` in it.
 3. Put a reverse proxy in front of the app for HTTPS: [Caddy](deploy/Caddyfile)
    (automatic certificates) or [nginx](deploy/nginx.conf) (with certbot).
@@ -257,13 +257,13 @@ contain them, is not logged).
 consistent copy while the server is running, for example from a daily cron job:
 
 ```sh
-sqlite3 /var/lib/benevole/benevole.db ".backup '/var/backups/benevole-$(date +%F).db'"
+sqlite3 /var/lib/jeviensaider/benevole.db ".backup '/var/backups/jeviensaider-$(date +%F).db'"
 ```
 
 ## Under the hood
 
 ```
-cmd/benevole/      entry point: configuration, server, CLI subcommands
+cmd/jeviensaider/      entry point: configuration, server, CLI subcommands
 internal/model/    domain types and rules, fill status, planning view
 internal/slotgen/  splits a time range into slots
 internal/store/    SQLite access, embedded migrations, sign-up transaction

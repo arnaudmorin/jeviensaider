@@ -13,7 +13,7 @@ import (
 	"jeviensaider/internal/mail"
 )
 
-const mailTestUsage = `Usage: benevole mail-test [-base-url URL] <address>
+const mailTestUsage = `Usage: jeviensaider mail-test [-base-url URL] <address>
 
 Sends a test e-mail to <address> with the server's SMTP settings
 (BENEVOLE_SMTP_*), right away and without retries, and prints the SMTP
@@ -23,13 +23,13 @@ Flags:
   -base-url URL         public URL (env BENEVOLE_BASE_URL), required with SMTP
 `
 
-// runMailTest implements "benevole mail-test" and returns the exit code.
+// runMailTest implements "jeviensaider mail-test" and returns the exit code.
 func runMailTest(args []string, stdout, stderr io.Writer) int {
 	return mailTest(args, stdout, stderr, func(cfg mail.Config) (mail.Sender, error) { return mail.NewSMTP(cfg) })
 }
 
 func mailTest(args []string, stdout, stderr io.Writer, newSender func(mail.Config) (mail.Sender, error)) int {
-	fs := flag.NewFlagSet("benevole mail-test", flag.ContinueOnError)
+	fs := flag.NewFlagSet("jeviensaider mail-test", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	fs.Usage = func() { fmt.Fprint(stderr, mailTestUsage) }
 	baseURL := fs.String("base-url", env("BENEVOLE_BASE_URL", ""), "")
@@ -78,7 +78,7 @@ func mailTest(args []string, stdout, stderr io.Writer, newSender func(mail.Confi
 		To:      to.Address,
 		Subject: "Je viens aider : e-mail de test",
 		Body: "Bonjour,\n\n" +
-			"Ceci est un e-mail de test envoyé par « benevole mail-test »" +
+			"Ceci est un e-mail de test envoyé par « jeviensaider mail-test »" +
 			" depuis " + host + " le " + now.Format("02/01/2006 à 15:04:05") + ".\n\n" +
 			"Si vous le recevez, l'envoi des e-mails fonctionne.\n" +
 			"Adresse du site : " + strings.TrimRight(*baseURL, "/") + "\n\n" +

@@ -1,0 +1,35 @@
+# systemd unit for the APE volunteer sign-up app.
+#
+#   sudo useradd --system --home /var/lib/jeviensaider --create-home jeviensaider
+#   sudo install -m 0755 jeviensaider /usr/local/bin/jeviensaider
+#   sudo cp deploy/jeviensaider.service /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now jeviensaider
+#
+# Optional secrets in /etc/jeviensaider.env (chmod 600), e.g.:
+#   BENEVOLE_CREATE_PASSWORD=un-mot-de-passe-pour-creer-des-evenements
+
+[Unit]
+Description=Je viens aider (inscription des bénévoles)
+After=network.target
+
+[Service]
+User=jeviensaider
+Group=jeviensaider
+WorkingDirectory=/var/lib/jeviensaider
+Environment=BENEVOLE_ADDR=127.0.0.1:8080
+Environment=BENEVOLE_DB=/var/lib/jeviensaider/benevole.db
+Environment=BENEVOLE_BASE_URL=https://jeviensaider.example.org
+Environment=BENEVOLE_TRUST_PROXY=true
+EnvironmentFile=-/etc/jeviensaider.env
+ExecStart=/usr/local/bin/jeviensaider
+Restart=on-failure
+
+# Hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/jeviensaider
+
+[Install]
+WantedBy=multi-user.target

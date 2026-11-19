@@ -13,12 +13,12 @@ COPY . .
 RUN go tool templ generate
 ARG TARGETOS TARGETARCH TARGETVARIANT
 RUN GOOS=$TARGETOS GOARCH=$TARGETARCH GOARM=${TARGETVARIANT#v} \
-    go build -trimpath -ldflags '-s -w' -o /out/benevole ./cmd/benevole \
+    go build -trimpath -ldflags '-s -w' -o /out/jeviensaider ./cmd/jeviensaider \
  && mkdir -p /out/data
 
 # --- Run: distroless, non-root (uid 65532), CA certs and tzdata included ---
 FROM gcr.io/distroless/static-debian13:nonroot@sha256:aafe993665bf6200db38a02c11a9351e782a84b6a45e7f33b6695638c88e3931
-COPY --from=build /out/benevole /usr/local/bin/benevole
+COPY --from=build /out/jeviensaider /usr/local/bin/jeviensaider
 # Empty data dir owned by the runtime user, so a named volume mounted here
 # is writable out of the box.
 COPY --from=build --chown=65532:65532 /out/data /data
@@ -31,6 +31,6 @@ EXPOSE 8080
 USER nonroot:nonroot
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
-  CMD ["/usr/local/bin/benevole", "-healthcheck"]
+  CMD ["/usr/local/bin/jeviensaider", "-healthcheck"]
 
-ENTRYPOINT ["/usr/local/bin/benevole"]
+ENTRYPOINT ["/usr/local/bin/jeviensaider"]

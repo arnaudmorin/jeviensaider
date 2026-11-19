@@ -1,5 +1,5 @@
-BINARY  := benevole
-PKG     := ./cmd/benevole
+BINARY  := jeviensaider
+PKG     := ./cmd/jeviensaider
 DB      ?= benevole.db
 ADDR    ?= :8080
 LDFLAGS := -s -w

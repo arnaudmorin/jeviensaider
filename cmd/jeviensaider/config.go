@@ -27,9 +27,9 @@ type config struct {
 }
 
 const usage = `Usage:
-  benevole [flags]           run the web server
-  benevole events <command>  super-admin tool: list, show, delete events (see "benevole events help")
-  benevole mail-test <addr>  send a test e-mail with the SMTP settings
+  jeviensaider [flags]           run the web server
+  jeviensaider events <command>  super-admin tool: list, show, delete events (see "jeviensaider events help")
+  jeviensaider mail-test <addr>  send a test e-mail with the SMTP settings
 
 Flags:
 `
@@ -52,14 +52,14 @@ func loadConfig(args []string) (*config, error) {
 
 	c := &config{}
 	var retentionDays, retentionMaxDays int
-	fs := flag.NewFlagSet("benevole", flag.ExitOnError)
+	fs := flag.NewFlagSet("jeviensaider", flag.ExitOnError)
 	fs.Usage = func() {
 		fmt.Fprint(fs.Output(), usage)
 		fs.PrintDefaults()
 	}
 	fs.StringVar(&c.addr, "addr", env("BENEVOLE_ADDR", ":8080"), "listen address (env BENEVOLE_ADDR)")
 	fs.StringVar(&c.dbPath, "db", env("BENEVOLE_DB", "benevole.db"), "SQLite database file (env BENEVOLE_DB)")
-	fs.StringVar(&c.baseURL, "base-url", env("BENEVOLE_BASE_URL", ""), "public URL, e.g. https://benevoles.example.org (env BENEVOLE_BASE_URL)")
+	fs.StringVar(&c.baseURL, "base-url", env("BENEVOLE_BASE_URL", ""), "public URL, e.g. https://jeviensaider.example.org (env BENEVOLE_BASE_URL)")
 	fs.BoolVar(&c.trustProxy, "trust-proxy", trustProxy, "trust X-Forwarded-* headers from a reverse proxy (env BENEVOLE_TRUST_PROXY)")
 	fs.IntVar(&retentionDays, "retention-days", retention, "delete events this many days after their last day of activity when the organiser chose none, 0 to keep them forever (env BENEVOLE_RETENTION_DAYS)")
 	fs.IntVar(&retentionMaxDays, "retention-max-days", retentionMax, "longest period an organiser can choose; 0: 180 days, or -retention-days if that is longer (env BENEVOLE_RETENTION_MAX_DAYS)")

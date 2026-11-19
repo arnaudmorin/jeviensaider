@@ -27,7 +27,7 @@ secret links (random 256-bit tokens, base64url).
 | **Visitor** | nothing | see an open event's planning, sign up |
 | **Volunteer** | personal link `/e/<slug>/me/<token>`, also kept in a cookie (`v<eventID>`, path `/e/<slug>`, HttpOnly, SameSite=Lax, 1 year) | see and cancel their slots, change their name and phone, replace their link |
 | **Organiser** | admin link `/a/<token>` | everything about one event |
-| **Super-admin** | shell access to the server | list, show and delete any event (`benevole events`) |
+| **Super-admin** | shell access to the server | list, show and delete any event (`jeviensaider events`) |
 | **Creator** | the creation password, if `BENEVOLE_CREATE_PASSWORD` is set | create (or duplicate) events |
 
 ## 3. Domain
@@ -214,11 +214,11 @@ Derived notions (computed, not stored):
 
 ### 4.7 Command line
 
-- `benevole` — run the web server.
-- `benevole events list|show|delete` — super-admin tool on the database.
-- `benevole mail-test <address>` — send one test e-mail with the SMTP
+- `jeviensaider` — run the web server.
+- `jeviensaider events list|show|delete` — super-admin tool on the database.
+- `jeviensaider mail-test <address>` — send one test e-mail with the SMTP
   settings and print the server's error.
-- `benevole -healthcheck` — for container health checks.
+- `jeviensaider -healthcheck` — for container health checks.
 
 ## 5. Configuration
 
@@ -264,7 +264,7 @@ for dialogs and partial updates; every feature also works without
 JavaScript.
 
 ```
-cmd/benevole/        main.go: wiring, server lifecycle, background loops
+cmd/jeviensaider/        main.go: wiring, server lifecycle, background loops
                      config.go, smtp.go, retention.go, maillimits.go: reading
                      flags and environment
                      events.go, mailtest.go: the CLI subcommands

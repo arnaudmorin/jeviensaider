@@ -1,5 +1,5 @@
 # Caddy obtains and renews the HTTPS certificate automatically.
-benevoles.example.org {
+jeviensaider.example.org {
 	encode zstd gzip
 	reverse_proxy 127.0.0.1:8080
 }

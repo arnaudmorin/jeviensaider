@@ -15,7 +15,7 @@ import (
 	"jeviensaider/internal/store"
 )
 
-const eventsUsage = `Usage: benevole events <command> [flags] [args]
+const eventsUsage = `Usage: jeviensaider events <command> [flags] [args]
 
 Super-admin tool. It works directly on the SQLite database, so it can see and
 change every event; it is safe to run while the server is running.
@@ -48,7 +48,7 @@ type eventsCmd struct {
 	yes     bool
 }
 
-// runEvents implements "benevole events ..." and returns the exit code.
+// runEvents implements "jeviensaider events ..." and returns the exit code.
 func runEvents(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	c := &eventsCmd{stdin: bufio.NewReader(stdin), out: stdout}
 	if len(args) == 0 || args[0] == "help" || args[0] == "-h" || args[0] == "-help" || args[0] == "--help" {
@@ -60,7 +60,7 @@ func runEvents(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	}
 	sub, rest := args[0], args[1:]
 
-	fs := flag.NewFlagSet("benevole events "+sub, flag.ContinueOnError)
+	fs := flag.NewFlagSet("jeviensaider events "+sub, flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	fs.Usage = func() { fmt.Fprint(stderr, eventsUsage) }
 	fs.StringVar(&c.db, "db", env("BENEVOLE_DB", "benevole.db"), "")
@@ -181,7 +181,7 @@ func (c *eventsCmd) list(ctx context.Context, st *store.Store, args []string) er
 
 func (c *eventsCmd) show(ctx context.Context, st *store.Store, args []string) error {
 	if len(args) != 1 {
-		return fmt.Errorf("usage: benevole events show <event>")
+		return fmt.Errorf("usage: jeviensaider events show <event>")
 	}
 	events, err := st.ListEventSummaries(ctx)
 	if err != nil {
@@ -214,7 +214,7 @@ func (c *eventsCmd) show(ctx context.Context, st *store.Store, args []string) er
 
 func (c *eventsCmd) delete(ctx context.Context, st *store.Store, args []string) error {
 	if len(args) == 0 {
-		return errors.New("usage: benevole events delete [-y] <event> [<event> ...]")
+		return errors.New("usage: jeviensaider events delete [-y] <event> [<event> ...]")
 	}
 	events, err := st.ListEventSummaries(ctx)
 	if err != nil {
@@ -263,7 +263,7 @@ func find(events []store.EventSummary, ref string) (store.EventSummary, error) {
 			return e, nil
 		}
 	}
-	return store.EventSummary{}, fmt.Errorf("no event %q (use a slug or an ID from \"benevole events list\")", ref)
+	return store.EventSummary{}, fmt.Errorf("no event %q (use a slug or an ID from \"jeviensaider events list\")", ref)
 }
 
 func truncate(s string, n int) string {
