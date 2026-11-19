@@ -3,7 +3,7 @@ name: build
 on:
   push:
     branches: [master]
-    tags: ["v*"]
+    paths-ignore: ["**.md", "docs/**"] # no release for a docs-only merge
   pull_request:
     branches: [master]
   schedule:
@@ -38,11 +38,11 @@ jobs:
       - name: govulncheck
         run: go run golang.org/x/vuln/cmd/govulncheck@v1.10.0 ./...
 
-  # Branches and PRs: same build as a release, nothing published. Checks
-  # .goreleaser.yaml before a tag needs it, and keeps the binaries as artifacts.
+  # Pull requests: same build as a release, nothing published. Checks
+  # .goreleaser.yaml before the merge needs it, and keeps the binaries as artifacts.
   snapshot:
     needs: test
-    if: github.event_name != 'schedule' && !startsWith(github.ref, 'refs/tags/')
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -63,18 +63,54 @@ jobs:
           path: dist/*.tar.gz
           if-no-files-found: error
 
-  # v* tags: binaries, checksums and changelog on a GitHub release (.goreleaser.yaml).
+  # Every merge to master is a release: bump the last v* tag (patch, or
+  # minor/major when the merged PR has that label), tag, then GoReleaser.
+  # Everything runs here: a tag pushed with GITHUB_TOKEN starts no workflow.
   release:
     needs: test
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
+    # One release at a time, so two quick merges never compute the same
+    # version. A run still waiting is replaced by the next one, whose
+    # release includes its changes.
+    concurrency:
+      group: release
+      cancel-in-progress: false
     permissions:
       contents: write
+      pull-requests: read
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 0 # the changelog needs the history
+          fetch-depth: 0 # the last tag and the changelog need the history
           persist-credentials: false
+      - id: version
+        name: next version
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # A re-run of a released commit keeps its tag.
+          if tag=$(git describe --tags --exact-match --match 'v[0-9]*' HEAD 2>/dev/null); then
+            echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          last=$(git describe --tags --abbrev=0 --match 'v[0-9]*' 2>/dev/null || echo v0.0.0)
+          IFS=. read -r major minor patch <<< "${last#v}"
+          labels=$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/pulls" --jq '.[0].labels[].name' || true)
+          if grep -qx major <<< "$labels"; then
+            major=$((major + 1)) minor=0 patch=0
+          elif grep -qx minor <<< "$labels"; then
+            minor=$((minor + 1)) patch=0
+          else
+            patch=$((patch + 1))
+          fi
+          tag="v$major.$minor.$patch"
+          echo "$last -> $tag"
+          gh api "repos/$GITHUB_REPOSITORY/git/refs" -f ref="refs/tags/$tag" -f sha="$GITHUB_SHA" > /dev/null
+          git tag "$tag" # GoReleaser reads the tag from the local checkout
+          echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
       - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
         with:
           go-version-file: go.mod
@@ -103,10 +139,9 @@ jobs:
           push: false
           cache-from: type=gha
 
-  # Pushes to master (and manual runs): build and publish to ghcr.io.
+  # Each release: build and publish to ghcr.io, tagged with its version.
   docker:
-    needs: test
-    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    needs: release
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -126,16 +161,16 @@ jobs:
         with:
           images: ghcr.io/${{ github.repository }}
           tags: |
-            type=raw,value=latest,enable={{is_default_branch}}
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest
+            type=semver,pattern={{version}},value=${{ needs.release.outputs.version }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ needs.release.outputs.version }}
             type=sha
       - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
           platforms: linux/amd64,linux/arm64,linux/arm/v7
           push: true
-          build-args: VERSION=${{ steps.meta.outputs.version }}
+          build-args: VERSION=${{ needs.release.outputs.version }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha

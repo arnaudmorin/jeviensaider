@@ -362,9 +362,13 @@ or pull request to `master`, and once a week:
   the race detector, and [`govulncheck`](https://go.dev/doc/security/vuln/) to catch known
   vulnerabilities in Go and the dependencies (the weekly run catches newly
   published ones);
-- the three Linux binaries;
-- the Docker image: built only for pull requests, built and pushed to
-  `ghcr.io` for pushes to `master`. Only that job may write packages.
+- pull requests: the release binaries and the Docker image are built, nothing
+  is published;
+- every merge to `master` (except docs-only changes) is a release: the last
+  `v*` tag is bumped, a GitHub release gets the Linux binaries and the Docker
+  commands, and the image is pushed to `ghcr.io` as `X.Y.Z`, `X.Y` and
+  `latest`. The bump is a patch by default; label the pull request `minor` or
+  `major` before merging it for a bigger one.
 
 Actions are pinned to commit SHAs and the Docker base images to digests, so
 a moved tag cannot change what runs. [Dependabot](.github/dependabot.yml)

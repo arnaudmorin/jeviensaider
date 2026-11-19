@@ -1,4 +1,4 @@
-# Release binaries on a v* tag (see the release job in .github/workflows/build.yml).
+# Release binaries on each merge to master (see the release job in .github/workflows/build.yml).
 # Check locally: goreleaser release --snapshot --clean
 version: 2
 
