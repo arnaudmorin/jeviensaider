@@ -89,8 +89,8 @@ you.
 
 Prebuilt binaries for `linux-amd64`, `linux-arm64` (Raspberry Pi 4/5) and
 `linux-armv7` are attached to every
-[build on `master`](https://github.com/arnaudmorin/jeviensaider/actions/workflows/build.yml)
-as downloadable artifacts. They can also be built locally with
+[release](https://github.com/arnaudmorin/jeviensaider/releases), with their
+checksums. They can also be built locally with
 `make build-arm64` or `make build-armv7`.
 
 ## Configuration
