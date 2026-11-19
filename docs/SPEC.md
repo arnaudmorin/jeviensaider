@@ -68,26 +68,35 @@ Derived notions (computed, not stored):
 
 ### 4.2 Public event page `/e/<slug>`
 
-- Header: title (a link back to the overview), date, location, description,
-  progress bar and "Il reste encore N places !" (or "Tous les créneaux sont
-  couverts, merci !").
+- Header: title, date, location, description.
 - Draft: only a "not open yet" notice. Closed: a "closed" notice.
-- **Overview** ("Vue d'ensemble"):
+- **"Tous les créneaux"** (the overview):
+  - Progress: "Il reste N places" (or "Tous les créneaux sont couverts,
+    merci !"), a bar and "N places prises sur M".
+  - "Là où on a le plus besoin de vous": up to three slots the visitor can
+    take that are under their minimum, the emptiest first, then the earliest.
+    Hidden under the filter.
   - Wide screens: a table, one row per stand, one column per distinct time
     range. Each row header shows the stand's colour dot, name and description
     cut after two lines; a "Voir plus" link (only when the text is cut) opens
     the full description.
-  - Phones: a timeline, one group per time range, one card per slot.
-  - A cell shows count/minimum, coloured by fill status, the public names,
-    and "Vous" on the visitor's own slots ("Vous ⚠" if two of their slots
-    overlap). A free cell opens the sign-up form.
-  - Filter "Créneaux à compléter" (`?todo=1`) hides slots that reached their
-    minimum.
-- **"Mes créneaux"** (`/e/<slug>/me/<token>`), next to "Vue d'ensemble" once
-  the browser knows the volunteer:
-  - "Mon planning": the same table, restricted to the volunteer's own slots,
-    with a summary (number of slots, total time, stands, overlap warning) and
-    an "Annuler" button in each cell (while the event is open).
+  - Phones: a list, one group per time range, one card per slot.
+  - A slot says in words where it stands, never as a bare fraction: "Il
+    reste N places" (under the minimum, dashed border), "Assez de monde,
+    encore N places" or "Assez de monde, vous pouvez venir" (minimum reached,
+    solid border), "Complet" (maximum reached, grey). It lists the public
+    names and, on the visitor's own slots, "Vous y êtes" ("· ⚠ en même temps
+    qu'un autre créneau" if two of their slots overlap). A slot one can take
+    is a link to the sign-up form ("Je m'inscris"). A legend explains the
+    borders.
+  - Switch "Seulement les places à prendre" (`?todo=1`) hides slots that
+    reached their minimum.
+- **"Mes créneaux"** (`/e/<slug>/me/<token>`), a tab next to "Tous les
+  créneaux" once the browser knows the volunteer, and a link in the header:
+  - After a first sign-up (`?welcome=1`): "Merci <nom> !".
+  - The volunteer's slots as cards (day, time, stand, who else is there,
+    overlap warning), with a summary (number of slots, total time, stands)
+    and "Je ne peux plus venir" on each (while the event is open).
   - "Ajouter à mon agenda" (`/e/<slug>/me/<token>/agenda.ics`), when the
     volunteer has at least one slot: an iCalendar file with one entry per
     slot (stand and event names, the stand description, the location and the
@@ -97,16 +106,21 @@ Derived notions (computed, not stored):
     entries that still exist. A cancelled or deleted slot stays in the
     calendar app. Not available for a draft event (404), like the sign-up
     form; a closed event still gives its file.
-  - Personal link with "Copier" and "Changer de lien".
+  - "Encore un peu de temps ?": the slot that needs people most, to take too.
   - "Mes coordonnées": change name and phone (while the event is open).
-  - "Ce n'est pas moi": forget this browser's cookie.
+  - Folded "Retrouver mes créneaux sur un autre appareil": the personal link
+    with "Copier", "J'ai partagé mon lien par erreur : en créer un nouveau"
+    (the old link stops working) and "Vous n'êtes pas <nom> ? Oublier sur
+    cet appareil" (forgets this browser's cookie).
 - **Stand view** `/e/<slug>/stands/<id>`: name and full description, as a
   dialog (htmx) or a page; a "Fermer" button.
+- Pages follow the device's light or dark setting.
 
 ### 4.3 Signing up `/e/<slug>/slots/<id>/signup`
 
-- Dialog (htmx) or page with: stand, day, time, count, who is already there,
-  the stand's full description, then name, optional phone, optional comment.
+- Dialog (htmx) or page with: stand, day, time, where the slot stands ("Il
+  reste N places"), who is already there, the stand's full description, then
+  name, optional phone, optional comment ("Un mot pour l'équipe").
   Pre-filled for a known volunteer.
 - Warns (does not block) when the slot overlaps another of the volunteer's
   slots; the button then reads "M'inscrire quand même".
@@ -122,13 +136,23 @@ Derived notions (computed, not stored):
 
 ### 4.4 Organiser page `/a/<token>`
 
-- Status: draft / open / closed.
-- Event settings, including the organiser e-mail and the notification flag.
-- Stands: add, edit, delete, move up/down.
-- Slots: a generator ("from 14:00 to 17:00, every 60 min, 2 people" → three
-  slots), and per-slot edit (times, min, max) and delete.
-- Volunteers: full names and phones, add someone by hand (allowed whatever
-  the status, capacity still applies), remove a sign-up.
+- One column that works on a phone (the badge "Organisation" in the header).
+- "Inscriptions": Brouillon / Ouvertes / Closes, with what each means.
+- Progress: places still needed, places taken, number of volunteers.
+- "Les deux liens de l'événement": the secret organiser link and the public
+  link (both with "Copier"), and a message ready to share ("Partager le
+  message" opens the phone's share sheet, or copies it).
+- Event settings ("Modifier l'événement"), including the organiser e-mail
+  and the notification flag.
+- Stands: a summary list (linking to each stand), then each stand: add,
+  edit, delete, move up/down.
+- Slots: a generator ("from 14:00 to 17:00, every 1 h, 2 people" → three
+  slots) that previews, as you type, the slots it will create; per-slot edit
+  (times, min, max, its own "Enregistrer") and delete.
+- Volunteers, on each slot: full names and phones (with a call button),
+  "Inscrire quelqu'un" by hand (allowed whatever the status, capacity still
+  applies), "Retirer".
+- "Qui est où, et quand" (wide screens): the whole planning with full names.
 - CSV export (`;`, UTF-8 BOM for Excel, one line per sign-up and one per
   missing person, formula injection neutralised).
 - Planning as a PDF to print (`/a/<token>/planning.pdf`): one A4 page per

@@ -37,7 +37,7 @@ Lien public, à partager avec les bénévoles :
 {{else}}
 Prochaines étapes :
   1. Ajoutez vos stands et leurs créneaux.
-  2. Passez l'événement en « Ouvert ».
+  2. Ouvrez les inscriptions : « Inscriptions », puis « Ouvertes ».
   3. Partagez le lien public avec les bénévoles :
      {{.PublicURL}}
 {{end}}{{if .Event.NotifySignups}}

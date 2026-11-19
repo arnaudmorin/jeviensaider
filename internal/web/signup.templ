@@ -18,7 +18,7 @@ templ signupDialog(d signupPage) {
 
 templ signupForm(d signupPage, page bool) {
 	<div class="signup-head" style={ standStyle(d.Slot.Stand.Color) }>
-		<p class="when"><span class="dot"></span>{ capitalize(dayFR(d.Slot.StartsAt)) } · { hm(d.Slot.StartsAt) } – { hm(d.Slot.EndsAt) }</p>
+		<p class="when"><span class="dot"></span>{ capitalize(dayFR(d.Slot.StartsAt)) } · { timeRange(d.Slot.StartsAt, d.Slot.EndsAt) }</p>
 		if page {
 			<h1 id="signup-title">{ d.Slot.Stand.Name }</h1>
 		} else {
@@ -53,7 +53,7 @@ templ signupForm(d signupPage, page bool) {
 					if i > 0 {
 						,
 					}
-					sur « { o.Stand.Name } » de { hm(o.StartsAt) } – { hm(o.EndsAt) }
+					sur « { o.Stand.Name } » de { timeRange(o.StartsAt, o.EndsAt) }
 				}
 				. Vous pouvez quand même vous inscrire si vous savez gérer les deux.
 			</div>

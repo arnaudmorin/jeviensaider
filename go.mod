@@ -5,6 +5,7 @@ go 1.26.0
 toolchain go1.27.4
 
 require (
+	github.com/a-h/templ v0.3.1118
 	github.com/signintech/gopdf v0.38.4
 	golang.org/x/image v0.48.0
 	golang.org/x/text v0.44.0
@@ -13,7 +14,6 @@ require (
 
 require (
 	github.com/a-h/parse v0.0.42 // indirect
-	github.com/a-h/templ v0.3.1118 // indirect
 	github.com/andybalholm/brotli v1.3.0 // indirect
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/cli/browser v1.3.0 // indirect

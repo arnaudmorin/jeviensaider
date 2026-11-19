@@ -42,3 +42,11 @@ func TestUrgentSlots(t *testing.T) {
 		t.Errorf("got %v, want %v", ids, want)
 	}
 }
+
+func TestLowerFirstLetter(t *testing.T) {
+	for in, want := range map[string]string{"Il reste": "il reste", "Équipe": "équipe", "": "", "x": "x"} {
+		if got := lower(in); got != want {
+			t.Errorf("lower(%q) = %q, want %q", in, got, want)
+		}
+	}
+}

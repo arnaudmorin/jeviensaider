@@ -33,9 +33,11 @@
   // copyText copies a field's value and confirms on the button.
   function copyText(input, button) {
     var done = function () {
-      var old = button.innerHTML;
+      // Keep the button's own label (it may hold an icon) across clicks.
+      if (button.dataset.label === undefined) button.dataset.label = button.innerHTML;
+      clearTimeout(button.copiedTimer);
       button.textContent = "Copié ✓";
-      setTimeout(function () { button.innerHTML = old; }, 1500);
+      button.copiedTimer = setTimeout(function () { button.innerHTML = button.dataset.label; }, 1500);
     };
     if (navigator.clipboard && window.isSecureContext) {
       navigator.clipboard.writeText(input.value).then(done);

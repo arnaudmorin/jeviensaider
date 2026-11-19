@@ -236,6 +236,12 @@ func TestOverlapWarningAndMyPlanning(t *testing.T) {
 		t.Errorf("my slots are wrong: %s", mine)
 	}
 	expect(t, r, 200, `class="cancel-form"`, "Annuler votre inscription : Pêche aux canards, 14h – 15h ?")
+	// The active tab is announced as the current page; tabs reload the whole
+	// page, so the header and layout follow.
+	expect(t, r, 200, `aria-current="page">`)
+	if strings.Contains(r.body, `hx-select="#planning" hx-swap="outerHTML"><a class="tab`) {
+		t.Error("tabs only swap part of the page")
+	}
 	// The next slot does not overlap: no warning.
 	if strings.Contains(e.get(marie, publicPath+"/slots/"+slots[1]+"/signup").body, "même horaire") {
 		t.Error("warning shown for a non-overlapping slot")

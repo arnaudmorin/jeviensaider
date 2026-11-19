@@ -177,7 +177,7 @@ func mailFuncs() template.FuncMap {
 	return template.FuncMap{
 		"day":    dayFR,
 		"date":   dateFR,
-		"span":   func(a, b time.Time) string { return hm(a) + " – " + hm(b) },
+		"span":   timeRange,
 		"plural": plural,
 	}
 }

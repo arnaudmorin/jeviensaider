@@ -185,10 +185,7 @@ templ adminSlot(d adminPage, s *model.SlotView) {
 	<article class={ "admin-slot", slotKind(s) }>
 		<div class="admin-slot-head">
 			<h4>
-				if d.P.MultiDay {
-					{ capitalize(dayFR(s.StartsAt)) },
-				}
-				{ hm(s.StartsAt) } – { hm(s.EndsAt) }
+				{ capitalize(slotWhen(d.P, s)) }
 			</h4>
 			<span class={ "slot-status", templ.KV("need-text", s.Missing > 0) }>{ slotStatus(s) }</span>
 			<span class="count">{ itoa(s.Count) }/{ itoa(s.MinPeople) }</span>
@@ -290,20 +287,7 @@ templ slotGenerator(d adminPage, st *model.StandView) {
 templ adminGrid(p *model.Planning) {
 	<div class="grid-wrap always">
 		<table class="grid admin-grid">
-			<thead>
-				<tr>
-					<th scope="col"><span class="sr-only">Stand</span></th>
-					for _, c := range p.Columns {
-						<th scope="col">
-							if p.MultiDay {
-								<small>{ dayFR(c.StartsAt) }</small>
-								<br/>
-							}
-							{ hm(c.StartsAt) }<small>{ " – " + hm(c.EndsAt) }</small>
-						</th>
-					}
-				</tr>
-			</thead>
+			@planningHead(p)
 			<tbody>
 				for _, row := range p.Rows {
 					<tr>

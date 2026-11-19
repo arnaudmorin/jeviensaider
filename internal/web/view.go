@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 	"unicode"
 	"unicode/utf8"
 
@@ -161,7 +162,25 @@ func i64(n int64) string { return strconv.FormatInt(n, 10) }
 
 func boolStr(b bool) string { return strconv.FormatBool(b) }
 
-func lower(s string) string { return strings.ToLower(s[:1]) + s[1:] }
+// lower lower-cases the first letter: "Il reste" -> "il reste".
+func lower(s string) string {
+	if s == "" {
+		return s
+	}
+	r, n := utf8.DecodeRuneInString(s)
+	return string(unicode.ToLower(r)) + s[n:]
+}
+
+// timeRange is a time span the French way: "14h – 15h30".
+func timeRange(from, to time.Time) string { return hm(from) + " – " + hm(to) }
+
+// groupWhen is the heading of a group of slots that share a time.
+func groupWhen(p *model.Planning, c model.Column) string {
+	if p.MultiDay {
+		return dayFR(c.StartsAt) + ", " + timeRange(c.StartsAt, c.EndsAt)
+	}
+	return timeRange(c.StartsAt, c.EndsAt)
+}
 
 // capitalize upper-cases the first letter: "samedi 19 juin" -> "Samedi 19 juin".
 func capitalize(s string) string {
@@ -183,7 +202,7 @@ func signupURL(eventURL string, s *model.SlotView) templ.SafeURL {
 
 // slotWhen is a slot's time, with its day when the event spans several.
 func slotWhen(p *model.Planning, s *model.SlotView) string {
-	t := hm(s.StartsAt) + " – " + hm(s.EndsAt)
+	t := timeRange(s.StartsAt, s.EndsAt)
 	if p.MultiDay {
 		return dayFR(s.StartsAt) + ", " + t
 	}
