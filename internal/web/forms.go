@@ -3,7 +3,6 @@ package web
 import (
 	"errors"
 	"fmt"
-	"math"
 	"net/http"
 	"net/mail"
 	"regexp"
@@ -74,50 +73,49 @@ func (s *Server) pathID(w http.ResponseWriter, r *http.Request) (int64, bool) {
 
 // formInt parses an optional integer field; empty means def.
 func formInt(r *http.Request, key string, def int) (int, error) {
+	return formIntIn(r, key, def, 0, 1000)
+}
+
+// formIntIn reads an integer field from lo to hi; def when it is empty.
+func formIntIn(r *http.Request, key string, def, lo, hi int) (int, error) {
 	v := strings.TrimSpace(r.FormValue(key))
 	if v == "" {
 		return def, nil
 	}
 	n, err := strconv.Atoi(v)
-	if err != nil || n < 0 || n > 1000 {
+	if err != nil || n < lo || n > hi {
 		return 0, userError("nombre invalide : " + v)
 	}
 	return n, nil
 }
 
 // retentionField is the "days before deletion" input of the event forms.
+// An empty field means the server default.
 type retentionField struct {
-	Show  bool // false when events are kept forever: there is nothing to choose
-	Value int  // the days shown in the field
-	Max   int  // the longest period that the server allows
+	Show    bool // false when events are kept forever: there is nothing to choose
+	Value   int  // the event's own days, 0: none (the field is empty)
+	Default int  // the server default, shown as the placeholder
+	Max     int  // the longest period that the server allows
 }
 
-func (s *Server) retentionField(days int) retentionField {
-	return retentionField{Show: s.retention.Enabled(), Value: days, Max: s.retention.Max()}
+// retentionField fills the input for an event that stores eventDays (0:
+// none). Days above the maximum show as the maximum, the days that apply.
+func (s *Server) retentionField(eventDays int) retentionField {
+	r := s.cfg.Retention
+	return retentionField{Show: r.Enabled(), Value: min(eventDays, r.Max()), Default: r.DefaultDays, Max: r.Max()}
 }
 
-// readRetention reads how many days after the event the server deletes it.
-//
-// It returns 0 when the form has no value, or when events are kept forever:
-// the caller then keeps what it has. A number from 1 to the maximum is
-// accepted. A value outside that range gives an error. days is the number that
-// was read, even when it is refused, so the form can show it again (0 if it
-// was not a number).
-func (s *Server) readRetention(r *http.Request) (days int, err error) {
-	v := strings.TrimSpace(r.FormValue("retention_days"))
-	if !s.retention.Enabled() || v == "" {
+// readRetention reads how many days after the event the server deletes it:
+// 0 when the field is empty (the server default) or when events are kept
+// forever, else a number from 1 to the maximum.
+func (s *Server) readRetention(r *http.Request) (int, error) {
+	if !s.cfg.Retention.Enabled() {
 		return 0, nil
 	}
-	max := s.retention.Max()
-	n, convErr := strconv.Atoi(v)
-	if errors.Is(convErr, strconv.ErrRange) && !strings.HasPrefix(v, "-") {
-		n, convErr = math.MaxInt, nil // a number too big to be accepted
-	}
-	switch {
-	case convErr != nil || n < 1:
-		return 0, userError(fmt.Sprintf("Durée de conservation invalide : indiquez un nombre de jours entre 1 et %d.", max))
-	case n > max:
-		return n, userError(fmt.Sprintf("La durée de conservation ne peut pas dépasser %d jours.", max))
+	max := s.cfg.Retention.Max()
+	n, err := formIntIn(r, "retention_days", 0, 1, max)
+	if err != nil {
+		return 0, userError(fmt.Sprintf("Durée de conservation invalide : laissez le champ vide pour la durée par défaut, ou indiquez un nombre de jours entre 1 et %d.", max))
 	}
 	return n, nil
 }
@@ -132,13 +130,13 @@ func (s *Server) readRetention(r *http.Request) (days int, err error) {
 func (s *Server) checkDateRange(t time.Time) error {
 	today := s.now()
 	max := time.Date(today.Year()+2, today.Month(), today.Day(), 23, 59, 59, 0, time.UTC)
-	if !s.retention.Enabled() {
+	if !s.cfg.Retention.Enabled() {
 		if t.After(max) {
 			return userError(fmt.Sprintf("date hors limites : choisissez une date avant le %s", dateFR(max.Format(model.DateLayout))))
 		}
 		return nil
 	}
-	back := s.retention.Max()
+	back := s.cfg.Retention.Max()
 	if back < 365 {
 		back = 365
 	}
@@ -231,7 +229,7 @@ func (s *Server) readEventForm(r *http.Request) (model.Event, error) {
 		AdminEmail:    clean(r.FormValue("admin_email"), maxEmail, false),
 		NotifySignups: r.FormValue("notify") == "1",
 	}
-	// Read first: the number is kept to show the form again, even when
+	// Read first: a valid number is kept to show the form again, even when
 	// another field is wrong.
 	var retentionErr error
 	ev.RetentionDays, retentionErr = s.readRetention(r)

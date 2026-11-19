@@ -404,7 +404,7 @@ func TestErrorPagesAndStatic(t *testing.T) {
 }
 
 func TestRetentionNotice(t *testing.T) {
-	e := newEnv(t, Config{RetentionDays: 60})
+	e := newEnv(t, Config{Retention: store.Retention{DefaultDays: 60}})
 	admin := e.client()
 	adminPath, _, _ := setupEvent(t, e, admin)
 	expect(t, e.get(admin, adminPath), 200, "supprimés automatiquement le", "60 jours après l'événement")

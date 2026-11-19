@@ -29,7 +29,7 @@ func (s *Server) home(w http.ResponseWriter, r *http.Request) {
 		NeedPassword: s.cfg.CreatePassword != "",
 		MailEnabled:  s.cfg.MailEnabled,
 		Form:         model.Event{NotifySignups: true},
-		Retention:    s.retentionField(s.retention.DefaultDays),
+		Retention:    s.retentionField(0),
 	}))
 }
 
@@ -40,13 +40,9 @@ func (s *Server) createEvent(w http.ResponseWriter, r *http.Request) {
 		err = userError("Mot de passe de création incorrect.")
 	}
 	if err != nil {
-		shown := ev.RetentionDays
-		if shown == 0 {
-			shown = s.retention.DefaultDays
-		}
 		s.render(w, r, http.StatusBadRequest, homeView(homePage{
 			Common: Common{Title: "Je viens aider"}, NeedPassword: s.cfg.CreatePassword != "", MailEnabled: s.cfg.MailEnabled, Error: err.Error(), Form: ev,
-			Retention: s.retentionField(shown),
+			Retention: s.retentionField(ev.RetentionDays),
 		}))
 		return
 	}

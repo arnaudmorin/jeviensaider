@@ -19,10 +19,8 @@ type config struct {
 	dbPath         string
 	baseURL        string // without a trailing slash
 	trustProxy     bool
-	retentionDays  int             // 0: events are kept forever
-	retentionMax   int             // longest period an organiser can choose, 0: not set (see newRetention)
 	createPassword string          // empty: anyone can create events
-	retention      store.Retention // built from the two retention values above
+	retention      store.Retention // from -retention-days and -retention-max-days
 	smtp           *mail.Config
 	mailLimits     web.MailLimits
 	healthcheck    bool // only check a running server's health and exit
@@ -53,6 +51,7 @@ func loadConfig(args []string) (*config, error) {
 	}
 
 	c := &config{}
+	var retentionDays, retentionMaxDays int
 	fs := flag.NewFlagSet("benevole", flag.ExitOnError)
 	fs.Usage = func() {
 		fmt.Fprint(fs.Output(), usage)
@@ -62,12 +61,12 @@ func loadConfig(args []string) (*config, error) {
 	fs.StringVar(&c.dbPath, "db", env("BENEVOLE_DB", "benevole.db"), "SQLite database file (env BENEVOLE_DB)")
 	fs.StringVar(&c.baseURL, "base-url", env("BENEVOLE_BASE_URL", ""), "public URL, e.g. https://benevoles.example.org (env BENEVOLE_BASE_URL)")
 	fs.BoolVar(&c.trustProxy, "trust-proxy", trustProxy, "trust X-Forwarded-* headers from a reverse proxy (env BENEVOLE_TRUST_PROXY)")
-	fs.IntVar(&c.retentionDays, "retention-days", retention, "delete events this many days after their last day of activity when the organiser chose none, 0 to keep them forever (env BENEVOLE_RETENTION_DAYS)")
-	fs.IntVar(&c.retentionMax, "retention-max-days", retentionMax, "longest period an organiser can choose, 0 for the default of 180 days or the value of -retention-days if that is longer (env BENEVOLE_RETENTION_MAX_DAYS)")
+	fs.IntVar(&retentionDays, "retention-days", retention, "delete events this many days after their last day of activity when the organiser chose none, 0 to keep them forever (env BENEVOLE_RETENTION_DAYS)")
+	fs.IntVar(&retentionMaxDays, "retention-max-days", retentionMax, "longest period an organiser can choose; 0: 180 days, or -retention-days if that is longer (env BENEVOLE_RETENTION_MAX_DAYS)")
 	fs.BoolVar(&c.healthcheck, "healthcheck", false, "query /healthz on the listen address and exit 0 if healthy (for container health checks)")
 	fs.Parse(args)
 	c.baseURL = strings.TrimRight(c.baseURL, "/")
-	if c.retention, err = newRetention(c.retentionDays, c.retentionMax); err != nil {
+	if c.retention, err = store.NewRetention(retentionDays, retentionMaxDays); err != nil {
 		return nil, err
 	}
 

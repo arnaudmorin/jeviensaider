@@ -98,7 +98,7 @@ as downloadable artifacts. They can also be built locally with
 | `-base-url` | `BENEVOLE_BASE_URL` | *(from request)* | Public URL used in shareable links, e.g. `https://jeviensaider.fr` |
 | `-trust-proxy` | `BENEVOLE_TRUST_PROXY` | `false` | Trust `X-Forwarded-*` headers when behind Caddy or nginx |
 | `-retention-days` | `BENEVOLE_RETENTION_DAYS` | `60` | Delete events this many days after they end, unless the organiser chose another number; `0` or `off` keeps them forever |
-| `-retention-max-days` | `BENEVOLE_RETENTION_MAX_DAYS` | `180` | Longest number of days that an organiser can choose for one event (see below) |
+| `-retention-max-days` | `BENEVOLE_RETENTION_MAX_DAYS` | `0` (180) | Longest number of days that an organiser can choose for one event; `0` or empty means 180, or `BENEVOLE_RETENTION_DAYS` if longer (see below) |
 | — | `BENEVOLE_CREATE_PASSWORD` | *(none)* | Password required to create an event |
 
 On a public server, set `BENEVOLE_CREATE_PASSWORD` so that only the APE can
@@ -165,12 +165,13 @@ error rather than falling back to 60 days.
 
 **Choosing how long an event is kept.** The creation form and the "Modifier
 l'événement" form of the admin page have a field for the number of days
-before deletion. The field starts at `BENEVOLE_RETENTION_DAYS` and accepts a
-number from 1 to `BENEVOLE_RETENTION_MAX_DAYS`. The server refuses a higher
-number, and the database refuses 0. So an organiser cannot keep an event
-forever. A duplicate of an event keeps the number of its source. Events that
-existed before this feature store no number, so they follow
-`BENEVOLE_RETENTION_DAYS`.
+before deletion. Left empty (it shows `BENEVOLE_RETENTION_DAYS` as a hint),
+the event follows the server default, even if you change it later. A number
+from 1 to `BENEVOLE_RETENTION_MAX_DAYS` fixes the event's own period. The
+server refuses a higher number, and the database refuses 0 and anything above
+3650 days (ten years). So an organiser cannot keep an event forever. A
+duplicate of an event keeps the number of its source. Events that existed
+before this feature store no number, so they follow `BENEVOLE_RETENTION_DAYS`.
 
 If you do not set `BENEVOLE_RETENTION_MAX_DAYS`, the maximum is 180 days. If
 `BENEVOLE_RETENTION_DAYS` is longer than 180 days, the maximum is equal to it.

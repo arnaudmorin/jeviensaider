@@ -73,9 +73,10 @@ type adminPage struct {
 	NextColor  string
 	Statuses   []string
 	ExpiresOn  string // "YYYY-MM-DD", empty if events are kept forever
-	// Retention holds the days that apply to this event, which can differ
-	// from the days stored with it (the server cuts them at its maximum).
-	Retention retentionField
+	// Retention is the days that apply to this event, which can differ from
+	// the days stored with it (the default, or cut at the maximum).
+	Retention      int
+	RetentionField retentionField
 	// NeedPassword: duplicating creates an event, so it asks for the
 	// creation password too.
 	NeedPassword bool
@@ -94,7 +95,7 @@ func (s *Server) adminPage(w http.ResponseWriter, r *http.Request, ev *model.Eve
 		return
 	}
 	var expires string
-	days := s.retention.Days(ev.RetentionDays)
+	days := s.cfg.Retention.Days(ev.RetentionDays)
 	if days > 0 {
 		last, err := s.store.EventLastDay(r.Context(), ev.ID)
 		if err != nil {
@@ -104,21 +105,22 @@ func (s *Server) adminPage(w http.ResponseWriter, r *http.Request, ev *model.Eve
 		expires = store.ExpiresOn(last, days).Format(model.DateLayout)
 	}
 	s.render(w, r, http.StatusOK, adminView(adminPage{
-		Common:       s.common(w, r, "Admin · "+ev.Title),
-		Event:        ev,
-		P:            p,
-		PublicURL:    s.absURL(r, eventURL(ev)),
-		AdminURL:     s.absURL(r, adminURL(ev)),
-		AdminPath:    adminURL(ev),
-		EventURL:     eventURL(ev),
-		Volunteers:   nvol,
-		Gen:          generatorDefaults(p.Stands, ev.Date, s.now()),
-		NextColor:    palette[len(p.Stands)%len(palette)],
-		Statuses:     model.Statuses,
-		ExpiresOn:    expires,
-		Retention:    s.retentionField(days),
-		NeedPassword: s.cfg.CreatePassword != "",
-		MailEnabled:  s.cfg.MailEnabled,
+		Common:         s.common(w, r, "Admin · "+ev.Title),
+		Event:          ev,
+		P:              p,
+		PublicURL:      s.absURL(r, eventURL(ev)),
+		AdminURL:       s.absURL(r, adminURL(ev)),
+		AdminPath:      adminURL(ev),
+		EventURL:       eventURL(ev),
+		Volunteers:     nvol,
+		Gen:            generatorDefaults(p.Stands, ev.Date, s.now()),
+		NextColor:      palette[len(p.Stands)%len(palette)],
+		Statuses:       model.Statuses,
+		ExpiresOn:      expires,
+		Retention:      days,
+		RetentionField: s.retentionField(ev.RetentionDays),
+		NeedPassword:   s.cfg.CreatePassword != "",
+		MailEnabled:    s.cfg.MailEnabled,
 	}))
 }
 
@@ -162,10 +164,10 @@ func (s *Server) adminUpdateEvent(w http.ResponseWriter, r *http.Request, ev *mo
 	}
 	ev.Title, ev.Date, ev.Location, ev.Description = form.Title, form.Date, form.Location, form.Description
 	ev.AdminEmail, ev.NotifySignups = form.AdminEmail, form.NotifySignups
-	// The form shows the days that apply. Saving it without a change must not
-	// turn "the server default" into a fixed number of days. No value (0)
-	// changes nothing.
-	if form.RetentionDays != 0 && form.RetentionDays != s.retention.Days(ev.RetentionDays) {
+	// The field holds the event's own days, empty for the server default:
+	// save what it says. A form without the field (deletion off, or a page
+	// from before the field existed) keeps the stored days.
+	if s.cfg.Retention.Enabled() && r.Form.Has("retention_days") {
 		ev.RetentionDays = form.RetentionDays
 	}
 	if s.storeError(w, r, s.store.UpdateEvent(r.Context(), ev)) {

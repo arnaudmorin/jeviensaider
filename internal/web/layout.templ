@@ -119,14 +119,27 @@ templ errorView(d errorPage) {
 	}
 }
 
-// retentionInput is the number of days before an event is deleted. Nothing
-// is shown when events are kept forever.
+// retentionInput is the number of days before an event is deleted: empty
+// for the server default. Nothing is shown when events are kept forever.
 templ retentionInput(f retentionField, id string) {
 	if f.Show {
 		<div class="field">
-			<label for={ id }>Durée de conservation (en jours)</label>
-			<input id={ id } aria-describedby={ id + "-hint" } type="number" name="retention_days" value={ itoa(f.Value) } min="1" max={ itoa(f.Max) } step="1" required inputmode="numeric"/>
-			<span class="hint" id={ id + "-hint" }>L'événement et ses inscriptions sont supprimés automatiquement ce nombre de jours après la fin de l'événement. Maximum : { itoa(f.Max) } jours.</span>
+			<label for={ id }><span class="label-text">Durée de conservation <span class="opt">facultatif</span></span></label>
+			<input
+				id={ id }
+				aria-describedby={ id + "-hint" }
+				type="number"
+				name="retention_days"
+				if f.Value > 0 {
+					value={ itoa(f.Value) }
+				}
+				placeholder={ itoa(f.Default) }
+				min="1"
+				max={ itoa(f.Max) }
+				step="1"
+				inputmode="numeric"
+			/>
+			<span class="hint" id={ id + "-hint" }>Nombre de jours après la fin de l'événement avant qu'il soit supprimé automatiquement, avec ses inscriptions. Vide : { itoa(f.Default) } jours. Maximum : { itoa(f.Max) } jours.</span>
 		</div>
 	}
 }

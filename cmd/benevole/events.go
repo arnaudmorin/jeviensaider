@@ -32,22 +32,20 @@ Flags:
   -base-url URL         public URL used to print links (env BENEVOLE_BASE_URL)
   -retention-days N     days before an event is deleted when its organiser chose none, 0 = kept forever
                         (env BENEVOLE_RETENTION_DAYS, default 60)
-  -retention-max-days N longest period an organiser can choose
-                        (env BENEVOLE_RETENTION_MAX_DAYS, default 180)
+  -retention-max-days N longest period an organiser can choose; 0 = 180 days, or
+                        -retention-days if longer (env BENEVOLE_RETENTION_MAX_DAYS, default 0)
   -y                    delete: do not ask for confirmation
 
 Use the same retention values as the server: they decide the expiry dates.
 `
 
 type eventsCmd struct {
-	stdin         *bufio.Reader
-	out           io.Writer
-	db            string
-	baseURL       string
-	retentionDays int
-	retentionMax  int
-	policy        store.Retention
-	yes           bool
+	stdin   *bufio.Reader
+	out     io.Writer
+	db      string
+	baseURL string
+	policy  store.Retention
+	yes     bool
 }
 
 // runEvents implements "benevole events ..." and returns the exit code.
@@ -77,14 +75,15 @@ func runEvents(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, err)
 		return 2
 	}
-	fs.IntVar(&c.retentionDays, "retention-days", retention, "")
-	fs.IntVar(&c.retentionMax, "retention-max-days", retentionMax, "")
+	var retentionDays, retentionMaxDays int
+	fs.IntVar(&retentionDays, "retention-days", retention, "")
+	fs.IntVar(&retentionMaxDays, "retention-max-days", retentionMax, "")
 	fs.BoolVar(&c.yes, "y", false, "")
 	pos, err := parseInterspersed(fs, rest)
 	if err != nil {
 		return 2
 	}
-	if c.policy, err = newRetention(c.retentionDays, c.retentionMax); err != nil {
+	if c.policy, err = store.NewRetention(retentionDays, retentionMaxDays); err != nil {
 		fmt.Fprintln(stderr, err)
 		return 2
 	}

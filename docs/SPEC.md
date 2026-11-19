@@ -193,15 +193,20 @@ Derived notions (computed, not stored):
   (default 60) when they chose none. `0`/`off` for `BENEVOLE_RETENTION_DAYS`
   keeps events forever, whatever number an event stores. Then the field is
   hidden.
-- The organiser sets the number when they create or edit the event. It is a
-  whole number from 1 to `BENEVOLE_RETENTION_MAX_DAYS` (default 180, or
-  `BENEVOLE_RETENTION_DAYS` if that is longer). The server refuses a higher
-  number, and the database refuses 0, so nobody can keep an event forever.
+- The organiser sets the number when they create or edit the event. The field
+  is optional: empty (the default shown as a placeholder) stores nothing, so
+  the event follows `BENEVOLE_RETENTION_DAYS`, even when it changes. Otherwise
+  it is a whole number from 1 to `BENEVOLE_RETENTION_MAX_DAYS` (0 or unset:
+  180, or `BENEVOLE_RETENTION_DAYS` if that is longer). The server refuses a
+  higher number, and the database refuses 0 and anything above 3650 days (ten
+  years, `store.CeilingRetentionDays`), so nobody can keep an event forever.
 - The cleanup cuts a stored number at the maximum. If the operator lowers the
   maximum, events that chose more days are deleted after the new maximum.
 - Events created before this feature store no number and follow
   `BENEVOLE_RETENTION_DAYS`. A duplicate keeps the number of its source.
-  Saving the edit form without changing the number keeps it as it was.
+  The edit form shows the event's own number (the maximum if it stores more),
+  or an empty field; saving it stores what it shows, and emptying it goes back
+  to the default.
 - If both values are set and `BENEVOLE_RETENTION_DAYS` is above
   `BENEVOLE_RETENTION_MAX_DAYS`, the program does not start.
 - Dates are accepted up to two years ahead and, when deletion is on, back to

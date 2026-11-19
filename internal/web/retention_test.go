@@ -6,6 +6,8 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+
+	"benevole-ape/internal/store"
 )
 
 var testCtx = context.Background()
@@ -13,7 +15,7 @@ var testCtx = context.Background()
 // retentionEnv has a default of 60 days and a maximum of 180 days.
 func retentionEnv(t *testing.T) *env {
 	t.Helper()
-	return newEnv(t, Config{RetentionDays: 60, MaxRetentionDays: 180})
+	return newEnv(t, Config{Retention: store.Retention{DefaultDays: 60, MaxDays: 180}})
 }
 
 func createForm(extra url.Values) url.Values {
@@ -26,7 +28,13 @@ func createForm(extra url.Values) url.Values {
 
 func TestCreateFormOffersTheRetention(t *testing.T) {
 	e := retentionEnv(t)
-	expect(t, e.get(e.client(), "/"), 200, `name="retention_days"`, `value="60"`, `min="1"`, `max="180"`, "Maximum : 180 jours")
+	// Empty, with the default as a placeholder: an event made without
+	// touching it follows the server default.
+	r := e.get(e.client(), "/")
+	expect(t, r, 200, `name="retention_days"`, `placeholder="60"`, `min="1"`, `max="180"`, "Vide : 60 jours", "Maximum : 180 jours")
+	if field := retentionInputTag(r.body); strings.Contains(field, "value=") || strings.Contains(field, "required") {
+		t.Errorf("the field is filled in or required: %s", field)
+	}
 
 	// Automatic deletion is off: there is nothing to choose.
 	off := newEnv(t, Config{})
@@ -47,8 +55,8 @@ func TestCreateEventWithRetention(t *testing.T) {
 		t.Fatalf("stored retention: %+v, %v", ev, err)
 	}
 
-	// The default value of the form is stored too: the organiser sees a
-	// deletion date and keeps it, even if the operator changes the default.
+	// Typing the default number pins it: the organiser keeps it even if the
+	// operator changes the default.
 	r = e.post(admin, "/events", createForm(url.Values{"retention_days": {"60"}}))
 	expect(t, r, http.StatusSeeOther)
 	ev, _ = e.store.EventByAdminToken(testCtx, strings.TrimPrefix(r.location, "/a/"))
@@ -56,13 +64,15 @@ func TestCreateEventWithRetention(t *testing.T) {
 		t.Errorf("stored retention %d, want 60", ev.RetentionDays)
 	}
 
-	// No field (a script, an old form): the default applies.
-	r = e.post(admin, "/events", createForm(nil))
-	expect(t, r, http.StatusSeeOther)
-	expect(t, e.get(admin, r.location), 200, "60 jours après l'événement")
-	ev, _ = e.store.EventByAdminToken(testCtx, strings.TrimPrefix(r.location, "/a/"))
-	if ev.RetentionDays != 0 {
-		t.Errorf("stored retention %d, want 0 (server default)", ev.RetentionDays)
+	// An empty field, or none (a script): the default applies.
+	for _, f := range []url.Values{createForm(url.Values{"retention_days": {""}}), createForm(nil)} {
+		r = e.post(admin, "/events", f)
+		expect(t, r, http.StatusSeeOther)
+		expect(t, e.get(admin, r.location), 200, "60 jours après l'événement")
+		ev, _ = e.store.EventByAdminToken(testCtx, strings.TrimPrefix(r.location, "/a/"))
+		if ev.RetentionDays != 0 {
+			t.Errorf("stored retention %d, want 0 (server default)", ev.RetentionDays)
+		}
 	}
 
 	// The maximum itself is allowed.
@@ -72,16 +82,16 @@ func TestCreateEventWithRetention(t *testing.T) {
 func TestCreateEventRefusesBadRetention(t *testing.T) {
 	e := retentionEnv(t)
 	c := e.client()
-	for _, v := range []string{"181", "100000", "99999999999999999999"} {
-		expect(t, e.post(c, "/events", createForm(url.Values{"retention_days": {v}})), http.StatusBadRequest,
-			"La durée de conservation ne peut pas dépasser 180 jours.")
+	for _, v := range []string{"181", "100000", "99999999999999999999", "0", "-5", "abc", "60 jours", "1.5"} {
+		r := e.post(c, "/events", createForm(url.Values{"retention_days": {v}, "title": {"Gala"}}))
+		expect(t, r, http.StatusBadRequest, "entre 1 et 180", `value="Gala"`)
+		// The refused number is not shown again: the field is back to empty.
+		if field := retentionInputTag(r.body); strings.Contains(field, "value=") {
+			t.Errorf("%q: the refused value is shown again: %s", v, field)
+		}
 	}
-	for _, v := range []string{"0", "-5", "abc", "60 jours", "1.5"} {
-		expect(t, e.post(c, "/events", createForm(url.Values{"retention_days": {v}})), http.StatusBadRequest,
-			"entre 1 et 180")
-	}
-	// The page keeps what was typed.
-	expect(t, e.post(c, "/events", createForm(url.Values{"retention_days": {"500"}, "title": {"Gala"}})), http.StatusBadRequest, `value="Gala"`, `value="500"`)
+	// A valid number is kept when another field is wrong.
+	expect(t, e.post(c, "/events", createForm(url.Values{"retention_days": {"90"}, "admin_email": {"x"}})), http.StatusBadRequest, `value="90"`)
 
 	sums, err := e.store.ListEventSummaries(testCtx)
 	if err != nil || len(sums) != 0 {
@@ -128,13 +138,8 @@ func TestAdminChangesTheRetention(t *testing.T) {
 	}
 	expect(t, e.get(admin, adminPath), 200, "Événement mis à jour", "120 jours après l'événement", `value="120"`)
 
-	// Over the maximum: refused, and the old value stays.
-	expect(t, e.post(admin, adminPath+"/event", updateForm(url.Values{"retention_days": {"181"}})), http.StatusSeeOther)
-	expect(t, e.get(admin, adminPath), 200, "La durée de conservation ne peut pas dépasser 180 jours.")
-	if got := stored(); got != 120 {
-		t.Errorf("stored %d after a refused change, want 120", got)
-	}
-	for _, v := range []string{"0", "-1", "abc"} {
+	// Refused values: the old value stays.
+	for _, v := range []string{"181", "0", "-1", "abc"} {
 		expect(t, e.post(admin, adminPath+"/event", updateForm(url.Values{"retention_days": {v}})), http.StatusSeeOther)
 		expect(t, e.get(admin, adminPath), 200, "entre 1 et 180")
 	}
@@ -147,20 +152,35 @@ func TestAdminChangesTheRetention(t *testing.T) {
 	if got := stored(); got != 120 {
 		t.Errorf("stored %d after a form without the field, want 120", got)
 	}
+
+	// Emptying the field goes back to the server default.
+	expect(t, e.post(admin, adminPath+"/event", updateForm(url.Values{"retention_days": {""}})), http.StatusSeeOther)
+	if got := stored(); got != 0 {
+		t.Errorf("stored %d after emptying the field, want 0", got)
+	}
+	expect(t, e.get(admin, adminPath), 200, "60 jours après l'événement")
 }
 
-// Saving the form without touching the field keeps an event on the server
-// default: only a real change stores a value.
+// An event on the server default shows an empty field, so saving the form
+// untouched keeps it on the default; typing the default number pins it.
 func TestAdminSaveKeepsTheDefault(t *testing.T) {
 	e := retentionEnv(t)
 	admin := e.client()
 	adminPath, _, _ := setupEvent(t, e, admin) // created without the field
 	token := strings.TrimPrefix(adminPath, "/a/")
 
-	expect(t, e.post(admin, adminPath+"/event", updateForm(url.Values{"retention_days": {"60"}, "title": {"Autre titre"}})), http.StatusSeeOther)
+	if field := retentionInputTag(e.get(admin, adminPath).body); field == "" || strings.Contains(field, "value=") {
+		t.Errorf("an event on the default must show an empty field: %q", field)
+	}
+	expect(t, e.post(admin, adminPath+"/event", updateForm(url.Values{"retention_days": {""}, "title": {"Autre titre"}})), http.StatusSeeOther)
 	ev, _ := e.store.EventByAdminToken(testCtx, token)
 	if ev.RetentionDays != 0 || ev.Title != "Autre titre" {
 		t.Errorf("event after save: retention %d, title %q; want 0 and the new title", ev.RetentionDays, ev.Title)
+	}
+
+	expect(t, e.post(admin, adminPath+"/event", updateForm(url.Values{"retention_days": {"60"}})), http.StatusSeeOther)
+	if ev, _ = e.store.EventByAdminToken(testCtx, token); ev.RetentionDays != 60 {
+		t.Errorf("typing the default: stored %d, want 60", ev.RetentionDays)
 	}
 }
 
@@ -176,6 +196,12 @@ func TestAdminShowsTheDaysThatApply(t *testing.T) {
 		t.Fatal(err)
 	}
 	expect(t, e.get(admin, adminPath), 200, "180 jours après l'événement", `value="180"`)
+
+	// Saving the page as shown brings the stored days down to the maximum.
+	expect(t, e.post(admin, adminPath+"/event", updateForm(url.Values{"retention_days": {"180"}})), http.StatusSeeOther)
+	if ev, _ = e.store.EventByAdminToken(testCtx, ev.AdminToken); ev.RetentionDays != 180 {
+		t.Errorf("stored %d, want 180", ev.RetentionDays)
+	}
 }
 
 func TestAdminHidesTheFieldWhenKeptForever(t *testing.T) {
@@ -210,8 +236,18 @@ func TestDuplicateKeepsTheRetention(t *testing.T) {
 // at least that period.
 func TestDateLimitsFollowTheMaximum(t *testing.T) {
 	// Clock fixed at 2026-05-01. A year back is always allowed.
-	e := newEnv(t, Config{RetentionDays: 60, MaxRetentionDays: 3 * 365})
+	e := newEnv(t, Config{Retention: store.Retention{DefaultDays: 60, MaxDays: 3 * 365}})
 	expect(t, e.post(e.client(), "/events", createForm(url.Values{"date": {"2023-06-01"}})), http.StatusSeeOther)
-	e = newEnv(t, Config{RetentionDays: 60, MaxRetentionDays: 180})
+	e = newEnv(t, Config{Retention: store.Retention{DefaultDays: 60, MaxDays: 180}})
 	expect(t, e.post(e.client(), "/events", createForm(url.Values{"date": {"2023-06-01"}})), http.StatusBadRequest, "date hors limites")
+}
+
+// retentionInputTag is the retention <input> tag of a page, "" if none.
+func retentionInputTag(body string) string {
+	i := strings.Index(body, `name="retention_days"`)
+	if i < 0 {
+		return ""
+	}
+	start := strings.LastIndex(body[:i], "<input")
+	return body[start : i+strings.Index(body[i:], ">")+1]
 }

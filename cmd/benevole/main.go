@@ -71,15 +71,14 @@ func serve(cfg *config) int {
 	defer st.Close()
 
 	srv, err := web.New(st, web.Config{
-		BaseURL:          cfg.baseURL,
-		CreatePassword:   cfg.createPassword,
-		TrustProxy:       cfg.trustProxy,
-		RetentionDays:    cfg.retention.DefaultDays,
-		MaxRetentionDays: cfg.retention.MaxDays,
-		Mailer:           mailQueue,
-		MailEnabled:      cfg.smtp != nil,
-		MailLimits:       &cfg.mailLimits,
-		Logger:           logger,
+		BaseURL:        cfg.baseURL,
+		CreatePassword: cfg.createPassword,
+		TrustProxy:     cfg.trustProxy,
+		Retention:      cfg.retention,
+		Mailer:         mailQueue,
+		MailEnabled:    cfg.smtp != nil,
+		MailLimits:     &cfg.mailLimits,
+		Logger:         logger,
 	})
 	if err != nil {
 		logger.Error("init web", "err", err)

@@ -108,7 +108,7 @@ func TestLoadConfig(t *testing.T) {
 		t.Setenv("BENEVOLE_"+k, "")
 	}
 	c, err := loadConfig(nil)
-	if err != nil || c.addr != ":8080" || c.dbPath != "benevole.db" || c.trustProxy || c.retentionDays != 60 || c.smtp != nil {
+	if err != nil || c.addr != ":8080" || c.dbPath != "benevole.db" || c.trustProxy || c.retention.DefaultDays != 60 || c.smtp != nil {
 		t.Fatalf("defaults: %+v %v", c, err)
 	}
 
@@ -117,7 +117,7 @@ func TestLoadConfig(t *testing.T) {
 	t.Setenv("BENEVOLE_BASE_URL", "https://jeviensaider.fr/")
 	t.Setenv("BENEVOLE_RETENTION_DAYS", "off")
 	c, err = loadConfig([]string{"-addr", "127.0.0.1:9000"})
-	if err != nil || !c.trustProxy || c.baseURL != "https://jeviensaider.fr" || c.retentionDays != 0 || c.addr != "127.0.0.1:9000" {
+	if err != nil || !c.trustProxy || c.baseURL != "https://jeviensaider.fr" || c.retention.DefaultDays != 0 || c.addr != "127.0.0.1:9000" {
 		t.Fatalf("environment and flags: %+v %v", c, err)
 	}
 
@@ -169,6 +169,22 @@ func TestLoadConfigRetention(t *testing.T) {
 	if c, err = loadConfig([]string{"-retention-max-days", "120"}); err != nil || c.retention != (store.Retention{DefaultDays: 90, MaxDays: 120}) {
 		t.Fatalf("flag over environment: %+v %v", c, err)
 	}
+
+	// 0 means the default maximum, from the variable as from the flag.
+	t.Setenv("BENEVOLE_RETENTION_MAX_DAYS", "0")
+	if c, err = loadConfig(nil); err != nil || c.retention != (store.Retention{DefaultDays: 90, MaxDays: 180}) {
+		t.Fatalf("maximum 0 from the environment: %+v %v", c, err)
+	}
+	t.Setenv("BENEVOLE_RETENTION_MAX_DAYS", "30")
+	if c, err = loadConfig([]string{"-retention-max-days", "0"}); err != nil || c.retention != (store.Retention{DefaultDays: 90, MaxDays: 180}) {
+		t.Fatalf("maximum 0 from the flag: %+v %v", c, err)
+	}
+
+	// Beyond ten years: no start.
+	if _, err = loadConfig([]string{"-retention-max-days", "3651"}); err == nil {
+		t.Fatal("a maximum above 3650 days was accepted")
+	}
+	t.Setenv("BENEVOLE_RETENTION_MAX_DAYS", "")
 
 	// Deletion off: nothing to cap.
 	t.Setenv("BENEVOLE_RETENTION_DAYS", "off")

@@ -1,6 +1,7 @@
 package web
 
 import (
+	"benevole-ape/internal/store"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -9,7 +10,7 @@ import (
 )
 
 func TestDateLimits(t *testing.T) {
-	e := newEnv(t, Config{RetentionDays: 60}) // clock fixed at 2026-05-01
+	e := newEnv(t, Config{Retention: store.Retention{DefaultDays: 60}}) // clock fixed at 2026-05-01
 	c := e.client()
 	expect(t, e.post(c, "/events", url.Values{"admin_email": {"orga@example.org"}, "title": {"Far"}, "date": {"9999-12-31"}}), http.StatusBadRequest, "date hors limites")
 	expect(t, e.post(c, "/events", url.Values{"admin_email": {"orga@example.org"}, "title": {"Old"}, "date": {"2025-04-30"}}), http.StatusBadRequest, "date hors limites")
@@ -28,13 +29,13 @@ func TestDateLimits(t *testing.T) {
 // With automatic deletion disabled, past dates stay editable (old events are
 // kept), but absurd future dates are still refused.
 func TestDateLimitsKeepForever(t *testing.T) {
-	e := newEnv(t, Config{RetentionDays: 0}) // clock fixed at 2026-05-01
+	e := newEnv(t, Config{Retention: store.Retention{DefaultDays: 0}}) // clock fixed at 2026-05-01
 	c := e.client()
 	expect(t, e.post(c, "/events", url.Values{"admin_email": {"orga@example.org"}, "title": {"Old"}, "date": {"2019-06-15"}}), http.StatusSeeOther)
 	expect(t, e.post(c, "/events", url.Values{"admin_email": {"orga@example.org"}, "title": {"Far"}, "date": {"9999-12-31"}}), http.StatusBadRequest, "date hors limites")
 
 	// A long retention also widens the past window (here 3 years).
-	e = newEnv(t, Config{RetentionDays: 3 * 365})
+	e = newEnv(t, Config{Retention: store.Retention{DefaultDays: 3 * 365}})
 	expect(t, e.post(e.client(), "/events", url.Values{"admin_email": {"orga@example.org"}, "title": {"Old"}, "date": {"2024-01-15"}}), http.StatusSeeOther)
 }
 

@@ -11,51 +11,19 @@ import (
 )
 
 func TestRetentionMaxFromEnv(t *testing.T) {
-	// An empty value is "not set": compose.yaml passes an empty string when
-	// the variable is missing from .env.
-	for v, want := range map[string]int{"": 0, "  ": 0, "90": 90, " 365 ": 365} {
+	// Empty and 0 mean the default maximum: compose.yaml passes an empty
+	// string when the variable is missing from .env, and the flag takes 0.
+	for v, want := range map[string]int{"": 0, "  ": 0, "0": 0, "90": 90, " 365 ": 365} {
 		t.Setenv("BENEVOLE_RETENTION_MAX_DAYS", v)
 		if got, err := retentionMaxFromEnv(); err != nil || got != want {
 			t.Errorf("%q: got %d, %v; want %d", v, got, err, want)
 		}
 	}
-	// 0 and "off" are refused: a maximum that allows anything is no maximum.
-	for _, v := range []string{"0", "off", "forever", "-1", "abc", "1.5"} {
+	// "off" is refused: a maximum that allows anything is no maximum.
+	for _, v := range []string{"off", "forever", "-1", "abc", "1.5"} {
 		t.Setenv("BENEVOLE_RETENTION_MAX_DAYS", v)
 		if _, err := retentionMaxFromEnv(); err == nil || !strings.Contains(err.Error(), "BENEVOLE_RETENTION_MAX_DAYS") {
 			t.Errorf("%q accepted or the error does not name the variable: %v", v, err)
-		}
-	}
-}
-
-func TestNewRetention(t *testing.T) {
-	for _, c := range []struct {
-		name      string
-		days, max int
-		want      store.Retention
-	}{
-		{"nothing set", 60, 0, store.Retention{DefaultDays: 60, MaxDays: 180}},
-		{"a long default raises the unset maximum", 365, 0, store.Retention{DefaultDays: 365, MaxDays: 365}},
-		{"an explicit maximum", 60, 90, store.Retention{DefaultDays: 60, MaxDays: 90}},
-		{"the maximum equals the default", 60, 60, store.Retention{DefaultDays: 60, MaxDays: 60}},
-		{"deletion off", 0, 0, store.Retention{DefaultDays: 0, MaxDays: 180}},
-		{"deletion off, a maximum is ignored", 0, 30, store.Retention{DefaultDays: 0, MaxDays: 30}},
-	} {
-		got, err := newRetention(c.days, c.max)
-		if err != nil || got != c.want {
-			t.Errorf("%s: newRetention(%d, %d) = %+v, %v; want %+v", c.name, c.days, c.max, got, err, c.want)
-		}
-	}
-	for _, c := range []struct {
-		name      string
-		days, max int
-	}{
-		{"default above an explicit maximum", 90, 30},
-		{"negative default", -1, 0},
-		{"negative maximum", 60, -5},
-	} {
-		if got, err := newRetention(c.days, c.max); err == nil {
-			t.Errorf("%s: newRetention(%d, %d) = %+v, want an error", c.name, c.days, c.max, got)
 		}
 	}
 }

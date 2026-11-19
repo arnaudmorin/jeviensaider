@@ -37,6 +37,41 @@ func TestRetentionDays(t *testing.T) {
 	}
 }
 
+func TestNewRetention(t *testing.T) {
+	for _, c := range []struct {
+		name      string
+		days, max int
+		want      Retention
+	}{
+		{"nothing set", 60, 0, Retention{DefaultDays: 60, MaxDays: 180}},
+		{"a long default raises the unset maximum", 365, 0, Retention{DefaultDays: 365, MaxDays: 365}},
+		{"an explicit maximum", 60, 90, Retention{DefaultDays: 60, MaxDays: 90}},
+		{"the maximum equals the default", 60, 60, Retention{DefaultDays: 60, MaxDays: 60}},
+		{"the ceiling itself", 3650, 3650, Retention{DefaultDays: 3650, MaxDays: 3650}},
+		{"deletion off", 0, 0, Retention{DefaultDays: 0, MaxDays: 180}},
+		{"deletion off, a maximum is ignored", 0, 30, Retention{DefaultDays: 0, MaxDays: 30}},
+	} {
+		got, err := NewRetention(c.days, c.max)
+		if err != nil || got != c.want {
+			t.Errorf("%s: NewRetention(%d, %d) = %+v, %v; want %+v", c.name, c.days, c.max, got, err, c.want)
+		}
+	}
+	for _, c := range []struct {
+		name      string
+		days, max int
+	}{
+		{"default above an explicit maximum", 90, 30},
+		{"negative default", -1, 0},
+		{"negative maximum", 60, -5},
+		{"default above ten years", 3651, 0},
+		{"maximum above ten years", 60, 3651},
+	} {
+		if got, err := NewRetention(c.days, c.max); err == nil {
+			t.Errorf("%s: NewRetention(%d, %d) = %+v, want an error", c.name, c.days, c.max, got)
+		}
+	}
+}
+
 // newDatedEvent creates an event dated 2026-06-20 whose creation date is
 // older, so that its last day of activity is its date.
 func newDatedEvent(t *testing.T, s *Store, retentionDays int) *model.Event {
@@ -182,8 +217,8 @@ func TestDuplicateEventKeepsRetention(t *testing.T) {
 	}
 }
 
-// A stored value of 0 would mean "forever" for the cleanup: the database
-// refuses it.
+// A stored value of 0 would mean "forever" for the cleanup, and one above the
+// ceiling too: the database refuses them.
 func TestRetentionDaysCheckConstraint(t *testing.T) {
 	s := openTest(t)
 	_, err := s.db.Exec(`INSERT INTO events (slug, title, admin_token, retention_days) VALUES ('a', 'A', 'tok', 0)`)
@@ -193,5 +228,11 @@ func TestRetentionDaysCheckConstraint(t *testing.T) {
 	_, err = s.db.Exec(`INSERT INTO events (slug, title, admin_token, retention_days) VALUES ('b', 'B', 'tok2', -5)`)
 	if err == nil {
 		t.Error("retention_days = -5 accepted")
+	}
+	// Above the ceiling, SQLite's date() would give NULL and the event would
+	// never be deleted.
+	_, err = s.db.Exec(`INSERT INTO events (slug, title, admin_token, retention_days) VALUES ('c', 'C', 'tok3', ?)`, CeilingRetentionDays+1)
+	if err == nil {
+		t.Error("retention_days above the ceiling accepted")
 	}
 }
