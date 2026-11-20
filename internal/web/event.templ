@@ -3,7 +3,7 @@ package web
 import "jeviensaider/internal/model"
 
 templ eventView(d eventPage) {
-	@layout(d.Common, pageOpts{MeLink: meLinkFor(d), Wide: d.Tab != "me"}) {
+	@layout(d.Common, pageOpts{Wide: d.Tab != "me"}) {
 		<section class="event-head">
 			<h1>{ d.Event.Title }</h1>
 			@eventMeta(d.Event)
@@ -46,13 +46,6 @@ templ eventView(d eventPage) {
 			</div>
 		}
 	}
-}
-
-func meLinkFor(d eventPage) string {
-	if d.Me == nil || d.Tab == "me" {
-		return ""
-	}
-	return d.MeURL
 }
 
 templ eventMeta(ev *model.Event) {

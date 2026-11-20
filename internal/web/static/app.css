@@ -129,7 +129,6 @@ main.container > * { margin-bottom: 0; }
 .brand { font-size: 1.15rem; color: var(--text); display: inline-flex; align-items: center; gap: 10px; text-decoration: none; margin-right: auto; }
 .brand img { display: block; }
 .brand:hover { color: var(--text); }
-.top-link { font-weight: 700; min-height: var(--tap); display: inline-flex; align-items: center; }
 .badge-admin { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; background: var(--badge-bg); color: var(--badge-fg); font-size: .8rem; font-weight: 700; }
 
 /* ---------- buttons ---------- */

@@ -2,9 +2,8 @@ package web
 
 // pageOpts are the per-page extras of the layout's header.
 type pageOpts struct {
-	Admin  bool   // organiser page: shows the "Organisation" badge
-	MeLink string // the visitor's "Mes créneaux" page, if known
-	Wide   bool   // a page with a wide planning grid
+	Admin bool // organiser page: shows the "Organisation" badge
+	Wide  bool // a page with a wide planning grid
 }
 
 templ layout(c Common, o pageOpts) {
@@ -34,9 +33,6 @@ templ layout(c Common, o pageOpts) {
 							@iconLock()
 							Organisation
 						</span>
-					}
-					if o.MeLink != "" {
-						<a class="top-link" href={ templ.SafeURL(o.MeLink) }>Mes créneaux</a>
 					}
 				</div>
 			</header>
