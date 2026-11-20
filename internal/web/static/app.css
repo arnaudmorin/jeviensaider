@@ -347,10 +347,17 @@ a.slot { flex-direction: row; align-items: center; gap: 12px; }
 .signup-head h2 { font-size: 1.7rem; }
 .signup-head p { margin: 0 0 6px; }
 .stand-title { display: flex; align-items: center; gap: 10px; }
-dialog.modal { border: 0; border-radius: 18px; padding: 24px 20px 20px; width: min(520px, calc(100vw - 24px)); max-height: calc(100vh - 24px); color: var(--text); background: var(--surface); }
+dialog.modal { border: 0; border-radius: 18px; padding: 24px 20px 20px; width: min(520px, calc(100vw - 24px)); max-height: calc(100vh - 24px); overflow-y: auto; color: var(--text); background: var(--surface); }
 dialog.modal::backdrop { background: var(--backdrop); }
-dialog .close { position: absolute; top: 8px; right: 8px; width: var(--tap); height: var(--tap); border: 0; background: transparent; font-size: 1.6rem; color: var(--muted); cursor: pointer; border-radius: 10px; }
-dialog .close:hover { background: var(--fill); }
+/* The close button stays at the top of the dialog when its content scrolls
+   (a long form on a phone, with the keyboard open), and the title wraps
+   beside it instead of running under it. */
+dialog .close {
+  position: sticky; top: 8px; z-index: 1; float: right; margin: -12px -8px 8px 12px;
+  width: var(--tap); height: var(--tap); display: inline-flex; align-items: center; justify-content: center;
+  border: 1.5px solid transparent; border-radius: 50%; background: var(--fill); color: var(--text); cursor: pointer;
+}
+dialog .close:hover { background: var(--line-strong); }
 .modal-actions { display: flex; justify-content: flex-end; margin-top: 16px; }
 .error-page h1 { font-size: 1.6rem; }
 

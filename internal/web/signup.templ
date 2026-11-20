@@ -11,7 +11,9 @@ templ signupView(d signupPage) {
 
 templ signupDialog(d signupPage) {
 	<dialog class="modal" aria-labelledby="signup-title">
-		<button type="button" class="close" data-close aria-label="Fermer">×</button>
+		<button type="button" class="close" data-close aria-label="Fermer">
+			@iconClose()
+		</button>
 		@signupForm(d, false)
 	</dialog>
 }
@@ -100,7 +102,9 @@ templ standView(d standPage) {
 
 templ standDialog(d standPage) {
 	<dialog class="modal" aria-labelledby="stand-title">
-		<button type="button" class="close" data-close aria-label="Fermer">×</button>
+		<button type="button" class="close" data-close aria-label="Fermer">
+			@iconClose()
+		</button>
 		@standInfo(d, false)
 		<div class="modal-actions"><button type="button" class="btn" data-close autofocus>Fermer</button></div>
 	</dialog>
