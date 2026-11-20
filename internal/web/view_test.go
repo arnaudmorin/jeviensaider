@@ -16,8 +16,8 @@ func TestSlotStatusWords(t *testing.T) {
 	}{
 		{model.SlotView{Slot: model.Slot{MinPeople: 3}, Missing: 3}, "Il reste 3 places"},
 		{model.SlotView{Slot: model.Slot{MinPeople: 2}, Count: 1, Missing: 1}, "Il reste 1 place"},
-		{model.SlotView{Slot: model.Slot{MinPeople: 3, MaxPeople: 4}, Count: 3}, "Assez de monde, encore 1 place"},
-		{model.SlotView{Slot: model.Slot{MinPeople: 2}, Count: 2}, "Assez de monde, vous pouvez venir"},
+		{model.SlotView{Slot: model.Slot{MinPeople: 3, MaxPeople: 4}, Count: 3}, "Équipe suffisante · encore 1 place"},
+		{model.SlotView{Slot: model.Slot{MinPeople: 2}, Count: 2}, "Équipe suffisante · renfort possible"},
 		{model.SlotView{Slot: model.Slot{MinPeople: 2, MaxPeople: 2}, Count: 2, Full: true}, "Complet"},
 	} {
 		if got := slotStatus(&c.sv); got != c.want {

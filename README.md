@@ -44,8 +44,8 @@ in a single SQLite file.
 **For volunteers**
 - **"Tous les créneaux"**: the whole event as a table of stands × hours,
   shown as a list grouped by hour on phones. Each slot says in words where it
-  stands ("Il reste 2 places", "Assez de monde, vous pouvez venir",
-  "Complet") and who is there; a dashed border means people are still
+  stands ("Il reste 2 places", "Équipe suffisante · renfort possible",
+  "Complet") and who is there; an orange tint means people are still
   needed. At the top: "Il reste N places", a progress bar, and the slots that
   need help most. A switch shows only the places still to take.
 - The **moments of the day** as titles above the hours of the table, and in

@@ -100,9 +100,9 @@ func slotStatus(s *model.SlotView) string {
 	}
 	if s.MaxPeople > 0 {
 		left := s.MaxPeople - s.Count
-		return "Assez de monde, encore " + itoa(left) + " " + plural(left, "place", "places")
+		return "Équipe suffisante · encore " + itoa(left) + " " + plural(left, "place", "places")
 	}
-	return "Assez de monde, vous pouvez venir"
+	return "Équipe suffisante · renfort possible"
 }
 
 // standStatus sums up a stand for the organiser.
