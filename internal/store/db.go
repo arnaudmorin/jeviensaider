@@ -33,13 +33,17 @@ var (
 	ErrEventNotOpen  = errors.New("event is not open for sign-ups")
 	ErrTooManyStands = fmt.Errorf("event has the maximum of %d stands", MaxStands)
 	ErrTooManySlots  = fmt.Errorf("event has the maximum of %d slots", MaxSlots)
+
+	ErrTooManyMoments = fmt.Errorf("event has the maximum of %d moments", MaxMoments)
+	ErrMomentExists   = errors.New("event already has a moment at this time")
 )
 
 // Per-event limits. They keep the planning page to a reasonable size: without
 // them, one event could make every view of its page render megabytes.
 const (
-	MaxStands = 50
-	MaxSlots  = 500
+	MaxStands  = 50
+	MaxSlots   = 500
+	MaxMoments = 30
 )
 
 // querier is what queries need: a *sql.DB, or a *sql.Tx inside a

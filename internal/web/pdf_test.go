@@ -28,7 +28,7 @@ func planningWith(slotsPerStand []int, perSlot int) *model.Planning {
 		}
 	}
 	signups := []model.SignupRow{{Signup: model.Signup{ID: 1, SlotID: 1, VolunteerID: 1, Comment: "avec ma fille"}, Name: "Zoé Lefèvre", Phone: "06 12 34 56 78"}}
-	return model.BuildPlanning(stands, slots, signups, 0, true)
+	return model.BuildPlanning(stands, slots, nil, signups, 0, true)
 }
 
 func TestRowHeightAndPagination(t *testing.T) {

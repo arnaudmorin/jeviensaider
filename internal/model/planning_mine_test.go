@@ -22,7 +22,7 @@ func TestMinePlanning(t *testing.T) {
 		{Signup: Signup{SlotID: 20, VolunteerID: me}},
 		{Signup: Signup{SlotID: 30, VolunteerID: other}},
 	}
-	p := BuildPlanning(stands, slots, signups, me, true)
+	p := BuildPlanning(stands, slots, nil, signups, me, true)
 
 	clash := map[int64]bool{}
 	for _, v := range p.MySlots {

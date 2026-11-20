@@ -43,6 +43,12 @@ secret links (random 256-bit tokens, base64url).
 - **Slot**: belongs to a stand; start and end (local wall-clock time, no
   timezone), minimum people (≥ 1), optional maximum. At most **500** slots
   per event.
+- **Moment**: belongs to an event. It has a title of 1 to 80 characters, and a
+  start and an end (local wall-clock time, no timezone). It names a part of
+  the day, such as "Spectacle des enfants". Nobody signs up for a moment and
+  it blocks nothing. An event has at most **30** moments, and one for each
+  exact start and end. A moment has an optional color (`#rrggbb`). An empty
+  color means no color.
 - **Volunteer**: belongs to an event; name (required), phone (optional), edit
   token. No e-mail is ever asked or stored.
 - **Sign-up**: a volunteer on a slot, with an optional comment. One per
@@ -94,6 +100,25 @@ Derived notions (computed, not stored):
     borders.
   - Switch "Seulement les places à prendre" (`?todo=1`) hides slots that
     reached their minimum.
+  - Moments (section 3): a column whose time range is the exact range of a
+    moment shows the title on its own line above the time range. A moment
+    with no slot at its exact time range gets a column of its own, tinted
+    from top to bottom, with empty cells that say "Pas de créneau" to screen
+    readers. When such a column exists in the table, the legend adds "Moment
+    sans créneau" on wide screens. The phone list and the list of an event with
+    no slot have no such column, so the legend does not name it there. On phones, a group shows the title in its heading, and a group
+    with no slot says "Pas d'inscription à ce moment". The filter above hides
+    these groups on phones and keeps every column in the table. An event
+    with moments and no slot (no stand, or stands without slots) shows the
+    list on every screen size, not "Aucun créneau n'a encore été proposé". A
+    draft event shows no moment. A
+    moment never appears in "Mes créneaux", the PDF, the CSV export or the
+    calendar file.
+  - A moment with a color shows a dot of that color before its title, in the
+    table header and in the phone list. The tint of a column with no slot is
+    that color mixed with the page background, so it stays readable in dark
+    mode. A moment with no color keeps the neutral tint. A column that has
+    slots is never tinted.
 - **"Mes créneaux"** (`/e/<slug>/me/<token>`), a tab next to "Tous les
   créneaux" once the browser knows the volunteer, and a link in the header:
   - After a first sign-up (`?welcome=1`): "Merci <nom> !".
@@ -148,6 +173,23 @@ Derived notions (computed, not stored):
 - Event settings ("Modifier l'événement"), including the organiser e-mail,
   the notification flag and the number of days before the event is deleted
   (see 4.6).
+- "Déroulé de la journée" (above "Stands"): the moments of the event (see
+  section 3), in time order. Each one shows its time range and title, and has
+  a "Modifier" panel with day, start, end, title and color (Jour, De, À,
+  Titre, Couleur), a save button and a
+  delete button that asks for confirmation. Below the list, a form with the
+  same fields adds a moment. In the add form, the color picker
+  starts with the next color of the stand palette. In the "Modifier" panel,
+  it shows the color of the moment, or a neutral color if the moment has none.
+  The box "Sans couleur" gives a moment no color, and so does a value that is
+  not `#rrggbb`. If the organizer changes the picker, the new color wins, even
+  when the box is ticked. A hidden field `color_was` holds the color that the
+  picker showed, so the server can see the change. The day
+  starts as the event's date, else the day of the first slot, else today. Errors use the
+  usual red message: end not after start, empty title, a moment already at
+  that time, more than 30 moments. The routes are `POST /a/<token>/moments`,
+  `POST /a/<token>/moments/<id>` and `POST /a/<token>/moments/<id>/delete`.
+  Each route acts only on the moments of that event.
 - Stands: a summary list (linking to each stand), then each stand: add,
   edit, delete, move up/down.
 - Slots: a generator ("from 14:00 to 17:00, every 1 h, 2 people" → three
@@ -156,7 +198,9 @@ Derived notions (computed, not stored):
 - Volunteers, on each slot: full names and phones (with a call button),
   "Inscrire quelqu'un" by hand (allowed whatever the status, capacity still
   applies), "Retirer".
-- "Qui est où, et quand" (wide screens): the whole planning with full names.
+- "Qui est où, et quand" (wide screens): the whole planning with full names,
+  and the titles of the moments in its header. It shows only when the event
+  has at least one slot.
 - CSV export (`;`, UTF-8 BOM for Excel, one line per sign-up and one per
   missing person, formula injection neutralised).
 - Planning as a PDF to print (`/a/<token>/planning.pdf`): one A4 page per
@@ -165,8 +209,8 @@ Derived notions (computed, not stored):
   page; a longer stand continues on more pages, without cutting a slot when
   it fits on one page.
 - Erase personal data (keeps stands and slots).
-- Duplicate the event (stands and slots, shifted to a new date; asks for the
-  creation password when one is configured).
+- Duplicate the event (stands, slots and moments, shifted to a new date; asks
+  for the creation password when one is configured).
 - Delete the event.
 - Shows when the event will be deleted automatically.
 - Sends the event's links to the organiser again, when e-mail is set up.
@@ -273,10 +317,10 @@ cmd/jeviensaider/    main.go: wiring, server lifecycle, background loops
                      events.go, mailtest.go: the CLI subcommands
 internal/model/      domain types and pure rules (Slot.Check, fill status,
                      statuses, public names); BuildPlanning turns stands +
-                     slots + sign-ups into a ready-to-render view
+                     slots + moments + sign-ups into a ready-to-render view
 internal/slotgen/    pure slot generator (start, end, step, min, max)
 internal/store/      SQLite access: one file per table group (events,
-                     stands, slots, signups), cleanup.go for automatic
+                     stands, slots, moments, signups), cleanup.go for automatic
                      deletion, retention.go for the deletion policy
                      (default and maximum days), embedded migrations tracked with
                      PRAGMA user_version
@@ -308,7 +352,7 @@ nothing about HTTP; `web` holds no SQL. Errors from `store`, `model` and
 
 ### Data
 
-Tables `events`, `stands`, `slots`, `volunteers`, `signups`, all with
+Tables `events`, `stands`, `slots`, `moments`, `volunteers`, `signups`, all with
 `ON DELETE CASCADE` from the event down. Times are stored as
 `YYYY-MM-DD HH:MM` local wall-clock text. Migrations live in
 `internal/store/migrations/NNN_name.sql` and run in order at startup.

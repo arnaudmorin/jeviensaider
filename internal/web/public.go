@@ -142,20 +142,42 @@ func (s *Server) cookieVolunteer(r *http.Request, ev *model.Event) *model.Volunt
 	return v
 }
 
+// planning loads the planning of an event: stands, slots and sign-ups, with
+// no moment. The screens and files that never show moments (the sign-up form,
+// the CSV, the PDF, the e-mails, the calendar file) use it, so that a moment
+// does not add a column or change how they write times.
 func (s *Server) planning(ctx context.Context, ev *model.Event, myID int64) (*model.Planning, error) {
+	p, _, err := s.loadPlanning(ctx, ev, myID, false)
+	return p, err
+}
+
+// planningWithMoments is for the pages that show moments: the event page and
+// the organizer page. It also returns the moments, by start and then by end,
+// so that the page does not read them a second time.
+func (s *Server) planningWithMoments(ctx context.Context, ev *model.Event, myID int64) (*model.Planning, []model.Moment, error) {
+	return s.loadPlanning(ctx, ev, myID, true)
+}
+
+func (s *Server) loadPlanning(ctx context.Context, ev *model.Event, myID int64, withMoments bool) (*model.Planning, []model.Moment, error) {
 	stands, err := s.store.ListStands(ctx, ev.ID)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	slots, err := s.store.ListSlots(ctx, ev.ID)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
+	}
+	var moments []model.Moment
+	if withMoments {
+		if moments, err = s.store.ListMoments(ctx, ev.ID); err != nil {
+			return nil, nil, err
+		}
 	}
 	signups, err := s.store.ListSignups(ctx, ev.ID)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return model.BuildPlanning(stands, slots, signups, myID, ev.IsOpen()), nil
+	return model.BuildPlanning(stands, slots, moments, signups, myID, ev.IsOpen()), moments, nil
 }
 
 // ---- event page (overview, "Mes créneaux") ----
@@ -184,7 +206,7 @@ func (s *Server) mePage(w http.ResponseWriter, r *http.Request, ev *model.Event,
 }
 
 func (s *Server) showEvent(w http.ResponseWriter, r *http.Request, ev *model.Event, me *model.Volunteer, meTab bool) {
-	p, err := s.planning(r.Context(), ev, volunteerID(me))
+	p, _, err := s.planningWithMoments(r.Context(), ev, volunteerID(me))
 	if err != nil {
 		s.serverError(w, r, err)
 		return

@@ -40,13 +40,14 @@ templ adminView(d adminPage) {
 			@progress(d.P.Count, d.P.Needed)
 			<p class="muted">{ itoa(d.P.Count) }/{ itoa(d.P.Needed) } places prises · { itoa(d.Volunteers) } { plural(d.Volunteers, "bénévole", "bénévoles") }</p>
 		</section>
-		if len(d.P.Columns) > 0 {
+		if d.P.HasSlots() {
 			<section class="admin-planning" aria-labelledby="who-title">
 				<h2 id="who-title">Qui est où, et quand</h2>
 				@adminGrid(d.P)
 			</section>
 		}
 		@adminLinks(d)
+		@momentsSection(d)
 		<section aria-labelledby="stands-title">
 			<div class="section-head">
 				<h2 id="stands-title">Stands</h2>
@@ -128,6 +129,69 @@ templ adminLinks(d adminPage) {
 			<p class="hint">L'événement et ses inscriptions seront supprimés automatiquement le { dateFR(d.ExpiresOn) }, { itoa(d.Retention) } jours après l'événement.</p>
 		}
 	</section>
+}
+
+// momentsSection lists the titled parts of the day and lets the organiser
+// add, change and delete them.
+templ momentsSection(d adminPage) {
+	<section id="moments" class="moments" aria-labelledby="moments-title">
+		<div class="section-head">
+			<h2 id="moments-title">Déroulé de la journée</h2>
+		</div>
+		<p class="hint">Les grandes parties de la journée, par exemple « Spectacle des enfants ». Les bénévoles les voient sur la page de l'événement. On ne s'y inscrit pas. Un moment prend le titre d'un créneau seulement si les heures de début et de fin sont exactement les mêmes. Sinon, il a sa propre colonne.</p>
+		if len(d.Moments) == 0 {
+			<p class="empty">Aucun moment pour l'instant.</p>
+		}
+		for _, m := range d.Moments {
+			<article class="admin-slot admin-moment" id={ "moment-" + i64(m.ID) }>
+				<div class="admin-slot-head">
+					<h4>@momentTitle("moment-title", m.Title, m.Color)</h4>
+					<span class="count">{ capitalize(when(d.P.MultiDay, m.StartsAt, m.EndsAt)) }</span>
+				</div>
+				<div class="admin-slot-actions">
+					<details class="sub">
+						<summary>Modifier</summary>
+						<form method="post" action={ templ.SafeURL(d.AdminPath + "/moments/" + i64(m.ID)) } class="stack">
+							@momentFields(m.StartsAt.Format(model.DateLayout), m.StartsAt.Format("15:04"), m.EndsAt.Format("15:04"), m.Title, momentPickerColor(m.Color), m.Color == "")
+							<div><button class="btn primary" type="submit">Enregistrer</button></div>
+						</form>
+						<form method="post" action={ templ.SafeURL(d.AdminPath + "/moments/" + i64(m.ID) + "/delete") } data-confirm={ "Supprimer le moment « " + m.Title + " » ?" }>
+							<p><button class="btn danger-text" type="submit">Supprimer ce moment</button></p>
+						</form>
+					</details>
+				</div>
+			</article>
+		}
+		<form method="post" action={ templ.SafeURL(d.AdminPath + "/moments") } class="card stack">
+			<h3>Ajouter un moment</h3>
+			@momentFields(d.MomentDate, "", "", "", d.MomentColor, false)
+			<div>
+				<button class="btn primary" type="submit">
+					@iconPlus()
+					Ajouter
+				</button>
+			</div>
+		</form>
+	</section>
+}
+
+// momentFields are the fields of a moment: day, start, end, title and color.
+// The box "Sans couleur" is how the organizer goes back to no color. The
+// hidden field color_was holds the color that the picker showed, so that the
+// server can tell a color that the organizer picked from one that was already
+// there.
+templ momentFields(date, from, to, title, color string, noColor bool) {
+	<label>Jour <input type="date" name="date" value={ date } required/></label>
+	<div class="row2">
+		<label>De <input type="time" name="from" value={ from } required/></label>
+		<label>À <input type="time" name="to" value={ to } required/></label>
+	</div>
+	<label>Titre <input name="title" value={ title } required maxlength="80"/></label>
+	<div class="add-stand">
+		<label>Couleur <input type="color" name="color" value={ color }/></label>
+		<input type="hidden" name="color_was" value={ color }/>
+		<label class="check"><input type="checkbox" name="nocolor" value="1" checked?={ noColor }/> <span>Sans couleur</span></label>
+	</div>
 }
 
 templ adminStand(d adminPage, st *model.StandView, first, last bool) {
@@ -292,17 +356,21 @@ templ adminGrid(p *model.Planning) {
 				for _, row := range p.Rows {
 					<tr>
 						<th scope="row" style={ standStyle(row.Stand.Color) }><span class="stand-name"><span class="dot"></span>{ row.Stand.Name }</span></th>
-						for _, cell := range row.Cells {
-							<td>
-								for _, s := range cell {
-									<div class={ "slot", slotKind(s) }>
-										<span class="slot-status">{ slotStatus(s) }</span>
-										for _, n := range s.Signups {
-											<span class="slot-names">{ n.Name }</span>
-										}
-									</div>
-								}
-							</td>
+						for i, cell := range row.Cells {
+							if p.Columns[i].MomentOnly {
+								@momentCell(p.Columns[i])
+							} else {
+								<td>
+									for _, s := range cell {
+										<div class={ "slot", slotKind(s) }>
+											<span class="slot-status">{ slotStatus(s) }</span>
+											for _, n := range s.Signups {
+												<span class="slot-names">{ n.Name }</span>
+											}
+										</div>
+									}
+								</td>
+							}
 						}
 					</tr>
 				}

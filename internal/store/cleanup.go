@@ -8,12 +8,13 @@ import (
 )
 
 // lastDayExpr is the last day ("YYYY-MM-DD") an event is relevant: the latest
-// of its date, the end of its last slot and its creation date. It expects the
-// events table to be aliased as e.
+// of its date, the end of its last slot, the end of its last moment and its
+// creation date. It expects the events table to be aliased as e.
 const lastDayExpr = `substr(max(
 	e.created_at,
 	e.date,
-	COALESCE((SELECT max(sl.ends_at) FROM slots sl JOIN stands st ON st.id = sl.stand_id WHERE st.event_id = e.id), '')
+	COALESCE((SELECT max(sl.ends_at) FROM slots sl JOIN stands st ON st.id = sl.stand_id WHERE st.event_id = e.id), ''),
+	COALESCE((SELECT max(m.ends_at) FROM moments m WHERE m.event_id = e.id), '')
 ), 1, 10)`
 
 // EventLastDay returns the last day of activity of an event (see lastDayExpr).

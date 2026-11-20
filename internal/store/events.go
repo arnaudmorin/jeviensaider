@@ -108,9 +108,9 @@ func (s *Store) PurgeVolunteers(ctx context.Context, eventID int64) (int64, erro
 	return res.RowsAffected()
 }
 
-// DuplicateEvent copies the structure (stands and slots, no volunteers) of
-// src into a new draft event. If both events have a date, slots are moved by
-// the same number of days.
+// DuplicateEvent copies the structure (stands, slots and moments, no
+// volunteers) of src into a new draft event. If both events have a date,
+// slots and moments are moved by the same number of days.
 func (s *Store) DuplicateEvent(ctx context.Context, src *model.Event, title, date string) (*model.Event, error) {
 	dst := &model.Event{
 		Title: title, Date: date, Description: src.Description, Location: src.Location,
@@ -132,6 +132,10 @@ func (s *Store) DuplicateEvent(ctx context.Context, src *model.Event, title, dat
 		if err != nil {
 			return err
 		}
+		moments, err := listMoments(ctx, tx, src.ID)
+		if err != nil {
+			return err
+		}
 		newID := map[int64]int64{}
 		for _, st := range stands {
 			res, err := tx.ExecContext(ctx,
@@ -147,6 +151,13 @@ func (s *Store) DuplicateEvent(ctx context.Context, src *model.Event, title, dat
 		for _, sl := range slots {
 			sl.StartsAt, sl.EndsAt = sl.StartsAt.Add(shift), sl.EndsAt.Add(shift)
 			if err := insertSlot(ctx, tx, newID[sl.StandID], sl); err != nil {
+				return err
+			}
+		}
+		for _, m := range moments {
+			m.EventID = dst.ID
+			m.StartsAt, m.EndsAt = m.StartsAt.Add(shift), m.EndsAt.Add(shift)
+			if _, err := insertMoment(ctx, tx, m); err != nil {
 				return err
 			}
 		}

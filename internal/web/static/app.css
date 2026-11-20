@@ -16,6 +16,7 @@
 :root {
   --bg: #ffffff;
   --fill: #f4f4f5;
+  --moment: #fbf0c4;
   --line: #e4e4e7;
   --line-strong: #d4d4d8;
   --field: #71717a;
@@ -56,6 +57,7 @@
     --surface: #1c1c20;
     --raised: #2f2f35;
     --fill: #26262b;
+    --moment: #3b3420;
     --line: #303036;
     --line-strong: #46464e;
     --field: #8e8e98;
@@ -250,10 +252,12 @@ legend { font-weight: 700; font-size: .95rem; padding: 0; margin-bottom: 6px; }
 .switch.on .switch-track::after { transform: translateX(16px); }
 .legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: .875rem; color: var(--muted); }
 .legend span { display: inline-flex; align-items: center; gap: 8px; }
+.legend .table-only { display: none; }
 .lg { width: 22px; height: 14px; border-radius: 4px; display: inline-block; }
 .lg.need { border: 2px dashed var(--link); }
 .lg.room { border: 1.5px solid var(--line-strong); }
 .lg.full { background: var(--fill); }
+.lg.moment { background: var(--moment); border: 1px solid var(--line-strong); }
 
 /* A slot: dashed when people are still needed, solid when there is enough,
    filled grey when full; the visitor's own slots are tinted. */
@@ -282,6 +286,15 @@ a.slot:hover { color: var(--text); background: var(--slot-hover); }
 .grid tbody th { color: var(--text); vertical-align: top; padding-top: 10px; }
 .grid td { vertical-align: top; padding: 0; }
 .grid td .slot + .slot { margin-top: 6px; }
+/* A part of the day with no slot: a tinted column from top to bottom. The
+   shadow fills the gaps between cells. The title and the legend say it in
+   words too. */
+.col-title { display: block; color: var(--text); font-weight: 700; overflow-wrap: anywhere; }
+.grid th.moment, .grid td.moment-cell { --moment-bg: var(--moment); background: var(--moment-bg); box-shadow: 0 0 0 3px var(--moment-bg); }
+/* A moment with its own color: the tint is that color over the page surface,
+   so it stays readable in light and dark mode. */
+.grid th.moment.tinted, .grid td.moment-cell.tinted { --moment-bg: color-mix(in srgb, var(--moment-color) 30%, var(--surface)); }
+.dot.moment-dot { background: var(--moment-color); margin-right: 6px; }
 .grid .slot { min-height: 96px; font-size: .9rem; }
 .stand-name { display: flex; align-items: center; gap: 8px; font-size: 1rem; }
 .stand-desc { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-weight: 400; color: var(--muted); font-size: .85rem; margin-top: 4px; }
@@ -290,10 +303,15 @@ a.slot:hover { color: var(--text); background: var(--slot-hover); }
 .timeline { display: flex; flex-direction: column; gap: 18px; }
 .tgroup { display: flex; flex-direction: column; gap: 8px; }
 .tgroup h3 { color: var(--muted); font-size: 1rem; margin: 0; }
+.tgroup h3 .group-title { display: block; color: var(--text); overflow-wrap: anywhere; }
+.tgroup > p { margin: 0; }
 @media (min-width: 760px) {
   .grid-wrap { display: block; }
+  .legend .table-only { display: inline-flex; }
   .timeline { display: none; }
 }
+/* An event with moments and no stand has no table: the list stays. */
+.timeline.always { display: flex; }
 
 /* ---------- personal page ---------- */
 .me-tab { display: flex; flex-direction: column; gap: 20px; }
@@ -350,6 +368,9 @@ dialog .close:hover { background: var(--fill); }
 .admin-slot.need { border: 2px dashed var(--link); }
 .admin-slot.full { background: var(--fill); border-color: transparent; }
 .admin-slot > p { margin: 0; }
+.moments { display: flex; flex-direction: column; gap: 12px; }
+.moments > p, .moments h2 { margin: 0; }
+.admin-moment .admin-slot-head h4 { white-space: normal; overflow-wrap: anywhere; }
 .admin-slot-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 10px; }
 .admin-slot-head h4 { flex: 1 0 auto; font-size: 1.1rem; white-space: nowrap; }
 .admin-slot-head .count { color: var(--muted); font-size: .875rem; }
@@ -395,5 +416,7 @@ section > details.card + details.card { margin-top: 10px; }
 @media (forced-colors: active) {
   .slot, .admin-slot, .lg { border-color: CanvasText; }
   .slot.need, .admin-slot.need, .lg.need { border-style: dashed; }
+  .grid th.moment, .grid td.moment-cell { border: 1px dotted CanvasText; }
+  .dot.moment-dot { border: 1px solid CanvasText; }
   .progress-bar, .dot, .switch-track { forced-color-adjust: none; }
 }

@@ -108,17 +108,22 @@ templ overview(d eventPage) {
 				</a>
 			</div>
 		</div>
-		@legend()
+		@legend(d.P)
 		@planningView(d)
 	</section>
 	<p class="hint">Déjà inscrit sur un autre téléphone ? Ouvrez le lien personnel reçu à l'inscription.</p>
 }
 
-templ legend() {
+templ legend(p *model.Planning) {
 	<p class="legend">
 		<span><i class="lg need" aria-hidden="true"></i>Places à prendre</span>
 		<span><i class="lg room" aria-hidden="true"></i>Assez de monde, on peut encore venir</span>
 		<span><i class="lg full" aria-hidden="true"></i>Complet</span>
+		// The swatch names a column of the table. An event with no slot has no
+		// table, and on a phone the table is hidden, so it is for wide screens.
+		if p.HasSlots() && p.HasMomentColumns() {
+			<span class="table-only"><i class="lg moment" aria-hidden="true"></i>Moment sans créneau</span>
+		}
 	</p>
 }
 
@@ -127,6 +132,10 @@ templ legend() {
 templ planningView(d eventPage) {
 	if len(d.P.Columns) == 0 {
 		<p class="empty">Aucun créneau n'a encore été proposé.</p>
+	} else if !d.P.HasSlots() {
+		// Moments but no slot (no stand, or stands without slots): the table
+		// would be empty, so the list is the planning, on every screen size.
+		@momentList(d, "timeline always")
 	} else {
 		<div class="grid-wrap">
 			<table class="grid">
@@ -141,33 +150,50 @@ templ planningView(d eventPage) {
 									<a class="stand-more" href={ templ.SafeURL(d.EventURL + "/stands/" + i64(row.Stand.ID)) } hx-get={ d.EventURL + "/stands/" + i64(row.Stand.ID) } hx-target="#modal">Voir plus</a>
 								}
 							</th>
-							for _, cell := range row.Cells {
-								<td>
-									for _, s := range cell {
-										@slotCell(d, s, false)
-									}
-								</td>
+							for i, cell := range row.Cells {
+								if d.P.Columns[i].MomentOnly {
+									@momentCell(d.P.Columns[i])
+								} else {
+									<td>
+										for _, s := range cell {
+											@slotCell(d, s, false)
+										}
+									</td>
+								}
 							}
 						</tr>
 					}
 				</tbody>
 			</table>
 		</div>
-		<div class="timeline">
-			for _, g := range d.P.Groups {
-				if groupShown(d, g) {
-					<section class="tgroup">
-						<h3>
-							{ capitalize(groupWhen(d.P, g.Column)) }
-						</h3>
-						for _, s := range g.Slots {
-							@slotCell(d, s, true)
-						}
-					</section>
-				}
-			}
-		</div>
+		@momentList(d, "timeline")
 	}
+}
+
+// momentList is the planning as a list grouped by time: one group per time
+// range, with its title when a moment gives one. A group that is only a
+// moment has no slot, so it says that nobody signs up.
+templ momentList(d eventPage, class string) {
+	<div class={ class }>
+		for _, g := range d.P.Groups {
+			if groupShown(d, g) {
+				<section class="tgroup">
+					<h3>
+						if g.Title != "" {
+							@momentTitle("group-title", g.Title, g.Color)
+						}
+						{ capitalize(groupWhen(d.P, g.Column)) }
+					</h3>
+					if g.MomentOnly {
+						<p class="muted">Pas d'inscription à ce moment</p>
+					}
+					for _, s := range g.Slots {
+						@slotCell(d, s, true)
+					}
+				</section>
+			}
+		}
+	</div>
 }
 
 // slotCell is one slot: a link to sign up when possible, else a box.
@@ -295,13 +321,48 @@ templ mySlots(d eventPage) {
 	</section>
 }
 
+// momentTitle is the title of a moment, with a dot of its color if it has
+// one. Every page that shows a moment title uses it. class is the class of the
+// span that holds the title.
+templ momentTitle(class, title, color string) {
+	<span class={ class }>
+		if color != "" {
+			<span class="dot moment-dot" style={ momentStyle(color) } aria-hidden="true"></span>
+		}
+		{ title }
+	</span>
+}
+
+// momentCell is the cell of a column that exists only for a moment: no stand
+// has a slot there. It is tinted with the color of the moment, if it has one.
+// The public grid and the organizer grid both use it.
+templ momentCell(c model.Column) {
+	<td
+		class={ "moment-cell", templ.KV("tinted", c.Color != "") }
+		if c.Color != "" {
+			style={ momentStyle(c.Color) }
+		}
+	><span class="sr-only">Pas de créneau</span></td>
+}
+
 // planningHead is the header row of a planning grid: one column per time.
 templ planningHead(p *model.Planning) {
 	<thead>
 		<tr>
 			<th scope="col"><span class="sr-only">Stand</span></th>
 			for _, c := range p.Columns {
-				<th scope="col">
+				<th
+					scope="col"
+					if c.MomentOnly {
+						class={ "moment", templ.KV("tinted", c.Color != "") }
+					}
+					if c.MomentOnly && c.Color != "" {
+						style={ momentStyle(c.Color) }
+					}
+				>
+					if c.Title != "" {
+						@momentTitle("col-title", c.Title, c.Color)
+					}
 					if p.MultiDay {
 						<small>{ dayFR(c.StartsAt) }</small>
 						<br/>

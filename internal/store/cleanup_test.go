@@ -98,3 +98,29 @@ func TestCleanup(t *testing.T) {
 		t.Errorf("rows left after cascade: %d", left)
 	}
 }
+
+// A moment counts as activity: an event with only a late moment must not be
+// deleted before that moment happens.
+func TestCleanupKeepsEventsUntilTheirLastMoment(t *testing.T) {
+	s := openTest(t)
+	ev := &model.Event{Title: "Spectacle"}
+	if err := s.CreateEvent(ctx, ev); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.db.Exec(`UPDATE events SET created_at = '2026-01-01 10:00:00' WHERE id = ?`, ev.ID); err != nil {
+		t.Fatal(err)
+	}
+	newMoment(t, s, ev.ID, "Spectacle", "2026-04-10 15:00", "2026-04-10 16:00")
+
+	got, err := s.EventLastDay(ctx, ev.ID)
+	if err != nil || !got.Equal(day("2026-04-10")) {
+		t.Fatalf("EventLastDay = %v, %v; want 2026-04-10", got, err)
+	}
+	r := Retention{DefaultDays: 30, MaxDays: 30}
+	if n, err := s.Cleanup(ctx, r, day("2026-05-10")); n != 0 || err != nil {
+		t.Fatalf("cleanup on the last day of retention: %d, %v", n, err)
+	}
+	if n, err := s.Cleanup(ctx, r, day("2026-05-11")); n != 1 || err != nil {
+		t.Fatalf("cleanup the day after: %d, %v", n, err)
+	}
+}

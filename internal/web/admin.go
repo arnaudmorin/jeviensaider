@@ -71,8 +71,13 @@ type adminPage struct {
 	Volunteers int
 	Gen        map[int64]genDefaults // slot generator, per stand
 	NextColor  string
-	Statuses   []string
-	ExpiresOn  string // "YYYY-MM-DD", empty if events are kept forever
+	// Moments are the titled parts of the day, in time order. MomentDate is
+	// the day that the "add a moment" form starts with.
+	Moments     []model.Moment
+	MomentDate  string
+	MomentColor string // the color that the "add a moment" form starts with
+	Statuses    []string
+	ExpiresOn   string // "YYYY-MM-DD", empty if events are kept forever
 	// Retention is the days that apply to this event, which can differ from
 	// the days stored with it (the default, or cut at the maximum).
 	Retention      int
@@ -84,7 +89,7 @@ type adminPage struct {
 }
 
 func (s *Server) adminPage(w http.ResponseWriter, r *http.Request, ev *model.Event) {
-	p, err := s.planning(r.Context(), ev, 0)
+	p, moments, err := s.planningWithMoments(r.Context(), ev, 0)
 	if err != nil {
 		s.serverError(w, r, err)
 		return
@@ -115,6 +120,9 @@ func (s *Server) adminPage(w http.ResponseWriter, r *http.Request, ev *model.Eve
 		Volunteers:     nvol,
 		Gen:            generatorDefaults(p.Stands, ev.Date, s.now()),
 		NextColor:      palette[len(p.Stands)%len(palette)],
+		Moments:        moments,
+		MomentDate:     momentDefaultDate(ev.Date, p, s.now()),
+		MomentColor:    palette[len(moments)%len(palette)],
 		Statuses:       model.Statuses,
 		ExpiresOn:      expires,
 		Retention:      days,
@@ -312,6 +320,96 @@ func (s *Server) adminUpdateSlot(w http.ResponseWriter, r *http.Request, ev *mod
 	}
 	setFlash(w, "success", "Créneau mis à jour.")
 	backToStand(w, r, ev, sl.StandID)
+}
+
+// momentDefaultDate is the day that the form to add a moment starts with: the
+// event's date, else the day of the first slot, else today. A column that
+// exists only for a moment does not count, because the organiser has not
+// chosen that day for the slots.
+func momentDefaultDate(eventDate string, p *model.Planning, today time.Time) string {
+	if eventDate != "" {
+		return eventDate
+	}
+	for _, c := range p.Columns {
+		if !c.MomentOnly {
+			return c.StartsAt.Format(model.DateLayout)
+		}
+	}
+	return today.Format(model.DateLayout)
+}
+
+// backToMoments redirects to the admin page, scrolled to the moments.
+func backToMoments(w http.ResponseWriter, r *http.Request, ev *model.Event) {
+	redirect(w, r, adminURL(ev)+"#moments")
+}
+
+// momentError reports err after an action on a moment: a message that the
+// organiser can act on (flash, back to the moments), or an internal error. It
+// returns false when err is nil.
+func (s *Server) momentError(w http.ResponseWriter, r *http.Request, ev *model.Event, err error) bool {
+	if err == nil {
+		return false
+	}
+	if msg, ok := userMessage(err); ok {
+		setFlash(w, "error", msg)
+		backToMoments(w, r, ev)
+		return true
+	}
+	return s.storeError(w, r, err)
+}
+
+func (s *Server) adminCreateMoment(w http.ResponseWriter, r *http.Request, ev *model.Event) {
+	m, err := s.readMomentForm(r, r.FormValue("date"))
+	if err == nil {
+		m.EventID = ev.ID
+		if err = m.Check(); err == nil {
+			err = s.store.CreateMoment(r.Context(), &m)
+		}
+	}
+	if s.momentError(w, r, ev, err) {
+		return
+	}
+	setFlash(w, "success", "Moment ajouté.")
+	backToMoments(w, r, ev)
+}
+
+func (s *Server) adminUpdateMoment(w http.ResponseWriter, r *http.Request, ev *model.Event) {
+	id, ok := s.pathID(w, r)
+	if !ok {
+		return
+	}
+	m, err := s.store.GetMoment(r.Context(), ev.ID, id)
+	if s.storeError(w, r, err) {
+		return
+	}
+	date := r.FormValue("date")
+	if date == "" {
+		date = m.StartsAt.Format(model.DateLayout)
+	}
+	form, err := s.readMomentForm(r, date)
+	if err == nil {
+		m.Title, m.Color, m.StartsAt, m.EndsAt = form.Title, form.Color, form.StartsAt, form.EndsAt
+		if err = m.Check(); err == nil {
+			err = s.store.UpdateMoment(r.Context(), m)
+		}
+	}
+	if s.momentError(w, r, ev, err) {
+		return
+	}
+	setFlash(w, "success", "Moment mis à jour.")
+	backToMoments(w, r, ev)
+}
+
+func (s *Server) adminDeleteMoment(w http.ResponseWriter, r *http.Request, ev *model.Event) {
+	id, ok := s.pathID(w, r)
+	if !ok {
+		return
+	}
+	if s.storeError(w, r, s.store.DeleteMoment(r.Context(), ev.ID, id)) {
+		return
+	}
+	setFlash(w, "info", "Moment supprimé.")
+	backToMoments(w, r, ev)
 }
 
 func (s *Server) adminDeleteSlot(w http.ResponseWriter, r *http.Request, ev *model.Event) {

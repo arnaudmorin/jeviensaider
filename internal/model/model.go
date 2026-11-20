@@ -105,6 +105,40 @@ func (s Slot) Check() error {
 	return nil
 }
 
+// MaxMomentTitle is the longest title of a moment, in characters.
+const MaxMomentTitle = 80
+
+// Errors returned by Moment.Check.
+var (
+	ErrMomentRange = errors.New("moment ends before it starts")
+	ErrMomentTitle = errors.New("moment title is empty or too long")
+)
+
+// Moment is a titled part of the day, for example "Spectacle des enfants".
+// It has a start and an end in local wall-clock time. It only informs the
+// public: nobody signs up for a moment, and it blocks nothing.
+type Moment struct {
+	ID      int64
+	EventID int64
+	Title   string
+	// Color is empty (no color) or "#rrggbb".
+	Color    string
+	StartsAt time.Time
+	EndsAt   time.Time
+}
+
+// Check makes sure that the moment ends after it starts and that its title
+// has 1 to MaxMomentTitle characters after trimming spaces.
+func (m Moment) Check() error {
+	if !m.EndsAt.After(m.StartsAt) {
+		return ErrMomentRange
+	}
+	if n := utf8.RuneCountInString(strings.TrimSpace(m.Title)); n < 1 || n > MaxMomentTitle {
+		return ErrMomentTitle
+	}
+	return nil
+}
+
 // Overlaps reports whether two slots share some time.
 func (s Slot) Overlaps(o Slot) bool {
 	return s.StartsAt.Before(o.EndsAt) && o.StartsAt.Before(s.EndsAt)

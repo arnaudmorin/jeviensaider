@@ -42,6 +42,24 @@ func cssColor(c string) string {
 	return defaultColor
 }
 
+// momentPickerColor is the color that the picker shows for a moment: its own,
+// or the neutral one when it has none.
+func momentPickerColor(color string) string {
+	if color == "" {
+		return neutralMomentColor
+	}
+	return color
+}
+
+// momentStyle sets the --moment-color CSS variable to a moment's color. A
+// color that is not valid gives no style.
+func momentStyle(color string) templ.SafeCSS {
+	if !validColor(color) {
+		return ""
+	}
+	return templ.SafeCSS("--moment-color: " + color)
+}
+
 // itoa is strconv.Itoa, short for templates.
 func itoa(n int) string { return strconv.Itoa(n) }
 
@@ -236,7 +254,8 @@ func withOthers(s *model.SlotView) string {
 // groupShown says whether a time group has something to show under the
 // "places à prendre" filter.
 func groupShown(d eventPage, g model.TimeGroup) bool {
-	if !d.TodoOnly {
+	// With no slot at all, the filter has nothing to keep: show the moments.
+	if !d.TodoOnly || !d.P.HasSlots() {
 		return true
 	}
 	for _, s := range g.Slots {

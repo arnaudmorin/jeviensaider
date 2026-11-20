@@ -23,6 +23,9 @@ in a single SQLite file.
   is still missing), which can be turned off per event.
 - Add stands, with a description of what volunteers do there, then generate
   their slots in one step: start, end, slot length and number of people.
+- Add the **moments of the day**, such as "Spectacle des enfants": a title, a
+  start, an end and an optional color. Nobody signs up for a moment. It only tells everyone how
+  the day runs.
 - Follow progress on a dashboard that shows who is signed up, with their
   contact details, and how many places are still missing.
 - Open and close sign-ups.
@@ -45,6 +48,9 @@ in a single SQLite file.
   "Complet") and who is there; a dashed border means people are still
   needed. At the top: "Il reste N places", a progress bar, and the slots that
   need help most. A switch shows only the places still to take.
+- The **moments of the day** as titles above the hours of the table, and in
+  the headings of the phone list. A moment with no slot, such as a show, still
+  has its own column.
 - Each stand's description under its name, cut after two lines; "Voir plus"
   opens the whole text. The sign-up form shows it too.
 - Sign up in a few seconds with just a name; a phone number is optional, and

@@ -65,7 +65,7 @@ func TestBuildPlanning(t *testing.T) {
 		{Signup: Signup{ID: 1, SlotID: 10, VolunteerID: 99}, Name: "Marie Dupont"},
 		{Signup: Signup{ID: 2, SlotID: 20, VolunteerID: 98}, Name: "Paul"},
 	}
-	p := BuildPlanning(stands, slots, signups, 99, true)
+	p := BuildPlanning(stands, slots, nil, signups, 99, true)
 	if len(p.Columns) != 2 {
 		t.Fatalf("want 2 columns, got %d", len(p.Columns))
 	}
@@ -79,7 +79,7 @@ func TestBuildPlanning(t *testing.T) {
 	if v := peche.Slots[1]; v.MySignupID != 0 || !v.CanSignUp {
 		t.Errorf("free slot: MySignupID %d, CanSignUp %v", v.MySignupID, v.CanSignUp)
 	}
-	if closed := BuildPlanning(stands, slots, signups, 99, false); closed.Stands[0].Slots[1].CanSignUp {
+	if closed := BuildPlanning(stands, slots, nil, signups, 99, false); closed.Stands[0].Slots[1].CanSignUp {
 		t.Error("CanSignUp on a closed event")
 	}
 	if peche.Slots[0].ID != 10 || peche.Slots[0].Status != FillPartial || !peche.Slots[0].Mine {

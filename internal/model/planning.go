@@ -36,6 +36,19 @@ type StandView struct {
 type Column struct {
 	StartsAt time.Time
 	EndsAt   time.Time
+	// Title is the title of the moment that has this exact time range. It is
+	// empty when no moment has it.
+	Title string
+	// Color is the color of that moment: empty, or "#rrggbb".
+	Color string
+	// MomentOnly means that the column exists for a moment and has no slot.
+	MomentOnly bool
+}
+
+// span is the time range that identifies a column.
+type span struct {
+	StartsAt time.Time
+	EndsAt   time.Time
 }
 
 // Row is one stand in the grid; Cells is aligned with Planning.Columns.
@@ -65,16 +78,17 @@ type Planning struct {
 	MySlots  []*SlotView // their slots, chronologically
 	HasClash bool        // two of their slots overlap
 
-	columnIndex map[Column]int // position of each column in Columns
+	columnIndex map[span]int // position of each column in Columns
 }
 
-// BuildPlanning assembles stands, slots and sign-ups into a Planning.
-// stands must be in display order. myVolunteerID may be 0; open says
-// whether the event accepts sign-ups.
-func BuildPlanning(stands []Stand, slots []Slot, signups []SignupRow, myVolunteerID int64, open bool) *Planning {
-	p := &Planning{MyID: myVolunteerID, Open: open, columnIndex: map[Column]int{}}
+// BuildPlanning assembles stands, slots, moments and sign-ups into a
+// Planning. stands must be in display order. myVolunteerID may be 0; open
+// says whether the event accepts sign-ups.
+func BuildPlanning(stands []Stand, slots []Slot, moments []Moment, signups []SignupRow, myVolunteerID int64, open bool) *Planning {
+	p := &Planning{MyID: myVolunteerID, Open: open, columnIndex: map[span]int{}}
 	byStand := p.addStands(stands)
 	views := p.addSlots(byStand, chronological(slots), signupsBySlot(signups))
+	p.addMoments(moments)
 	p.buildRows()
 	p.buildGroups(views)
 	p.markClashes()
@@ -113,14 +127,45 @@ func (p *Planning) addSlots(byStand map[int64]*StandView, slots []Slot, bySlot m
 		if v.Mine {
 			p.MySlots = append(p.MySlots, v)
 		}
-		c := Column{StartsAt: sl.StartsAt, EndsAt: sl.EndsAt}
-		if _, ok := p.columnIndex[c]; !ok {
-			p.columnIndex[c] = len(p.Columns)
-			p.Columns = append(p.Columns, c)
+		k := span{sl.StartsAt, sl.EndsAt}
+		if _, ok := p.columnIndex[k]; !ok {
+			p.columnIndex[k] = len(p.Columns)
+			p.Columns = append(p.Columns, Column{StartsAt: sl.StartsAt, EndsAt: sl.EndsAt})
 		}
 		views = append(views, v)
 	}
 	return views
+}
+
+// addMoments gives the title of each moment to the column that has its time
+// range. The match is exact: a moment from 10:00 to 12:00 does not cover the
+// slots 10:00 to 11:00 and 11:00 to 12:00. A moment with no such column adds
+// a column of its own, with no slots. The columns are then sorted again by start, then end.
+func (p *Planning) addMoments(moments []Moment) {
+	if len(moments) == 0 {
+		return
+	}
+	for _, m := range moments {
+		k := span{m.StartsAt, m.EndsAt}
+		if i, ok := p.columnIndex[k]; ok {
+			if p.Columns[i].Title == "" {
+				p.Columns[i].Title, p.Columns[i].Color = m.Title, m.Color
+			}
+			continue
+		}
+		p.columnIndex[k] = len(p.Columns)
+		p.Columns = append(p.Columns, Column{StartsAt: m.StartsAt, EndsAt: m.EndsAt, Title: m.Title, Color: m.Color, MomentOnly: true})
+	}
+	sort.SliceStable(p.Columns, func(i, j int) bool {
+		a, b := p.Columns[i], p.Columns[j]
+		if !a.StartsAt.Equal(b.StartsAt) {
+			return a.StartsAt.Before(b.StartsAt)
+		}
+		return a.EndsAt.Before(b.EndsAt)
+	})
+	for i, c := range p.Columns {
+		p.columnIndex[span{c.StartsAt, c.EndsAt}] = i
+	}
 }
 
 func (p *Planning) newSlotView(sl Slot, stand *Stand, signups []SignupRow) *SlotView {
@@ -162,7 +207,7 @@ func (p *Planning) buildGroups(views []*SlotView) {
 }
 
 func (p *Planning) column(v *SlotView) int {
-	return p.columnIndex[Column{StartsAt: v.StartsAt, EndsAt: v.EndsAt}]
+	return p.columnIndex[span{v.StartsAt, v.EndsAt}]
 }
 
 // markClashes flags the current volunteer's slots that overlap each other.
@@ -209,6 +254,28 @@ func spansSeveralDays(cols []Column) bool {
 	return false
 }
 
+// HasSlots reports whether at least one column has slots, so whether the
+// event has something to sign up for.
+func (p *Planning) HasSlots() bool {
+	for _, c := range p.Columns {
+		if !c.MomentOnly {
+			return true
+		}
+	}
+	return false
+}
+
+// HasMomentColumns reports whether at least one column exists only for a
+// moment.
+func (p *Planning) HasMomentColumns() bool {
+	for _, c := range p.Columns {
+		if c.MomentOnly {
+			return true
+		}
+	}
+	return false
+}
+
 // Slot returns the slot view with the given id, or nil.
 func (p *Planning) Slot(id int64) *SlotView {
 	for _, st := range p.Stands {
@@ -241,7 +308,7 @@ func (p *Planning) Mine() *Planning {
 			signups = append(signups, v.Signups...)
 		}
 	}
-	return BuildPlanning(stands, slots, signups, p.MyID, p.Open)
+	return BuildPlanning(stands, slots, nil, signups, p.MyID, p.Open)
 }
 
 // MyOverlaps returns the current volunteer's other slots that overlap v.

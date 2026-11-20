@@ -18,6 +18,10 @@ import (
 
 const defaultColor = "#3d7cc9"
 
+// neutralMomentColor is what the color picker shows for a moment that has no
+// color: the light tint of a column with no slot.
+const neutralMomentColor = "#fbf0c4"
+
 // palette gives each new stand a distinct default colour.
 var palette = []string{"#3d7cc9", "#d9534f", "#2e9e6a", "#e8932c", "#8a5cc7", "#c94f8f", "#2aa3b5", "#7a8b2e"}
 
@@ -198,6 +202,14 @@ func userMessage(err error) (string, bool) {
 		return fmt.Sprintf("Un événement ne peut pas avoir plus de %d stands.", store.MaxStands), true
 	case errors.Is(err, store.ErrTooManySlots):
 		return fmt.Sprintf("Un événement ne peut pas avoir plus de %d créneaux.", store.MaxSlots), true
+	case errors.Is(err, store.ErrTooManyMoments):
+		return fmt.Sprintf("Un événement ne peut pas avoir plus de %d moments.", store.MaxMoments), true
+	case errors.Is(err, store.ErrMomentExists):
+		return "Un moment existe déjà à cette heure.", true
+	case errors.Is(err, model.ErrMomentRange):
+		return "L'heure de fin doit être après l'heure de début.", true
+	case errors.Is(err, model.ErrMomentTitle):
+		return fmt.Sprintf("Le titre du moment est obligatoire (%d caractères au maximum).", model.MaxMomentTitle), true
 	case errors.Is(err, model.ErrSlotRange):
 		return "L'heure de fin doit être après l'heure de début.", true
 	case errors.Is(err, model.ErrSlotMin):
@@ -269,6 +281,33 @@ type volunteerForm struct {
 	Name    string
 	Phone   string
 	Comment string
+}
+
+// readMomentForm reads the times, the title and the color of a moment. The times belong
+// to the day date (YYYY-MM-DD). The title is read one character past
+// model.MaxMomentTitle, so that Moment.Check can say that it is too long.
+func (s *Server) readMomentForm(r *http.Request, date string) (model.Moment, error) {
+	var m model.Moment
+	var err error
+	if m.StartsAt, err = s.parseDateTime(date, r.FormValue("from")); err != nil {
+		return m, userError("Début : " + err.Error())
+	}
+	if m.EndsAt, err = s.parseDateTime(date, r.FormValue("to")); err != nil {
+		return m, userError("Fin : " + err.Error())
+	}
+	m.Title = clean(r.FormValue("title"), model.MaxMomentTitle+1, false)
+	// Unlike a stand, a moment may have no color: anything that is not a
+	// "#rrggbb" color, or the "Sans couleur" box, gives an empty color. The
+	// box does not count if the organizer changed the picker (color_was is
+	// the color that the picker showed), so a color that was picked is kept.
+	// A form without color_was keeps the box in charge.
+	c := r.FormValue("color")
+	was := r.FormValue("color_was")
+	picked := was != "" && c != was
+	if (picked || r.FormValue("nocolor") != "1") && validColor(c) {
+		m.Color = c
+	}
+	return m, nil
 }
 
 // readVolunteerForm reads a sign-up: a name, an optional phone and comment.
