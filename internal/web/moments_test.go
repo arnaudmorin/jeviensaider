@@ -47,8 +47,7 @@ func TestPublicTableShowsMomentTitles(t *testing.T) {
 	expect(t, r, 200,
 		`class="col-title">Goûter`,
 		`class="col-title">Spectacle des enfants`,
-		`class="moment-cell"`,
-		"Moment sans créneau")
+		`class="moment-cell"`)
 	if i, j := strings.Index(r.body, "Spectacle des enfants"), strings.Index(r.body, "Goûter"); i > j {
 		t.Error("the 11:00 moment must come before the 14:00 one")
 	}
@@ -184,32 +183,17 @@ func TestTodoFilterKeepsMomentsWhenThereIsNoSlot(t *testing.T) {
 	expect(t, e.get(e.client(), pub+"?todo=1"), 200, "Spectacle")
 }
 
-// The legend names the tinted column of the table. An event with only
-// moments has no table, so it must not show that swatch.
-func TestLegendHasNoMomentSwatchWithoutATable(t *testing.T) {
-	e := newEnv(t, Config{})
-	admin := e.client()
-	r := e.post(admin, "/events", url.Values{"title": {"Spectacle"}, "date": {"2026-06-20"}, "admin_email": {"orga@example.org"}})
-	expect(t, r, http.StatusSeeOther)
-	adminPath := r.location
-	addMoment(t, e, adminPath, "Spectacle des enfants", "2026-06-20 11:00", "2026-06-20 12:00")
-	expect(t, e.post(admin, adminPath+"/status", url.Values{"status": {"open"}}), http.StatusSeeOther)
-	pub := publicLinkRe.FindStringSubmatch(e.get(admin, adminPath).body)[1]
-
-	page := e.get(e.client(), pub)
-	expect(t, page, 200, "Spectacle des enfants")
-	if strings.Contains(page.body, "Moment sans créneau") {
-		t.Error("the legend names a column that the page does not draw")
-	}
-}
-
-// With a table, the swatch is for wide screens only: the table is hidden on a
-// phone (see the min-width media query in app.css).
-func TestLegendMomentSwatchIsForTheTableOnly(t *testing.T) {
+// The legend explains the slots only: a column that exists only for a
+// moment shows its title, so it needs no swatch.
+func TestLegendHasNoMomentSwatch(t *testing.T) {
 	e := newEnv(t, Config{})
 	admin := e.client()
 	adminPath, pub, _ := openEventWithSlot(t, e, admin, url.Values{"title": {"Fête"}, "admin_email": {"orga@example.org"}})
 	addMoment(t, e, adminPath, "Spectacle", "2026-06-20 11:00", "2026-06-20 12:00")
 
-	expect(t, e.get(e.client(), pub), 200, `<span class="table-only"><i class="lg moment"`)
+	page := e.get(e.client(), pub)
+	expect(t, page, 200, `class="moment-cell"`, `class="legend"`)
+	if strings.Contains(page.body, "Moment sans créneau") || strings.Contains(page.body, "lg moment") {
+		t.Error("the legend names the moment columns")
+	}
 }

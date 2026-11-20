@@ -109,9 +109,8 @@ Derived notions (computed, not stored):
     moment shows the title on its own line above the time range. A moment
     with no slot at its exact time range gets a column of its own, tinted
     from top to bottom, with empty cells that say "Pas de créneau" to screen
-    readers. When such a column exists in the table, the legend adds "Moment
-    sans créneau" on wide screens. The phone list and the list of an event with
-    no slot have no such column, so the legend does not name it there. On phones, a group shows the title in its heading, and a group
+    readers. The legend does not name these columns: their title says what
+    they are. On phones, a group shows the title in its heading, and a group
     with no slot says "Pas d'inscription à ce moment". The filter above hides
     these groups on phones and keeps every column in the table. An event
     with moments and no slot (no stand, or stands without slots) shows the

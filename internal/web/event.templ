@@ -108,20 +108,15 @@ templ overview(d eventPage) {
 				</a>
 			</div>
 		</div>
-		@legend(d.P)
+		@legend()
 		@planningView(d)
 	</section>
 }
 
-templ legend(p *model.Planning) {
+templ legend() {
 	<p class="legend">
 		<span><i class="lg need" aria-hidden="true"></i>Places à prendre</span>
 		<span><i class="lg full" aria-hidden="true"></i>Équipe suffisante ou complet</span>
-		// The swatch names a column of the table. An event with no slot has no
-		// table, and on a phone the table is hidden, so it is for wide screens.
-		if p.HasSlots() && p.HasMomentColumns() {
-			<span class="table-only"><i class="lg moment" aria-hidden="true"></i>Moment sans créneau</span>
-		}
 	</p>
 }
 

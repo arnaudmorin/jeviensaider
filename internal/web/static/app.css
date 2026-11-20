@@ -260,11 +260,9 @@ legend { font-weight: 700; font-size: .95rem; padding: 0; margin-bottom: 6px; }
 .switch.on .switch-track::after { transform: translateX(16px); }
 .legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: .875rem; color: var(--muted); }
 .legend span { display: inline-flex; align-items: center; gap: 8px; }
-.legend .table-only { display: none; }
 .lg { width: 22px; height: 14px; border-radius: 4px; display: inline-block; }
 .lg.need { background: var(--primary-tonal); }
 .lg.full { background: var(--slot-full-bg); border: 1.5px solid var(--slot-full-border); }
-.lg.moment { background: var(--moment); border: 1px solid var(--line-strong); }
 
 /* A slot: tinted orange when people are still needed (like the "Là où on a
    le plus besoin de vous" cards), flat grey when there are enough people,
@@ -323,7 +321,6 @@ a.slot { flex-direction: row; align-items: center; gap: 12px; }
 .tgroup > p { margin: 0; }
 @media (min-width: 760px) {
   .grid-wrap { display: block; }
-  .legend .table-only { display: inline-flex; }
   .timeline { display: none; }
 }
 /* An event with moments and no stand has no table: the list stays. */
