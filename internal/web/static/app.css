@@ -280,15 +280,14 @@ a.slot.need:hover { background: var(--tonal-hover); }
 .slot-me { font-weight: 700; font-size: .95rem; color: var(--primary-on-tonal); }
 .slot-names { font-size: .875rem; color: var(--muted); }
 /* A slot that one can take: its text on the left and "Je m'inscris" on the
-   right, like the "J'y vais" cards. In the narrow cells of the table, the
-   link goes under the text. */
+   right, like the "J'y vais" cards. In the narrow cells of the table, it
+   goes under the text. Where people are needed, it is the same button as
+   "J'y vais" (btn primary small); otherwise a plain link. */
 a.slot { flex-direction: row; align-items: center; gap: 12px; }
 .slot-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .slot-cta { flex-shrink: 0; font-weight: 700; font-size: .9rem; color: var(--link); }
 .grid a.slot { flex-direction: column; align-items: stretch; gap: 2px; }
 .grid .slot-cta { align-self: flex-start; margin-top: 6px; }
-.slot.need .slot-cta { color: var(--on-primary); background: var(--primary); border-radius: 8px; padding: 6px 12px; }
-.grid .slot.need .slot-cta { background: none; color: var(--link); padding: 0; text-decoration: underline; }
 .dot { width: 12px; height: 12px; border-radius: 50%; background: var(--stand, var(--muted)); display: inline-block; flex-shrink: 0; }
 
 .grid-wrap { display: none; overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius); }

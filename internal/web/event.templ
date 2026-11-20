@@ -200,7 +200,8 @@ templ slotCell(d eventPage, s *model.SlotView, showStand bool) {
 				<span class="slot-main">
 					@slotBody(d.P, s, showStand)
 				</span>
-				<span class="slot-cta">Je m'inscris</span>
+				// Where people are needed, the same button as "J'y vais".
+				<span class={ "slot-cta", templ.KV("btn primary small", s.Missing > 0) }>Je m'inscris</span>
 			</a>
 		} else {
 			<div class={ "slot", slotKind(s), "st-" + s.Status, templ.KV("mine", s.Mine), templ.KV("clash", s.Clash) } style={ standStyle(s.Stand.Color) }>
