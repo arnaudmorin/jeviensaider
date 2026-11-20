@@ -117,8 +117,7 @@ templ overview(d eventPage) {
 templ legend(p *model.Planning) {
 	<p class="legend">
 		<span><i class="lg need" aria-hidden="true"></i>Places à prendre</span>
-		<span><i class="lg room" aria-hidden="true"></i>Assez de monde, on peut encore venir</span>
-		<span><i class="lg full" aria-hidden="true"></i>Complet</span>
+		<span><i class="lg full" aria-hidden="true"></i>Assez de monde ou complet</span>
 		// The swatch names a column of the table. An event with no slot has no
 		// table, and on a phone the table is hidden, so it is for wide screens.
 		if p.HasSlots() && p.HasMomentColumns() {
@@ -204,7 +203,9 @@ templ slotCell(d eventPage, s *model.SlotView, showStand bool) {
 	if !d.TodoOnly || s.Missing > 0 {
 		if s.CanSignUp {
 			<a class={ "slot", slotKind(s), "st-" + s.Status } href={ signupURL(d.EventURL, s) } hx-get={ string(signupURL(d.EventURL, s)) } hx-target="#modal" style={ standStyle(s.Stand.Color) }>
-				@slotBody(d.P, s, showStand)
+				<span class="slot-main">
+					@slotBody(d.P, s, showStand)
+				</span>
 				<span class="slot-cta">Je m'inscris</span>
 			</a>
 		} else {

@@ -93,13 +93,15 @@ Derived notions (computed, not stored):
     the full description.
   - Phones: a list, one group per time range, one card per slot.
   - A slot says in words where it stands, never as a bare fraction: "Il
-    reste N places" (under the minimum, dashed border), "Assez de monde,
+    reste N places" (under the minimum, orange tint), "Assez de monde,
     encore N places" or "Assez de monde, vous pouvez venir" (minimum reached,
-    solid border), "Complet" (maximum reached, grey). It lists the public
+    flat grey), "Complet" (maximum reached, flat grey). The visitor's own
+    slots have an orange border. It lists the public
     names and, on the visitor's own slots, "Vous y êtes" ("· ⚠ en même temps
     qu'un autre créneau" if two of their slots overlap). A slot one can take
-    is a link to the sign-up form ("Je m'inscris"). A legend explains the
-    borders.
+    is a link to the sign-up form ("Je m'inscris"), on the right of the card
+    on phones. A legend explains the colours: "Places à prendre" and "Assez
+    de monde ou complet".
   - Switch "Seulement les places à prendre" (`?todo=1`) hides slots that
     reached their minimum.
   - Moments (section 3): a column whose time range is the exact range of a

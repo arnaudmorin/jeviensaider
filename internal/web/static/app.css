@@ -1,6 +1,7 @@
 /* Je viens aider. Sober and legible: white, neutral greys, the logo's
    orange for actions. Statuses always say their meaning in words, and
-   differ by more than colour (dashed / solid / filled). Mobile first. */
+   differ by more than colour (tinted with a button / flat). Mobile
+   first. */
 
 @font-face {
   font-family: "Atkinson Hyperlegible";
@@ -45,6 +46,10 @@
   --error-bg: #fdecea;   --error-fg: #7a1a12;
   --warning-bg: #fff1e8; --warning-fg: #6c2a0d;
   --info-bg: #eef2f7;    --info-fg: #1e3a5f;
+  /* A slot with enough people, full or not. */
+  --slot-full-bg: #f4f4f5;
+  --slot-full-border: transparent;
+  --slot-full-text: #18181b;
   --radius: 14px;
   --tap: 44px;
   color-scheme: light;
@@ -83,6 +88,10 @@
     --error-bg: #3b1714;   --error-fg: #ffc9c2;
     --warning-bg: #3a1e10; --warning-fg: #fdd4b0;
     --info-bg: #1a2433;    --info-fg: #c7d8ee;
+    /* In the dark, a slot with enough people sinks into the page. */
+    --slot-full-bg: #131316;
+    --slot-full-border: #2a2a30;
+    --slot-full-text: #b6b6bf;
     color-scheme: dark;
   }
 }
@@ -253,25 +262,33 @@ legend { font-weight: 700; font-size: .95rem; padding: 0; margin-bottom: 6px; }
 .legend span { display: inline-flex; align-items: center; gap: 8px; }
 .legend .table-only { display: none; }
 .lg { width: 22px; height: 14px; border-radius: 4px; display: inline-block; }
-.lg.need { border: 2px dashed var(--link); }
-.lg.room { border: 1.5px solid var(--line-strong); }
-.lg.full { background: var(--fill); }
+.lg.need { background: var(--primary-tonal); }
+.lg.full { background: var(--slot-full-bg); border: 1.5px solid var(--slot-full-border); }
 .lg.moment { background: var(--moment); border: 1px solid var(--line-strong); }
 
-/* A slot: dashed when people are still needed, solid when there is enough,
-   filled grey when full; the visitor's own slots are tinted. */
+/* A slot: tinted orange when people are still needed (like the "Là où on a
+   le plus besoin de vous" cards), flat grey when there are enough people,
+   full or not; the visitor's own slots have an orange border. */
 .slot { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border-radius: 12px; background: var(--surface); border: 1.5px solid var(--line-strong); color: var(--text); text-decoration: none; }
 a.slot:hover { color: var(--text); background: var(--slot-hover); }
-.slot.need { border: 2px dashed var(--link); }
-.slot.full { background: var(--fill); border-color: transparent; }
-.slot.mine { background: var(--primary-tonal); border: 1.5px solid transparent; }
+.slot.need { background: var(--primary-tonal); border-color: transparent; }
+a.slot.need:hover { background: var(--tonal-hover); }
+.slot.room, .slot.full { background: var(--slot-full-bg); border-color: var(--slot-full-border); color: var(--slot-full-text); }
+.slot.mine { background: var(--surface); border: 2px solid var(--link); color: var(--text); }
 .slot-stand { display: flex; align-items: center; gap: 8px; font-weight: 700; }
 .slot-status { font-weight: 700; font-size: .95rem; color: var(--ok); }
 .slot.need .slot-status, .slot-status.need-text { color: var(--primary-on-tonal); }
-.slot.full .slot-status { color: var(--muted); }
+.slot.room .slot-status, .slot.full .slot-status { color: var(--muted); }
 .slot-me { font-weight: 700; font-size: .95rem; color: var(--primary-on-tonal); }
 .slot-names { font-size: .875rem; color: var(--muted); }
-.slot-cta { align-self: flex-start; margin-top: 6px; font-weight: 700; font-size: .9rem; color: var(--link); }
+/* A slot that one can take: its text on the left and "Je m'inscris" on the
+   right, like the "J'y vais" cards. In the narrow cells of the table, the
+   link goes under the text. */
+a.slot { flex-direction: row; align-items: center; gap: 12px; }
+.slot-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.slot-cta { flex-shrink: 0; font-weight: 700; font-size: .9rem; color: var(--link); }
+.grid a.slot { flex-direction: column; align-items: stretch; gap: 2px; }
+.grid .slot-cta { align-self: flex-start; margin-top: 6px; }
 .slot.need .slot-cta { color: var(--on-primary); background: var(--primary); border-radius: 8px; padding: 6px 12px; }
 .grid .slot.need .slot-cta { background: none; color: var(--link); padding: 0; text-decoration: underline; }
 .dot { width: 12px; height: 12px; border-radius: 50%; background: var(--stand, var(--muted)); display: inline-block; flex-shrink: 0; }
@@ -364,8 +381,8 @@ dialog .close:hover { background: var(--fill); }
 .row-actions { display: flex; gap: 4px; }
 .row-actions form { margin: 0; }
 .admin-slot { border: 1.5px solid var(--line-strong); border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; }
-.admin-slot.need { border: 2px dashed var(--link); }
-.admin-slot.full { background: var(--fill); border-color: transparent; }
+.admin-slot.need { background: var(--primary-tonal); border-color: transparent; }
+.admin-slot.room, .admin-slot.full { background: var(--slot-full-bg); border-color: var(--slot-full-border); color: var(--slot-full-text); }
 .admin-slot > p { margin: 0; }
 .moments { display: flex; flex-direction: column; gap: 12px; }
 .moments > p, .moments h2 { margin: 0; }
