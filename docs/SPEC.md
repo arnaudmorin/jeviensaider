@@ -38,8 +38,9 @@ secret links (random 256-bit tokens, base64url).
   - Status: `draft` (planning not public, no sign-ups), `open` (sign-ups
     allowed), `closed` (read-only for volunteers; the organiser can still add
     people).
-- **Stand**: belongs to an event; name, description, colour (`#rrggbb`),
-  display position. At most **50** stands per event.
+- **Stand**: belongs to an event; name, description, optional colour
+  (`#rrggbb`; empty means no colour), display position. At most **50** stands
+  per event.
 - **Slot**: belongs to a stand; start and end (local wall-clock time, no
   timezone), minimum people (≥ 1), optional maximum. At most **500** slots
   per event.
@@ -86,7 +87,8 @@ Derived notions (computed, not stored):
     take that are under their minimum, the emptiest first, then the earliest.
     Hidden under the filter.
   - Wide screens: a table, one row per stand, one column per distinct time
-    range. Each row header shows the stand's colour dot, name and description
+    range. Each row header shows the stand's colour dot (none for a stand
+    with no colour), name and description
     cut after two lines; a "Voir plus" link (only when the text is cut) opens
     the full description.
   - Phones: a list, one group per time range, one card per slot.
@@ -191,7 +193,12 @@ Derived notions (computed, not stored):
   `POST /a/<token>/moments/<id>` and `POST /a/<token>/moments/<id>/delete`.
   Each route acts only on the moments of that event.
 - Stands: a summary list (linking to each stand), then each stand: add,
-  edit, delete, move up/down.
+  edit, delete, move up/down. The colour of a stand is optional and works
+  like the colour of a moment: the add form starts with the next colour of
+  the stand palette, the "Modifier" panel shows the stand's colour (or the
+  default blue if it has none), and the box "Sans couleur", with the hidden
+  field `color_was`, follows the same rules. A stand with no colour has no
+  dot, and its pages in the PDF have a light grey band.
 - Slots: a generator ("from 14:00 to 17:00, every 1 h, 2 people" → three
   slots) that previews, as you type, the slots it will create; per-slot edit
   (times, min, max, its own "Enregistrer") and delete.

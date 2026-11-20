@@ -59,7 +59,7 @@ templ adminView(d adminPage) {
 					for _, st := range d.P.Stands {
 						<li>
 							<a href={ templ.SafeURL("#stand-" + i64(st.ID)) } style={ standStyle(st.Color) }>
-								<span class="dot"></span>
+								@standDot(st.Color)
 								<span class="grow">
 									<strong>{ st.Name }</strong>
 									<span class="muted">{ itoa(len(st.Slots)) } { plural(len(st.Slots), "créneau", "créneaux") } · { itoa(st.Count) }/{ itoa(st.Needed) }</span>
@@ -75,7 +75,7 @@ templ adminView(d adminPage) {
 			}
 			<form method="post" action={ templ.SafeURL(d.AdminPath + "/stands") } class="card add-stand">
 				<label class="grow">Nouveau stand <input name="name" required maxlength="80" placeholder="Buvette, accueil, rangement…"/></label>
-				<label>Couleur <input type="color" name="color" value={ d.NextColor }/></label>
+				@colorFields(d.NextColor, false)
 				<button class="btn primary" type="submit">
 					@iconPlus()
 					Ajouter
@@ -176,10 +176,7 @@ templ momentsSection(d adminPage) {
 }
 
 // momentFields are the fields of a moment: day, start, end, title and color.
-// The box "Sans couleur" is how the organizer goes back to no color. The
-// hidden field color_was holds the color that the picker showed, so that the
-// server can tell a color that the organizer picked from one that was already
-// there.
+// The box "Sans couleur" is how the organizer goes back to no color.
 templ momentFields(date, from, to, title, color string, noColor bool) {
 	<label>Jour <input type="date" name="date" value={ date } required/></label>
 	<div class="row2">
@@ -188,16 +185,27 @@ templ momentFields(date, from, to, title, color string, noColor bool) {
 	</div>
 	<label>Titre <input name="title" value={ title } required maxlength="80"/></label>
 	<div class="add-stand">
-		<label>Couleur <input type="color" name="color" value={ color }/></label>
-		<input type="hidden" name="color_was" value={ color }/>
-		<label class="check"><input type="checkbox" name="nocolor" value="1" checked?={ noColor }/> <span>Sans couleur</span></label>
+		@colorFields(color, noColor)
 	</div>
+}
+
+// colorFields are the color picker and the box "Sans couleur" of a stand or a
+// moment. The hidden field color_was holds the color that the picker showed,
+// so that the server can tell a color that the organizer picked from one
+// that was already there.
+templ colorFields(color string, noColor bool) {
+	<label>Couleur <input type="color" name="color" value={ color }/></label>
+	<input type="hidden" name="color_was" value={ color }/>
+	<label class="check"><input type="checkbox" name="nocolor" value="1" checked?={ noColor }/> <span>Sans couleur</span></label>
 }
 
 templ adminStand(d adminPage, st *model.StandView, first, last bool) {
 	<section class="stand" id={ "stand-" + i64(st.ID) } style={ standStyle(st.Color) }>
 		<header class="stand-head">
-			<h3><span class="dot"></span>{ st.Name }</h3>
+			<h3>
+				@standDot(st.Color)
+				{ st.Name }
+			</h3>
 			<div class="row-actions">
 				<form method="post" action={ templ.SafeURL(d.AdminPath + "/stands/" + i64(st.ID) + "/move") }><input type="hidden" name="dir" value="up"/><button class="btn icon" type="submit" title="Monter" aria-label={ "Monter " + st.Name } disabled?={ first }>↑</button></form>
 				<form method="post" action={ templ.SafeURL(d.AdminPath + "/stands/" + i64(st.ID) + "/move") }><input type="hidden" name="dir" value="down"/><button class="btn icon" type="submit" title="Descendre" aria-label={ "Descendre " + st.Name } disabled?={ last }>↓</button></form>
@@ -233,7 +241,7 @@ templ adminStand(d adminPage, st *model.StandView, first, last bool) {
 			<form method="post" action={ templ.SafeURL(d.AdminPath + "/stands/" + i64(st.ID)) } class="stack">
 				<div class="add-stand">
 					<label class="grow">Nom <input name="name" value={ st.Name } required maxlength="80"/></label>
-					<label>Couleur <input type="color" name="color" value={ cssColor(st.Color) }/></label>
+					@colorFields(standPickerColor(st.Color), st.Color == "")
 				</div>
 				<label><span class="label-text">Description <span class="opt">ce que font les bénévoles</span></span> <textarea name="description" rows="2" maxlength="1000">{ st.Description }</textarea></label>
 				<div><button class="btn primary" type="submit">Enregistrer</button></div>
@@ -355,7 +363,12 @@ templ adminGrid(p *model.Planning) {
 			<tbody>
 				for _, row := range p.Rows {
 					<tr>
-						<th scope="row" style={ standStyle(row.Stand.Color) }><span class="stand-name"><span class="dot"></span>{ row.Stand.Name }</span></th>
+						<th scope="row" style={ standStyle(row.Stand.Color) }>
+							<span class="stand-name">
+								@standDot(row.Stand.Color)
+								{ row.Stand.Name }
+							</span>
+						</th>
 						for i, cell := range row.Cells {
 							if p.Columns[i].MomentOnly {
 								@momentCell(p.Columns[i])

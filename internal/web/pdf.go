@@ -344,11 +344,11 @@ func (d *pdfDoc) strokeRect(x, y, w, h float64) {
 	d.pdf.RectFromUpperLeftWithStyle(x, y, w, h, "D")
 }
 
-// standColor turns a validated "#rrggbb" into a colour (the default colour
-// otherwise).
+// standColor turns a validated "#rrggbb" into a colour. A stand with no
+// color, or a color that is not valid, gets the light grey of the headers.
 func standColor(hex string) rgb {
 	if !validColor(hex) {
-		hex = defaultColor
+		return colHead
 	}
 	v, _ := strconv.ParseUint(hex[1:], 16, 32)
 	return rgb{uint8(v >> 16), uint8(v >> 8), uint8(v)}

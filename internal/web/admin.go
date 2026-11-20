@@ -204,13 +204,10 @@ func readStand(r *http.Request, ev *model.Event) (*model.Stand, error) {
 		EventID:     ev.ID,
 		Name:        clean(r.FormValue("name"), maxStandName, false),
 		Description: clean(r.FormValue("description"), maxStandDescription, true),
-		Color:       r.FormValue("color"),
+		Color:       readColor(r),
 	}
 	if st.Name == "" {
 		return nil, userError("Le nom du stand est obligatoire.")
-	}
-	if !validColor(st.Color) {
-		st.Color = defaultColor
 	}
 	return st, nil
 }

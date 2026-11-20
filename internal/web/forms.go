@@ -16,6 +16,7 @@ import (
 	"jeviensaider/internal/store"
 )
 
+// defaultColor is what the color picker shows for a stand that has no color.
 const defaultColor = "#3d7cc9"
 
 // neutralMomentColor is what the color picker shows for a moment that has no
@@ -296,18 +297,23 @@ func (s *Server) readMomentForm(r *http.Request, date string) (model.Moment, err
 		return m, userError("Fin : " + err.Error())
 	}
 	m.Title = clean(r.FormValue("title"), model.MaxMomentTitle+1, false)
-	// Unlike a stand, a moment may have no color: anything that is not a
-	// "#rrggbb" color, or the "Sans couleur" box, gives an empty color. The
-	// box does not count if the organizer changed the picker (color_was is
-	// the color that the picker showed), so a color that was picked is kept.
-	// A form without color_was keeps the box in charge.
+	m.Color = readColor(r)
+	return m, nil
+}
+
+// readColor reads the optional color of a stand or a moment. Anything that
+// is not a "#rrggbb" color, or the "Sans couleur" box, gives an empty color.
+// The box does not count if the organizer changed the picker (color_was is
+// the color that the picker showed), so a color that was picked is kept. A
+// form without color_was keeps the box in charge.
+func readColor(r *http.Request) string {
 	c := r.FormValue("color")
 	was := r.FormValue("color_was")
 	picked := was != "" && c != was
 	if (picked || r.FormValue("nocolor") != "1") && validColor(c) {
-		m.Color = c
+		return c
 	}
-	return m, nil
+	return ""
 }
 
 // readVolunteerForm reads a sign-up: a name, an optional phone and comment.

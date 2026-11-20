@@ -48,6 +48,13 @@ templ eventView(d eventPage) {
 	}
 }
 
+// standDot is the dot of a stand's color, or nothing for a stand with no color.
+templ standDot(color string) {
+	if validColor(color) {
+		<span class="dot"></span>
+	}
+}
+
 templ eventMeta(ev *model.Event) {
 	if ev.Date != "" || ev.Location != "" {
 		<p class="meta">
@@ -137,7 +144,10 @@ templ planningView(d eventPage) {
 					for _, row := range d.P.Rows {
 						<tr>
 							<th scope="row" style={ standStyle(row.Stand.Color) }>
-								<span class="stand-name"><span class="dot"></span>{ row.Stand.Name }</span>
+								<span class="stand-name">
+									@standDot(row.Stand.Color)
+									{ row.Stand.Name }
+								</span>
 								if row.Stand.Description != "" {
 									<span class="stand-desc">{ row.Stand.Description }</span>
 									<a class="stand-more" href={ templ.SafeURL(d.EventURL + "/stands/" + i64(row.Stand.ID)) } hx-get={ d.EventURL + "/stands/" + i64(row.Stand.ID) } hx-target="#modal">Voir plus</a>
@@ -212,7 +222,10 @@ templ slotBody(p *model.Planning, s *model.SlotView, showStand bool) {
 	// the whole slot is read as one link.
 	if showStand {
 		<span class="sr-only">{ slotWhen(p, s) },</span>
-		<span class="slot-stand"><span class="dot"></span>{ s.Stand.Name }</span>
+		<span class="slot-stand">
+			@standDot(s.Stand.Color)
+			{ s.Stand.Name }
+		</span>
 		<span class="sr-only">:</span>
 	} else {
 		<span class="sr-only">{ s.Stand.Name }, { slotWhen(p, s) } :</span>
@@ -259,7 +272,10 @@ templ mySlots(d eventPage) {
 				for _, s := range d.P.MySlots {
 					<article class={ "card my-slot", templ.KV("clash", s.Clash) } style={ standStyle(s.Stand.Color) }>
 						<p class="when">{ capitalize(dayFR(s.StartsAt)) } · { timeRange(s.StartsAt, s.EndsAt) }</p>
-						<h3><span class="dot"></span>{ s.Stand.Name }</h3>
+						<h3>
+							@standDot(s.Stand.Color)
+							{ s.Stand.Name }
+						</h3>
 						<p class="muted">{ withOthers(s) }</p>
 						if s.Clash {
 							<p class="warn">⚠ En même temps qu'un autre de vos créneaux.</p>

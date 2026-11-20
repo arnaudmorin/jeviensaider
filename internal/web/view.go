@@ -34,8 +34,9 @@ var assetVersion = func() string {
 // asset is the URL of a static file, versioned for long caching.
 func asset(name string) string { return "/static/" + name + "?v=" + assetVersion }
 
-// cssColor is a stand's colour if it is a valid one, for use in CSS.
-func cssColor(c string) string {
+// standPickerColor is the color that the picker shows for a stand: its own,
+// or the default one when it has none.
+func standPickerColor(c string) string {
 	if validColor(c) {
 		return c
 	}
@@ -215,9 +216,13 @@ func capitalize(s string) string {
 	return string(unicode.ToUpper(r)) + s[n:]
 }
 
-// standStyle sets the --stand CSS variable to a stand's colour.
+// standStyle sets the --stand CSS variable to a stand's color. A stand with
+// no color, or a color that is not valid, gives no style.
 func standStyle(color string) templ.SafeCSS {
-	return templ.SafeCSS("--stand: " + cssColor(color))
+	if !validColor(color) {
+		return ""
+	}
+	return templ.SafeCSS("--stand: " + color)
 }
 
 func signupURL(eventURL string, s *model.SlotView) templ.SafeURL {
