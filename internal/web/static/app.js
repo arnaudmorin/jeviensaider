@@ -152,6 +152,22 @@
     initPreviews(document);
   }
 
+  // In the form of a stand or a moment, the box "Sans couleur" and the box
+  // that fills the row or the column cannot both be ticked, and picking a
+  // color means that the organizer wants one. The server reads the form the
+  // same way, so this only makes the screen show what will be saved.
+  function syncColorBoxes(e) {
+    var t = e.target, f = t.form;
+    if (!f || !f.elements.nocolor) return;
+    var noColor = f.elements.nocolor;
+    var fill = f.elements.fill || f.elements.fill_row;
+    if (t.name === "color") noColor.checked = false;
+    else if (t === noColor && noColor.checked && fill) fill.checked = false;
+    else if (t === fill && fill.checked) noColor.checked = false;
+  }
+  document.addEventListener("input", syncColorBoxes);
+  document.addEventListener("change", syncColorBoxes);
+
   // Select-on-focus for read-only link fields.
   document.addEventListener("focusin", function (e) {
     var t = e.target;

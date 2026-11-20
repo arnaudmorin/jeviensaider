@@ -2,6 +2,7 @@ package store
 
 import (
 	"database/sql"
+	"io/fs"
 	"path/filepath"
 	"testing"
 
@@ -87,9 +88,58 @@ func TestUpgradeToMoments(t *testing.T) {
 	if got, err := s.EventLastDay(ctx, 1); err != nil || !got.Equal(day("2027-01-15")) {
 		t.Errorf("EventLastDay = %v, %v; want 2027-01-15", got, err)
 	}
+	// migrate() numbers the files by their place in the sorted list, so the
+	// version is the number of files.
+	files, err := fs.Glob(migrationsFS, "migrations/*.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
 	var version int
 	s.db.QueryRow(`PRAGMA user_version`).Scan(&version)
-	if version != 5 {
-		t.Errorf("user_version = %d, want 5", version)
+	if version != len(files) {
+		t.Errorf("user_version = %d, want %d (the number of migrations)", version, len(files))
+	}
+}
+
+// A database from before the fill setting keeps the look of its planning: a
+// colored moment with no slot at its time range is still tinted, and the other
+// moments are not.
+func TestUpgradeToFill(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "old.db")
+	old, err := sql.Open("sqlite", path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"001_init.sql", "002_admin_email.sql", "003_drop_volunteer_email.sql", "004_retention_days.sql", "005_moments.sql"} {
+		body, err := migrationsFS.ReadFile("migrations/" + name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := old.Exec(string(body)); err != nil {
+			t.Fatal(name, err)
+		}
+	}
+	if _, err := old.Exec(`PRAGMA user_version = 5;
+		INSERT INTO events (id, slug, title, admin_token, date) VALUES (1, 'fete', 'Fête', 'tok', '2026-06-20');
+		INSERT INTO stands (id, event_id, name) VALUES (1, 1, 'Pêche');
+		INSERT INTO slots (stand_id, starts_at, ends_at) VALUES (1, '2026-06-20 10:00', '2026-06-20 11:00');
+		INSERT INTO moments (id, event_id, title, color, starts_at, ends_at) VALUES
+			(1, 1, 'With a slot', '#e8c93a', '2026-06-20 10:00', '2026-06-20 11:00'),
+			(2, 1, 'No slot', '#e8c93a', '2026-06-20 11:00', '2026-06-20 12:00'),
+			(3, 1, 'No color', '', '2026-06-20 13:00', '2026-06-20 14:00');`); err != nil {
+		t.Fatal(err)
+	}
+	old.Close()
+
+	s, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	for id, want := range map[int64]bool{1: false, 2: true, 3: false} {
+		m, err := s.GetMoment(ctx, 1, id)
+		if err != nil || m.Fill != want {
+			t.Errorf("moment %d: fill = %v, want %v (%v)", id, m.Fill, want, err)
+		}
 	}
 }

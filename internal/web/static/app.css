@@ -288,27 +288,54 @@ a.slot { flex-direction: row; align-items: center; gap: 12px; }
 .slot-cta { flex-shrink: 0; font-weight: 700; font-size: .9rem; color: var(--link); }
 .grid a.slot { flex-direction: column; align-items: stretch; gap: 2px; }
 .grid .slot-cta { align-self: flex-start; margin-top: 6px; }
-.dot { width: 12px; height: 12px; border-radius: 50%; background: var(--stand, var(--muted)); display: inline-block; flex-shrink: 0; }
+/* The colour of a stand shows as a stripe on the left side of the element that
+   carries it, and the colour of a moment as a stripe on top of it, because a
+   moment is a column. An element with no colour has no stripe. A stripe is a
+   shadow inside the box, so it follows the rounded corners. */
+.striped { box-shadow: inset 4px 0 0 var(--stand, transparent); padding-left: 12px; }
+.striped-top { box-shadow: inset 0 4px 0 var(--moment-color, transparent); }
+.grid thead th.striped-top { padding-top: 10px; }
+.tgroup.striped-top { padding-top: 12px; border-radius: 12px; }
 
-.grid-wrap { display: none; overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius); }
+.grid-wrap { display: none; overflow-x: auto; padding: 0 6px; border: 1px solid var(--line); border-radius: var(--radius); }
 .grid-wrap.always { display: block; }
-.grid { border-collapse: separate; border-spacing: 6px; width: 100%; min-width: 640px; table-layout: fixed; }
-.grid th { font-size: .875rem; color: var(--muted); font-weight: 700; text-align: left; padding: 6px 4px; }
+.grid { border-collapse: separate; border-spacing: 0 6px; width: 100%; min-width: 640px; table-layout: fixed; }
+.grid th { font-size: .875rem; color: var(--muted); font-weight: 700; text-align: left; padding: 6px 7px 6px 4px; }
 .grid th small { font-weight: 400; }
 .grid thead th:first-child { width: 200px; }
-.grid tbody th { color: var(--text); vertical-align: top; padding-top: 10px; }
-.grid td { vertical-align: top; padding: 0; }
+.grid tbody th { color: var(--text); vertical-align: top; padding: 10px 7px 6px 12px; border-radius: 12px 0 0 12px; box-shadow: inset 4px 0 0 var(--stand, transparent); }
+.grid td { vertical-align: top; padding: 0 3px; }
+.grid td:last-child { padding-right: 0; }
 .grid td .slot + .slot { margin-top: 6px; }
-/* A part of the day with no slot: a tinted column from top to bottom. The
-   shadow fills the gaps between cells. The title and the legend say it in
-   words too. */
+/* A part of the day with no slot: a column from top to bottom. The shadow
+   fills the gap between two rows. The transparent side borders, with the
+   background cut at the padding box, keep a gap between two such columns
+   that sit side by side. The title says it in words too. Its rules come
+   after the row fill rules below, because a moment wins over a stand in the
+   cells that they share. */
 .col-title { display: block; color: var(--text); font-weight: 700; overflow-wrap: anywhere; }
-.grid th.moment, .grid td.moment-cell { --moment-bg: var(--moment); background: var(--moment-bg); box-shadow: 0 0 0 3px var(--moment-bg); }
-/* A moment with its own color: the tint is that color over the page surface,
-   so it stays readable in light and dark mode. */
-.grid th.moment.tinted, .grid td.moment-cell.tinted { --moment-bg: color-mix(in srgb, var(--moment-color) 30%, var(--surface)); }
-.dot.moment-dot { background: var(--moment-color); margin-right: 6px; }
 .grid .slot { min-height: 96px; font-size: .9rem; }
+/* A stand can colour its whole row, not only its dot. The tint is the stand
+   colour mixed into the surface, so the text keeps its contrast in light and
+   dark mode. The cells touch, so the colour has no gap inside the row. */
+.grid tr.fill th, .grid tr.fill td { background: color-mix(in srgb, var(--stand) 16%, var(--surface)); }
+.grid tr.fill th { padding: 10px 10px; border-radius: 12px 0 0 12px; }
+.grid tr.fill td { padding-top: 6px; padding-bottom: 6px; }
+.grid tr.fill td:last-child { padding-right: 3px; border-radius: 0 12px 12px 0; }
+.grid thead th.moment, .grid tbody td.moment-cell, .grid thead th.tinted, .grid tbody td.tinted { border-inline: 3px solid transparent; background-clip: padding-box; }
+.grid thead th.moment, .grid thead th.tinted { padding-inline: 1px 4px; }
+.grid tbody td.moment-cell, .grid tbody td.tinted { padding-inline: 0; }
+.grid thead th.moment, .grid tbody td.moment-cell { --moment-bg: var(--moment); background-color: var(--moment-bg); box-shadow: 0 -6px 0 -3px var(--moment-bg), 0 6px 0 -3px var(--moment-bg); }
+/* A moment that tints its column: that color over the page surface, so it
+   stays readable in light and dark mode. This works for a column with slots
+   too, and for its group in the phone list. */
+.grid thead th.tinted, .grid tbody td.tinted { --moment-bg: color-mix(in srgb, var(--moment-color) 30%, var(--surface)); background-color: var(--moment-bg); box-shadow: 0 -6px 0 -3px var(--moment-bg), 0 6px 0 -3px var(--moment-bg); }
+.grid thead th.striped-top.moment, .grid thead th.striped-top.tinted { box-shadow: inset 0 4px 0 var(--moment-color), 0 -6px 0 -3px var(--moment-bg), 0 6px 0 -3px var(--moment-bg); }
+.tgroup.tinted { background: color-mix(in srgb, var(--moment-color) 30%, var(--surface)); border-radius: 12px; padding: 10px 12px; }
+/* In the phone list, a card shows the colour of its stand as a stripe on its
+   left side. The card keeps its own background, because that background says
+   how the slot stands (open, enough people, full). */
+.timeline .slot { padding-left: 16px; box-shadow: inset 4px 0 0 var(--stand, transparent); }
 .stand-name { display: flex; align-items: center; gap: 8px; font-size: 1rem; }
 .stand-desc { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-weight: 400; color: var(--muted); font-size: .85rem; margin-top: 4px; }
 .stand-more { display: none; font-size: .85rem; font-weight: 700; }
@@ -331,7 +358,7 @@ a.slot { flex-direction: row; align-items: center; gap: 12px; }
 .thanks { display: flex; flex-direction: column; gap: 6px; color: var(--ok); }
 .thanks h2 { font-size: 1.9rem; color: var(--text); margin: 4px 0 0; }
 .thanks p { color: var(--text); font-size: 1.1rem; margin: 0; }
-.my-slot { display: flex; flex-direction: column; gap: 4px; }
+.my-slot { display: flex; flex-direction: column; gap: 4px; box-shadow: inset 4px 0 0 var(--stand, transparent); }
 .my-slot .when { font-weight: 700; color: var(--muted); font-size: .95rem; margin: 0; }
 .my-slot h3 { display: flex; align-items: center; gap: 8px; font-size: 1.2rem; margin: 0; }
 .my-slot p { margin: 0; }
@@ -371,7 +398,7 @@ dialog .close:hover { background: var(--line-strong); }
 .links h2 { margin: 0; }
 .share-label { margin-top: 4px; }
 .stand-list { list-style: none; margin: 0 0 16px; padding: 0; display: flex; flex-direction: column; gap: 8px; }
-.stand-list a { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radius); color: var(--text); text-decoration: none; }
+.stand-list a { display: flex; align-items: center; gap: 12px; padding: 12px 14px 12px 18px; box-shadow: inset 4px 0 0 var(--stand, transparent); border: 1px solid var(--line); border-radius: var(--radius); color: var(--text); text-decoration: none; }
 .stand-list a:hover { background: var(--fill); color: var(--text); }
 .stand-list .grow { display: flex; flex-direction: column; }
 .stand-list .muted { font-size: .875rem; }
@@ -435,7 +462,6 @@ section > details.card + details.card { margin-top: 10px; }
 @media (forced-colors: active) {
   .slot, .admin-slot, .lg { border-color: CanvasText; }
   .slot.need, .admin-slot.need, .lg.need { border-style: dashed; }
-  .grid th.moment, .grid td.moment-cell { border: 1px dotted CanvasText; }
-  .dot.moment-dot { border: 1px solid CanvasText; }
-  .progress-bar, .dot, .switch-track { forced-color-adjust: none; }
+  .grid thead th.moment, .grid tbody td.moment-cell { border: 1px dotted CanvasText; }
+  .progress-bar, .switch-track { forced-color-adjust: none; }
 }

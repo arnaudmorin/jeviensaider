@@ -23,7 +23,9 @@ func storedStands(t *testing.T, e *env, adminPath string) []model.Stand {
 	return list
 }
 
-const standDotHTML = `<span class="dot"></span>`
+// The color of a stand shows as a stripe, set by the --stand variable. There is
+// no dot of color any more, on any page.
+const dotClass = `class="dot`
 
 func TestStandColorFromTheForm(t *testing.T) {
 	e := newEnv(t, Config{})
@@ -35,7 +37,14 @@ func TestStandColorFromTheForm(t *testing.T) {
 	if got := storedStands(t, e, adminPath)[0].Color; got != "#2e9e6a" {
 		t.Fatalf("stand color = %q, want #2e9e6a", got)
 	}
-	expect(t, e.get(e.client(), pub), 200, "--stand: #2e9e6a", standDotHTML)
+	expect(t, e.get(e.client(), pub), 200, "--stand: #2e9e6a")
+	for name, body := range map[string]string{"public": e.get(e.client(), pub).body, "admin": e.get(admin, adminPath).body} {
+		if strings.Contains(body, dotClass) {
+			t.Errorf("%s page: the dot of color is gone, but the page still has one", name)
+		}
+	}
+	// The stand has a stripe on its title in the admin page, and none without a color.
+	expect(t, e.get(admin, adminPath), 200, `class="stand-head striped"`)
 	expect(t, e.get(admin, adminPath), 200, `name="color_was" value="#2e9e6a"`)
 	if body := e.get(admin, adminPath).body; strings.Contains(body, `name="nocolor" value="1" checked`) {
 		t.Error("the box \"Sans couleur\" is ticked for a stand with a color")
@@ -55,16 +64,16 @@ func TestStandWithoutColor(t *testing.T) {
 		}
 	}
 
-	// No color: no dot and no --stand variable, on every page.
+	// No color: no stripe and no --stand variable, on every page.
 	body := e.get(e.client(), pub).body
 	if !strings.Contains(body, "Tombola") {
 		t.Fatal("the stand is not on the public page")
 	}
-	if strings.Contains(body, standDotHTML) || strings.Contains(body, "--stand") {
+	if strings.Contains(body, "--stand") || strings.Contains(body, `class="stand-head striped"`) {
 		t.Error("a stand with no color shows a color on the public page")
 	}
 	body = e.get(admin, adminPath).body
-	if strings.Contains(body, standDotHTML) || strings.Contains(body, "--stand") {
+	if strings.Contains(body, "--stand") || strings.Contains(body, "striped") {
 		t.Error("a stand with no color shows a color on the admin page")
 	}
 	// The panel shows the default color in the picker and the box ticked.

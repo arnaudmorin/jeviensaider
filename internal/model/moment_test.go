@@ -178,3 +178,32 @@ func TestPlanningMomentColor(t *testing.T) {
 		t.Errorf("group color = %q, want the moment color", p.Groups[1].Color)
 	}
 }
+
+// The fill needs a color that the page can use. A stored color that is not
+// "#rrggbb" gives a grey column, not a tinted one.
+func TestPlanningFillNeedsAValidColor(t *testing.T) {
+	for color, want := range map[string]bool{"#e8c93a": true, "": false, "red": false, "#e8c93": false} {
+		moments := []Moment{{ID: 1, Title: "Spectacle", Color: color, Fill: true, StartsAt: at("2026-06-20 11:00"), EndsAt: at("2026-06-20 12:00")}}
+		p := BuildPlanning(momentTestStands(), nil, moments, nil, 0, true)
+		if got := p.Columns[0].Fill; got != want {
+			t.Errorf("color %q: column fill = %v, want %v", color, got, want)
+		}
+	}
+}
+
+// Like the fill of a moment, the fill of a row needs a valid color.
+func TestStandTints(t *testing.T) {
+	for _, c := range []struct {
+		stand Stand
+		want  bool
+	}{
+		{Stand{Color: "#3d7cc9", FillRow: true}, true},
+		{Stand{Color: "#3d7cc9"}, false},
+		{Stand{FillRow: true}, false},
+		{Stand{Color: "blue", FillRow: true}, false},
+	} {
+		if got := c.stand.Tints(); got != c.want {
+			t.Errorf("%+v: Tints = %v, want %v", c.stand, got, c.want)
+		}
+	}
+}

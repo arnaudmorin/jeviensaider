@@ -19,11 +19,8 @@ templ signupDialog(d signupPage) {
 }
 
 templ signupForm(d signupPage, page bool) {
-	<div class="signup-head" style={ standStyle(d.Slot.Stand.Color) }>
-		<p class="when">
-			@standDot(d.Slot.Stand.Color)
-			{ capitalize(dayFR(d.Slot.StartsAt)) } · { timeRange(d.Slot.StartsAt, d.Slot.EndsAt) }
-		</p>
+	<div class={ "signup-head", templ.KV("striped", validColor(d.Slot.Stand.Color)) } style={ standStyle(d.Slot.Stand.Color) }>
+		<p class="when">{ capitalize(dayFR(d.Slot.StartsAt)) } · { timeRange(d.Slot.StartsAt, d.Slot.EndsAt) }</p>
 		if page {
 			<h1 id="signup-title">{ d.Slot.Stand.Name }</h1>
 		} else {
@@ -112,15 +109,9 @@ templ standDialog(d standPage) {
 
 templ standInfo(d standPage, page bool) {
 	if page {
-		<h1 id="stand-title" class="stand-title" style={ standStyle(d.Stand.Color) }>
-			@standDot(d.Stand.Color)
-			{ d.Stand.Name }
-		</h1>
+		<h1 id="stand-title" class={ "stand-title", templ.KV("striped", validColor(d.Stand.Color)) } style={ standStyle(d.Stand.Color) }>{ d.Stand.Name }</h1>
 	} else {
-		<h2 id="stand-title" class="stand-title" style={ standStyle(d.Stand.Color) }>
-			@standDot(d.Stand.Color)
-			{ d.Stand.Name }
-		</h2>
+		<h2 id="stand-title" class={ "stand-title", templ.KV("striped", validColor(d.Stand.Color)) } style={ standStyle(d.Stand.Color) }>{ d.Stand.Name }</h2>
 	}
 	if d.Stand.Description != "" {
 		<p class="desc stand-full">{ d.Stand.Description }</p>

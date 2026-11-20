@@ -112,7 +112,7 @@ func TestUncoloredMomentKeepsTheOldMarkup(t *testing.T) {
 			t.Errorf("the page does not contain %q", want)
 		}
 	}
-	for _, not := range []string{"moment-dot", "tinted", "--moment-color"} {
+	for _, not := range []string{"striped", "tinted", "--moment-color"} {
 		if strings.Contains(body, not) {
 			t.Errorf("a moment with no color must not produce %q", not)
 		}
@@ -127,22 +127,96 @@ func TestColorOnAJoinedColumn(t *testing.T) {
 	setMomentColor(t, e, adminPath, m, "#e8c93a")
 
 	body := e.get(e.client(), pub).body
-	if !strings.Contains(body, `class="dot moment-dot"`) {
-		t.Error("the header must show the dot")
+	if !strings.Contains(body, `class="striped-top"`) || !strings.Contains(body, "--moment-color: #e8c93a") {
+		t.Error("the header must show the stripe of the color, on top")
+	}
+	if strings.Contains(body, dotClass) {
+		t.Error("the dot of color is gone, but the page still has one")
 	}
 	if strings.Contains(body, "tinted") {
 		t.Error("a column that has slots must not be tinted")
 	}
 }
 
-func TestColorTintsAMomentOnlyColumn(t *testing.T) {
+// A color alone gives the stripe, on top of the column. The tint of the column is a choice, made with
+// the "fill" box of the moment.
+func TestColorWithoutFillOnlyGivesTheStripe(t *testing.T) {
 	e := newEnv(t, Config{})
 	admin := e.client()
 	adminPath, pub, _ := openEventWithSlot(t, e, admin, url.Values{"title": {"Fête"}, "admin_email": {"orga@example.org"}})
 	m := addMoment(t, e, adminPath, "Spectacle", "2026-06-20 11:00", "2026-06-20 12:00")
 	setMomentColor(t, e, adminPath, m, "#e8c93a")
 
-	expect(t, e.get(e.client(), pub), 200, `class="moment tinted"`, `class="moment-cell tinted"`, "--moment-color: #e8c93a")
+	body := e.get(e.client(), pub).body
+	for _, want := range []string{`class="moment-cell"`, `class="moment striped-top"`, "--moment-color: #e8c93a"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("the page does not contain %q", want)
+		}
+	}
+	if strings.Contains(body, "tinted") {
+		t.Error("a moment without the fill must not tint its column")
+	}
+}
+
+func TestFillTintsAMomentOnlyColumn(t *testing.T) {
+	e := newEnv(t, Config{})
+	admin := e.client()
+	adminPath, pub, _ := openEventWithSlot(t, e, admin, url.Values{"title": {"Fête"}, "admin_email": {"orga@example.org"}})
+	m := addMoment(t, e, adminPath, "Spectacle", "2026-06-20 11:00", "2026-06-20 12:00")
+	m.Fill = true
+	setMomentColor(t, e, adminPath, m, "#e8c93a")
+
+	body := e.get(e.client(), pub).body
+	expect(t, resp{code: 200, body: body}, 200, `class="moment tinted striped-top"`, `class="moment-cell tinted"`, `<section class="tgroup tinted striped-top"`, "--moment-color: #e8c93a")
+}
+
+// The fill also tints a column that has slots.
+func TestFillTintsAColumnWithSlots(t *testing.T) {
+	e := newEnv(t, Config{})
+	admin := e.client()
+	adminPath, pub, _ := openEventWithSlot(t, e, admin, url.Values{"title": {"Fête"}, "admin_email": {"orga@example.org"}})
+	m := addMoment(t, e, adminPath, "Goûter", "2026-06-20 14:00", "2026-06-20 15:00")
+	m.Fill = true
+	setMomentColor(t, e, adminPath, m, "#e8c93a")
+
+	// The header, the cell of the stand and the group of the phone list.
+	body := e.get(e.client(), pub).body
+	if n := strings.Count(body, "tinted"); n != 3 {
+		t.Errorf("%d tinted parts, want 3 (header, cell, phone group)", n)
+	}
+	// The admin grid shows the same: the header and the cell.
+	if body := e.get(admin, adminPath).body; strings.Count(body, `class="tinted`) != 2 {
+		t.Error("the admin grid does not tint the column")
+	}
+}
+
+func TestMomentFillFromTheForm(t *testing.T) {
+	e := newEnv(t, Config{})
+	admin := e.client()
+	adminPath, _, _ := openEventWithSlot(t, e, admin, url.Values{"title": {"Fête"}, "admin_email": {"orga@example.org"}})
+
+	f := momentForm("12:00", "13:00", "Spectacle", "#e8c93a")
+	f.Set("fill", "1")
+	expect(t, e.post(admin, adminPath+"/moments", f), http.StatusSeeOther)
+	if m := storedMoments(t, e, adminPath)[0]; !m.Fill {
+		t.Fatalf("fill not saved: %+v", m)
+	}
+	expect(t, e.get(admin, adminPath), 200, `name="fill" value="1" checked`)
+	id := i64(storedMoments(t, e, adminPath)[0].ID)
+
+	// A form without the box turns it off.
+	expect(t, e.post(admin, adminPath+"/moments/"+id, momentForm("12:00", "13:00", "Spectacle", "#e8c93a")), http.StatusSeeOther)
+	if m := storedMoments(t, e, adminPath)[0]; m.Fill {
+		t.Error("fill still on after the box was cleared")
+	}
+	// The fill needs a color: "Sans couleur" turns it off too.
+	f = momentForm("12:00", "13:00", "Spectacle", "#e8c93a")
+	f.Set("fill", "1")
+	f.Set("nocolor", "1")
+	expect(t, e.post(admin, adminPath+"/moments/"+id, f), http.StatusSeeOther)
+	if m := storedMoments(t, e, adminPath)[0]; m.Fill || m.Color != "" {
+		t.Errorf("a moment with no color kept the fill: %+v", m)
+	}
 }
 
 // A moment with no color opens its edit panel with "Sans couleur" ticked. A
