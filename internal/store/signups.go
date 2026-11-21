@@ -87,6 +87,9 @@ func (s *Store) SignUp(ctx context.Context, req SignupRequest) (*SignupResult, e
 		if res.Slot, err = getSlot(ctx, tx, req.EventID, req.SlotID); err != nil {
 			return err
 		}
+		if req, err = resolveAdminVolunteer(ctx, tx, req); err != nil {
+			return err
+		}
 		if res.Volunteer, res.NewVolunteer, err = findOrCreateVolunteer(ctx, tx, req); err != nil {
 			return err
 		}
@@ -240,4 +243,78 @@ func (s *Store) CountVolunteers(ctx context.Context, eventID int64) (int, error)
 // sameName compares two names ignoring case and spacing.
 func sameName(a, b string) bool {
 	return strings.EqualFold(strings.Join(strings.Fields(a), " "), strings.Join(strings.Fields(b), " "))
+}
+
+// phoneDigits keeps the digits of a phone number, so that "06 11 22 33 44" and
+// "0611223344" are the same number.
+func phoneDigits(s string) string {
+	return strings.Map(func(r rune) rune {
+		if r >= '0' && r <= '9' {
+			return r
+		}
+		return -1
+	}, s)
+}
+
+// pickVolunteer chooses, among volunteers with the same name (oldest first),
+// the one that the organizer means. With a phone number, it takes the person
+// with that number, else a person with no number yet. A person with another
+// number is somebody else with the same name. Without a phone number, nothing
+// tells them apart, so it takes the oldest. It returns nil if nobody fits.
+func pickVolunteer(sameNamed []*model.Volunteer, phone string) *model.Volunteer {
+	digits := phoneDigits(phone)
+	if digits == "" {
+		if len(sameNamed) > 0 {
+			return sameNamed[0]
+		}
+		return nil
+	}
+	var blank *model.Volunteer
+	for _, v := range sameNamed {
+		switch have := phoneDigits(v.Phone); {
+		case have == digits:
+			return v
+		case have == "" && blank == nil:
+			blank = v
+		}
+	}
+	return blank
+}
+
+// resolveAdminVolunteer completes a request of the organizer, who has no token
+// for the person. If the event already has this person, it sets their token,
+// so that one person has one volunteer record whatever the organizer adds: a
+// slot or a pledge. What the organizer typed never changes that person: the
+// name keeps its spelling, and the phone number is stored only if the person
+// had none. Other requests come back unchanged.
+func resolveAdminVolunteer(ctx context.Context, q querier, req SignupRequest) (SignupRequest, error) {
+	if !req.Admin || req.EditToken != "" || req.Name == "" {
+		return req, nil
+	}
+	rows, err := q.QueryContext(ctx,
+		`SELECT `+volunteerCols+` FROM volunteers WHERE event_id = ? ORDER BY id`, req.EventID)
+	if err != nil {
+		return req, err
+	}
+	defer rows.Close()
+	var sameNamed []*model.Volunteer
+	for rows.Next() {
+		v, err := scanVolunteer(rows)
+		if err != nil {
+			return req, err
+		}
+		if sameName(v.Name, req.Name) {
+			sameNamed = append(sameNamed, v)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return req, err
+	}
+	if known := pickVolunteer(sameNamed, req.Phone); known != nil {
+		req.EditToken, req.Name = known.EditToken, known.Name
+		if known.Phone != "" {
+			req.Phone = known.Phone
+		}
+	}
+	return req, nil
 }

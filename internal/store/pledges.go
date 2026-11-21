@@ -58,21 +58,11 @@ func (s *Store) Pledge(ctx context.Context, req PledgeRequest) (*PledgeResult, e
 		if res.List, err = getPledgeList(ctx, tx, req.EventID, req.ListID); err != nil {
 			return err
 		}
-		signup := SignupRequest{EventID: req.EventID, EditToken: req.EditToken, Name: req.Name, Phone: req.Phone}
-		if req.Admin && req.EditToken == "" {
-			// The organizer has no token for the person. Reuse the volunteer
-			// with the same name, so that a second pledge changes the
-			// quantity and does not add a second person. What the organizer
-			// typed must not change the details of that volunteer: the name
-			// keeps its spelling, and the phone changes only if it was empty.
-			if known, err := volunteerByName(ctx, tx, req.EventID, req.Name); err != nil {
-				return err
-			} else if known != nil {
-				signup.EditToken, signup.Name = known.EditToken, known.Name
-				if known.Phone != "" {
-					signup.Phone = known.Phone
-				}
-			}
+		signup, err := resolveAdminVolunteer(ctx, tx, SignupRequest{
+			EventID: req.EventID, EditToken: req.EditToken, Name: req.Name, Phone: req.Phone, Admin: req.Admin,
+		})
+		if err != nil {
+			return err
 		}
 		res.Volunteer, res.NewVolunteer, err = findOrCreateVolunteer(ctx, tx, signup)
 		if err != nil {
@@ -142,25 +132,4 @@ func (s *Store) ListPledges(ctx context.Context, eventID int64) ([]model.PledgeR
 		out = append(out, r)
 	}
 	return out, rows.Err()
-}
-
-// volunteerByName returns the volunteer of the event with this name, ignoring
-// case and spacing. It returns nil if there is none.
-func volunteerByName(ctx context.Context, q querier, eventID int64, name string) (*model.Volunteer, error) {
-	rows, err := q.QueryContext(ctx,
-		`SELECT `+volunteerCols+` FROM volunteers WHERE event_id = ? ORDER BY id`, eventID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	for rows.Next() {
-		v, err := scanVolunteer(rows)
-		if err != nil {
-			return nil, err
-		}
-		if sameName(v.Name, name) {
-			return v, nil
-		}
-	}
-	return nil, rows.Err()
 }

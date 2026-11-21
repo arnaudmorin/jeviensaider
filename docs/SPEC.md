@@ -361,7 +361,20 @@ It works like a slot sign-up, with these differences:
   (times, min, max, its own "Enregistrer") and delete.
 - Volunteers, on each slot: full names and phones (with a call button),
   "Inscrire quelqu'un" by hand (allowed whatever the status, capacity still
-  applies), "Retirer".
+  applies), "Retirer". "Inscrire quelqu'un" works the same on a slot and on a
+  pledge list. The organizer has no token for the person, so the app looks for
+  a volunteer of the event with the same name, ignoring case and spacing:
+  - With a phone number, it takes the volunteer who has that number (digits
+    only, so "06 11 22 33 44" is "0611223344"). Else it takes a volunteer with
+    the same name and no number. Else the person is new: a different number
+    means somebody else with the same name.
+  - Without a phone number, nothing tells two people with the same name
+    apart, so the app takes the oldest.
+  - What the organizer types never changes a known volunteer. The name keeps
+    its spelling, and the phone number is stored only if the volunteer had
+    none.
+  - So one person has one volunteer record, whatever the organizer adds: the
+    sign-ups and the pledges of that person show on one personal page.
 - "À apporter", after the stands: the pledge lists. It looks like the stands:
   the title shows the number of lists. The section has these parts:
   - It has no total across lists, because the lists have different units.
@@ -385,13 +398,10 @@ It works like a slot sign-up, with these differences:
     its pledges. It asks first and gives the number of pledges.
   - "Inscrire quelqu'un" adds a pledge by hand (`POST /a/<token>/pledges`).
     It works whatever the status of the event, and it sends no e-mail. The
-    maximum still applies. The button is hidden when the list is full. A name
-    that the event already has (same name, ignoring case and spacing) is the
-    same person, so a second pledge changes the quantity of the first. What the
-    organizer types never changes the details of that person: the name keeps
-    its spelling, and the phone number is stored only if the person had none.
-    Known limits: two people with the same name become one volunteer, and
-    "Inscrire quelqu'un" on a slot still creates a new volunteer each time.
+    maximum still applies. The button is hidden when the list is full. The
+    app finds the volunteer as it does for a slot (see "Volunteers, on each
+    slot"), so a second pledge of the same person changes the quantity of the
+    first.
   - The organizer cannot set the maximum below the total or the minimum. For a
     maximum below the total, the message names the total: "Il y en a déjà
     14 au total : le maximum doit être au moins 14." For a maximum below the
