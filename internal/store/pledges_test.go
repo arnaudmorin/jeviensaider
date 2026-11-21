@@ -443,8 +443,8 @@ func TestAdminPledgeSamePersonTwice(t *testing.T) {
 }
 
 // A pledge that the organizer adds for a known volunteer must not change the
-// contact details of that volunteer. The typed name and phone are ignored. A
-// phone number fills a blank only.
+// contact details of that volunteer. A phone number fills a blank only. A
+// different number means somebody else with the same name.
 func TestAdminPledgeKeepsKnownVolunteerDetails(t *testing.T) {
 	s := openTest(t)
 	ev, _, _ := fixture(t, s, 0)
@@ -462,15 +462,17 @@ func TestAdminPledgeKeepsKnownVolunteerDetails(t *testing.T) {
 	}
 
 	marie := add("Marie Dupont", "0611223344", 2).Volunteer
-	again := add("marie dupont", "0699999999", 3)
+	// The same number, written another way, is the same person.
+	again := add("marie dupont", "06 11 22 33 44", 3)
 	if again.NewVolunteer || again.Volunteer.ID != marie.ID || again.Previous != 2 {
 		t.Fatalf("second pledge = %+v, want the same volunteer with Previous 2", again)
 	}
 	if v := stored(marie.EditToken); v.Name != "Marie Dupont" || v.Phone != "0611223344" {
 		t.Errorf("volunteer = %q, %q; want the name and the phone unchanged", v.Name, v.Phone)
 	}
-	if again.Volunteer.Name != "Marie Dupont" || again.Volunteer.Phone != "0611223344" {
-		t.Errorf("result volunteer = %q, %q; want the stored details", again.Volunteer.Name, again.Volunteer.Phone)
+	// With no number, nothing tells the people apart: it is the same person.
+	if r := add("MARIE DUPONT", "", 4); r.NewVolunteer || r.Volunteer.ID != marie.ID {
+		t.Fatalf("pledge without a phone = %+v, want the same volunteer", r)
 	}
 
 	// A known volunteer with no phone gets the typed number.
@@ -480,4 +482,109 @@ func TestAdminPledgeKeepsKnownVolunteerDetails(t *testing.T) {
 		t.Errorf("volunteer = %q, %q; want the name kept and the blank phone filled", v.Name, v.Phone)
 	}
 	wantVolunteers(t, s, ev.ID, 2)
+}
+
+// Two people can have the same name. The phone number tells them apart, and
+// neither of them changes.
+func TestAdminSameNameDifferentPhones(t *testing.T) {
+	s := openTest(t)
+	ev, _, _ := fixture(t, s, 0)
+	l := newPledgeList(t, s, model.PledgeList{EventID: ev.ID, Name: "Gâteaux"})
+	add := func(phone string, quantity int) *PledgeResult {
+		return mustPledge(t, s, PledgeRequest{EventID: ev.ID, ListID: l.ID, Name: "Marie Dupont", Phone: phone, Quantity: quantity, Admin: true})
+	}
+
+	first := add("0611223344", 2)
+	second := add("0699999999", 5)
+	if !second.NewVolunteer || second.Volunteer.ID == first.Volunteer.ID {
+		t.Fatalf("a second number gave %+v, want another volunteer", second)
+	}
+	wantVolunteers(t, s, ev.ID, 2)
+	for _, v := range []*model.Volunteer{first.Volunteer, second.Volunteer} {
+		got, err := s.VolunteerByToken(ctx, ev.ID, v.EditToken)
+		if err != nil || got.Name != "Marie Dupont" || got.Phone != v.Phone {
+			t.Errorf("volunteer %d = %+v, %v; want it unchanged", v.ID, got, err)
+		}
+	}
+
+	// Each number finds its own person again.
+	if r := add("06 99 99 99 99", 6); r.NewVolunteer || r.Volunteer.ID != second.Volunteer.ID || r.Previous != 5 {
+		t.Errorf("pledge with the second number = %+v, want the second volunteer", r)
+	}
+	if r := add("0611223344", 3); r.NewVolunteer || r.Volunteer.ID != first.Volunteer.ID || r.Previous != 2 {
+		t.Errorf("pledge with the first number = %+v, want the first volunteer", r)
+	}
+	// With no number, it takes the oldest.
+	if r := add("", 4); r.NewVolunteer || r.Volunteer.ID != first.Volunteer.ID {
+		t.Errorf("pledge without a number = %+v, want the oldest volunteer", r)
+	}
+	wantVolunteers(t, s, ev.ID, 2)
+}
+
+// The organizer adds a person to several slots and to a list: one volunteer.
+func TestAdminAddsOneVolunteerEverywhere(t *testing.T) {
+	s := openTest(t)
+	ev, _, slots := fixture(t, s, 0)
+	l := newPledgeList(t, s, model.PledgeList{EventID: ev.ID, Name: "Gâteaux"})
+	signUp := func(slot model.Slot, name, phone string) *SignupResult {
+		t.Helper()
+		r, err := s.SignUp(ctx, SignupRequest{EventID: ev.ID, SlotID: slot.ID, Name: name, Phone: phone, Admin: true})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return r
+	}
+
+	first := signUp(slots[0], "Marie Dupont", "0611223344")
+	if !first.NewVolunteer {
+		t.Fatal("the first sign-up must create a volunteer")
+	}
+	second := signUp(slots[1], "marie dupont", "")
+	if second.NewVolunteer || second.Volunteer.ID != first.Volunteer.ID {
+		t.Fatalf("second slot = %+v, want the same volunteer", second)
+	}
+	if second.Volunteer.Name != "Marie Dupont" || second.Volunteer.Phone != "0611223344" {
+		t.Errorf("the typed name changed the volunteer: %+v", second.Volunteer)
+	}
+	if p := mustPledge(t, s, PledgeRequest{EventID: ev.ID, ListID: l.ID, Name: "MARIE DUPONT", Quantity: 2, Admin: true}); p.NewVolunteer || p.Volunteer.ID != first.Volunteer.ID {
+		t.Errorf("pledge = %+v, want the same volunteer as the slots", p)
+	}
+	wantVolunteers(t, s, ev.ID, 1)
+
+	// Another phone number is another person with the same name.
+	other := signUp(slots[0], "Marie Dupont", "0699999999")
+	if !other.NewVolunteer || other.Volunteer.ID == first.Volunteer.ID {
+		t.Errorf("a second number gave %+v, want another volunteer", other)
+	}
+	wantVolunteers(t, s, ev.ID, 2)
+}
+
+func TestPickVolunteer(t *testing.T) {
+	a := &model.Volunteer{ID: 1, Phone: "06 11 22 33 44"}
+	b := &model.Volunteer{ID: 2, Phone: ""}
+	c := &model.Volunteer{ID: 3, Phone: "0699999999"}
+	for _, tc := range []struct {
+		name  string
+		vols  []*model.Volunteer
+		phone string
+		want  int64 // 0 = nobody
+	}{
+		{"nobody", nil, "0611223344", 0},
+		{"nobody, no phone", nil, "", 0},
+		{"no phone takes the oldest", []*model.Volunteer{a, c}, "", 1},
+		{"same number, other spacing", []*model.Volunteer{c, a}, "0611223344", 1},
+		{"another number is another person", []*model.Volunteer{a}, "0699999999", 0},
+		{"a blank is filled", []*model.Volunteer{a, b}, "0655443322", 2},
+		{"the number wins over a blank", []*model.Volunteer{b, a}, "0611223344", 1},
+		{"text is not a number", []*model.Volunteer{a}, "abc", 1},
+	} {
+		got := pickVolunteer(tc.vols, tc.phone)
+		var id int64
+		if got != nil {
+			id = got.ID
+		}
+		if id != tc.want {
+			t.Errorf("%s: got volunteer %d, want %d", tc.name, id, tc.want)
+		}
+	}
 }
