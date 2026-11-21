@@ -11,7 +11,7 @@ templ adminPledges(d adminPage) {
 		<div class="section-head">
 			<h2 id="pledges-title">À apporter <span class="section-count">{ itoa(len(d.P.Pledges)) }</span></h2>
 		</div>
-		<details class="tool" open?={ len(d.P.Pledges) == 0 }>
+		<details class="tool">
 			<summary class="btn tonal">
 				@iconPlus()
 				Nouvelle liste
