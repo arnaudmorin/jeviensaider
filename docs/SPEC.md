@@ -197,12 +197,20 @@ Derived notions (computed, not stored):
 - Event settings ("Modifier l'événement"), including the organiser e-mail,
   the notification flag and the number of days before the event is deleted
   (see 4.6).
+- The page is cut into sections ("Les deux liens de l'événement", "Déroulé
+  de la journée", "Stands", "Outils"), each with a rule above its title. The
+  title of "Déroulé de la journée" and of "Stands" shows how many there are.
+  Each form that adds or changes something opens from a button, in a framed
+  panel with its own title, its save button and "Annuler" (which puts the
+  form back as it was and closes the panel; without the script, the button
+  that opened the panel closes it). A delete button sits at the bottom of the
+  panel, below a rule.
 - "Déroulé de la journée" (above "Stands"): the moments of the event (see
-  section 3), in time order. Each one shows its time range and title, and has
+  section 3), in time order. A "Nouveau moment" button above the list opens
+  the form that adds one. Each moment shows its time range and title, and has
   a "Modifier" panel with day, start, end, title and color (Jour, De, À,
   Titre, Couleur), the box "Colorer toute la colonne du planning" (`fill`), a save button and a
-  delete button that asks for confirmation. Below the list, a form with the
-  same fields adds a moment. In the add form, the color picker
+  delete button that asks for confirmation. The add form has the same fields. In the add form, the color picker
   starts with the next color of the stand palette. In the "Modifier" panel,
   it shows the color of the moment, or a neutral color if the moment has none.
   The box "Sans couleur" gives a moment no color, and so does a value that is
@@ -217,8 +225,19 @@ Derived notions (computed, not stored):
   that time, more than 30 moments. The routes are `POST /a/<token>/moments`,
   `POST /a/<token>/moments/<id>` and `POST /a/<token>/moments/<id>/delete`.
   Each route acts only on the moments of that event.
-- Stands: a summary list (linking to each stand), then each stand: add,
-  edit, delete, move up/down. The colour of a stand is optional and works
+- Stands: a "Nouveau stand" button (its panel is open while the event has
+  no stand), then each stand as a card that folds. Its head shows the name,
+  the stripe of its colour, the number of slots, the places taken out of the
+  places needed, and its status ("Il reste N places", "Complet", "Aucun
+  créneau"). A click on the head opens the card, and another click closes
+  it. The cards start closed, except the stand that the organiser just
+  changed: every action on a stand or on one of its slots comes back to
+  `/a/<token>?stand=<id>#stand-<id>`, with that card open. An open card shows
+  the description, two buttons that open the panel that edits or deletes the
+  stand ("Modifier") and the slot generator ("Ajouter des créneaux", or
+  "Créer les créneaux" and open while the stand has no slot), only one of the
+  two open at a time, the buttons that move the stand up and down, and then
+  the slots of the stand. The colour of a stand is optional and works
   like the colour of a moment: the add form starts with the next colour of
   the stand palette, the "Modifier" panel shows the stand's colour (or the
   default blue if it has none), and the box "Sans couleur", with the hidden
