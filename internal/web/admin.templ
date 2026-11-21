@@ -55,7 +55,7 @@ templ adminView(d adminPage) {
 			<div class="section-head">
 				<h2 id="stands-title">Stands <span class="section-count">{ itoa(len(d.P.Stands)) }</span></h2>
 			</div>
-			<details class="tool" open?={ len(d.P.Stands) == 0 }>
+			<details class="tool">
 				<summary class="btn tonal">
 					@iconPlus()
 					Nouveau stand

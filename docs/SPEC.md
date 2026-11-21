@@ -338,8 +338,8 @@ It works like a slot sign-up, with these differences:
   that time, more than 30 moments. The routes are `POST /a/<token>/moments`,
   `POST /a/<token>/moments/<id>` and `POST /a/<token>/moments/<id>/delete`.
   Each route acts only on the moments of that event.
-- Stands: a "Nouveau stand" button (its panel is open while the event has
-  no stand), then each stand as a card that folds. Its head shows the name,
+- Stands: a "Nouveau stand" button (its panel starts closed: an event may
+  have only lists), then each stand as a card that folds. Its head shows the name,
   the stripe of its colour, the number of slots, the places taken out of the
   places needed, and its status ("Il reste N places", "Complet", "Aucun
   créneau"). A click on the head opens the card, and another click closes
@@ -366,8 +366,8 @@ It works like a slot sign-up, with these differences:
   the title shows the number of lists. The section has these parts:
   - It has no total across lists, because the lists have different units.
     Each card gives its own status.
-  - A "Nouvelle liste" button, whose panel is open while the event has no
-    list (`POST /a/<token>/lists`). The form asks for a name (required) and an
+  - A "Nouvelle liste" button, whose panel starts closed
+    (`POST /a/<token>/lists`). The form asks for a name (required) and an
     optional description, drop-off time, unit (singular and plural), minimum
     and maximum.
   - Each list is a card that folds. Its head shows the name, the drop-off time
