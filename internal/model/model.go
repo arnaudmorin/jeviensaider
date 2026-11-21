@@ -4,11 +4,17 @@ package model
 
 import (
 	"errors"
+	"regexp"
 	"strings"
 	"time"
 	"unicode"
 	"unicode/utf8"
 )
+
+var colorRe = regexp.MustCompile(`^#[0-9a-fA-F]{6}$`)
+
+// ValidColor says whether s is a color that the planning can use: "#rrggbb".
+func ValidColor(s string) bool { return colorRe.MatchString(s) }
 
 // TimeLayout is how slot times are stored in SQLite: local wall-clock time,
 // without timezone (an event happens in one place, one timezone).
@@ -72,7 +78,14 @@ type Stand struct {
 	Description string
 	Position    int
 	Color       string
+	// FillRow colours the whole row of the stand in the planning, not only
+	// the dot next to its name. It has no effect without a valid color.
+	FillRow bool
 }
+
+// Tints says whether the planning colours the whole row of the stand:
+// FillRow is set and the color is one that the page can use.
+func (s Stand) Tints() bool { return s.FillRow && ValidColor(s.Color) }
 
 type Slot struct {
 	ID        int64
@@ -122,10 +135,17 @@ type Moment struct {
 	EventID int64
 	Title   string
 	// Color is empty (no color) or "#rrggbb".
-	Color    string
+	Color string
+	// Fill tints the column of the moment with its color, not only the dot
+	// next to its title. It has no effect without a valid color.
+	Fill     bool
 	StartsAt time.Time
 	EndsAt   time.Time
 }
+
+// Tints says whether the moment tints its column: Fill is set and the color
+// is one that the page can use.
+func (m Moment) Tints() bool { return m.Fill && ValidColor(m.Color) }
 
 // Check makes sure that the moment ends after it starts and that its title
 // has 1 to MaxMomentTitle characters after trimming spaces.

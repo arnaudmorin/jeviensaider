@@ -39,8 +39,10 @@ secret links (random 256-bit tokens, base64url).
     allowed), `closed` (read-only for volunteers; the organiser can still add
     people).
 - **Stand**: belongs to an event; name, description, optional colour
-  (`#rrggbb`; empty means no colour), display position. At most **50** stands
-  per event.
+  (`#rrggbb`; empty means no colour), display position, and `fill_row` (see
+  the planning table: the colour tints the whole row, not only its stripe).
+  `fill_row` has no effect on a stand that has no valid colour, and the forms
+  clear it then. At most **50** stands per event.
 - **Slot**: belongs to a stand; start and end (local wall-clock time, no
   timezone), minimum people (≥ 1), optional maximum. At most **500** slots
   per event.
@@ -49,7 +51,9 @@ secret links (random 256-bit tokens, base64url).
   the day, such as "Spectacle des enfants". Nobody signs up for a moment and
   it blocks nothing. An event has at most **30** moments, and one for each
   exact start and end. A moment has an optional color (`#rrggbb`). An empty
-  color means no color.
+  color means no color. A moment also has `fill`: when it is set, the color
+  tints the whole column of the moment, not only its stripe. `fill` has no effect
+  on a moment that has no valid color.
 - **Volunteer**: belongs to an event; name (required), phone (optional), edit
   token. No e-mail is ever asked or stored.
 - **Sign-up**: a volunteer on a slot, with an optional comment. One per
@@ -87,8 +91,8 @@ Derived notions (computed, not stored):
     take that are under their minimum, the emptiest first, then the earliest.
     Hidden under the filter.
   - Wide screens: a table, one row per stand, one column per distinct time
-    range. Each row header shows the stand's colour dot (none for a stand
-    with no colour), name and description
+    range. Each row header shows a stripe of the stand's colour on its left
+    side (none for a stand with no colour), the name and the description
     cut after two lines; a "Voir plus" link (only when the text is cut) opens
     the full description.
   - Phones: a list, one group per time range, one card per slot.
@@ -118,11 +122,27 @@ Derived notions (computed, not stored):
     draft event shows no moment. A
     moment never appears in "Mes créneaux", the PDF, the CSV export or the
     calendar file.
-  - A moment with a color shows a dot of that color before its title, in the
-    table header and in the phone list. The tint of a column with no slot is
-    that color mixed with the page background, so it stays readable in dark
-    mode. A moment with no color keeps the neutral tint. A column that has
-    slots is never tinted.
+  - The color of a stand or of a moment shows as a stripe, and never as a
+    dot. A stand has a vertical stripe on the left side of the row header of
+    the table, of each slot card in the phone list, of the cards of "Mes
+    créneaux", of the titles of the sign-up window and of the stand page, and
+    of the list of stands and the head of each stand in the admin page. A
+    moment is a column, so it has a horizontal stripe on top of its column
+    header, of its group in the phone list and of its entry in the admin
+    list. Without a color, there is no stripe.
+  - Without `fill`, a column with no slot has the neutral tint, and a column
+    that has slots is not tinted. With `fill`, the column is tinted with the
+    color of the moment, mixed with the page background so that it stays
+    readable in dark mode. This is true for a column with slots too, and for
+    its group in the phone list. A color that is not `#rrggbb` gives no tint
+    and no stripe, even with `fill`. Two columns of moments that sit side by
+    side keep a gap between them.
+  - A stand with `fill_row` set has its whole row tinted with its colour,
+    mixed with the page background, in the table. The setting has no effect
+    in the phone list: a card keeps its own background, because that
+    background says how the slot stands (open, enough people, full), and the
+    stripe shows the colour. A moment that tints a column wins over the stand
+    in the cells that they share.
 - **"Mes créneaux"** (`/e/<slug>/me/<token>`), a tab next to "Tous les
   créneaux" once the browser knows the volunteer, and a link in the header:
   - After a first sign-up (`?welcome=1`): "Merci <nom> !".
@@ -180,15 +200,18 @@ Derived notions (computed, not stored):
 - "Déroulé de la journée" (above "Stands"): the moments of the event (see
   section 3), in time order. Each one shows its time range and title, and has
   a "Modifier" panel with day, start, end, title and color (Jour, De, À,
-  Titre, Couleur), a save button and a
+  Titre, Couleur), the box "Colorer toute la colonne du planning" (`fill`), a save button and a
   delete button that asks for confirmation. Below the list, a form with the
   same fields adds a moment. In the add form, the color picker
   starts with the next color of the stand palette. In the "Modifier" panel,
   it shows the color of the moment, or a neutral color if the moment has none.
   The box "Sans couleur" gives a moment no color, and so does a value that is
-  not `#rrggbb`. If the organizer changes the picker, the new color wins, even
+  not `#rrggbb`; a moment with no color never has `fill`. If the organizer changes the picker, the new color wins, even
   when the box is ticked. A hidden field `color_was` holds the color that the
-  picker showed, so the server can see the change. The day
+  picker showed, so the server can see the change. A small script keeps the boxes in step
+  on the screen, in the forms of a stand too: picking a color unticks "Sans
+  couleur", ticking "Sans couleur" unticks the fill box, and ticking the fill
+  box unticks "Sans couleur". The server does not rely on it. The day
   starts as the event's date, else the day of the first slot, else today. Errors use the
   usual red message: end not after start, empty title, a moment already at
   that time, more than 30 moments. The routes are `POST /a/<token>/moments`,
@@ -200,7 +223,7 @@ Derived notions (computed, not stored):
   the stand palette, the "Modifier" panel shows the stand's colour (or the
   default blue if it has none), and the box "Sans couleur", with the hidden
   field `color_was`, follows the same rules. A stand with no colour has no
-  dot, and its pages in the PDF have a light grey band.
+  stripe, and its pages in the PDF have a light grey band.
 - Slots: a generator ("from 14:00 to 17:00, every 1 h, 2 people" → three
   slots) that previews, as you type, the slots it will create; per-slot edit
   (times, min, max, its own "Enregistrer") and delete.

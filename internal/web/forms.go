@@ -26,9 +26,7 @@ const neutralMomentColor = "#fbf0c4"
 // palette gives each new stand a distinct default colour.
 var palette = []string{"#3d7cc9", "#d9534f", "#2e9e6a", "#e8932c", "#8a5cc7", "#c94f8f", "#2aa3b5", "#7a8b2e"}
 
-var colorRe = regexp.MustCompile(`^#[0-9a-fA-F]{6}$`)
-
-func validColor(s string) bool { return colorRe.MatchString(s) }
+func validColor(s string) bool { return model.ValidColor(s) }
 
 // Maximum lengths of text fields, in characters. The templates repeat them
 // as maxlength attributes, so that browsers stop typing at the same point.
@@ -298,6 +296,8 @@ func (s *Server) readMomentForm(r *http.Request, date string) (model.Moment, err
 	}
 	m.Title = clean(r.FormValue("title"), model.MaxMomentTitle+1, false)
 	m.Color = readColor(r)
+	// The fill needs a color.
+	m.Fill = r.FormValue("fill") == "1" && m.Color != ""
 	return m, nil
 }
 
