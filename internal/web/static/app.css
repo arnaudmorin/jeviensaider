@@ -277,6 +277,12 @@ a.slot.need:hover { background: var(--tonal-hover); }
 .slot-status { font-weight: 700; font-size: .95rem; color: var(--ok); }
 .slot.need .slot-status, .slot-status.need-text { color: var(--primary-on-tonal); }
 .slot.room .slot-status, .slot.full .slot-status { color: var(--muted); }
+/* A pledge list on the event page has the colors of a slot: orange under its
+   minimum, flat grey otherwise. */
+.card.pledge.need { background: var(--primary-tonal); border-color: transparent; }
+.card.pledge.room, .card.pledge.full { background: var(--slot-full-bg); border-color: var(--slot-full-border); color: var(--slot-full-text); }
+.pledge-status { font-weight: 700; color: var(--muted); }
+.card.pledge.need .pledge-status { color: var(--primary-on-tonal); }
 .slot-me { font-weight: 700; font-size: .95rem; color: var(--primary-on-tonal); }
 .slot-names { font-size: .875rem; color: var(--muted); }
 /* A slot that one can take: its text on the left and "Je m'inscris" on the
@@ -399,6 +405,7 @@ dialog .close:hover { background: var(--line-strong); }
 .share-label { margin-top: 4px; }
 .stand-status { font-weight: 700; color: var(--ok); }
 .stand-status.need-text { color: var(--primary-on-tonal); }
+.stand-status.muted { color: var(--muted); }
 /* The organiser page is cut into sections (links, moments, stands, tools),
    each with a rule and some air above its title. */
 main.admin > .admin-section { border-top: 1.5px solid var(--line-strong); padding-top: 28px; margin-top: 12px; }
@@ -486,8 +493,8 @@ section > details.card + details.card { margin-top: 10px; }
 }
 /* Windows high contrast: keep the dashed / solid borders that carry meaning. */
 @media (forced-colors: active) {
-  .slot, .admin-slot, .lg { border-color: CanvasText; }
-  .slot.need, .admin-slot.need, .lg.need { border-style: dashed; }
+  .slot, .admin-slot, .lg, .card.pledge { border-color: CanvasText; }
+  .slot.need, .admin-slot.need, .lg.need, .card.pledge.need { border-style: dashed; }
   .grid thead th.moment, .grid tbody td.moment-cell { border: 1px dotted CanvasText; }
   .progress-bar, .switch-track { forced-color-adjust: none; }
 }
