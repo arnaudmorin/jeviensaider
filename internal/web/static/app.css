@@ -397,24 +397,50 @@ dialog .close:hover { background: var(--line-strong); }
 .link-block.secret { border: 1.5px solid var(--text); }
 .links h2 { margin: 0; }
 .share-label { margin-top: 4px; }
-.stand-list { list-style: none; margin: 0 0 16px; padding: 0; display: flex; flex-direction: column; gap: 8px; }
-.stand-list a { display: flex; align-items: center; gap: 12px; padding: 12px 14px 12px 18px; box-shadow: inset 4px 0 0 var(--stand, transparent); border: 1px solid var(--line); border-radius: var(--radius); color: var(--text); text-decoration: none; }
-.stand-list a:hover { background: var(--fill); color: var(--text); }
-.stand-list .grow { display: flex; flex-direction: column; }
-.stand-list .muted { font-size: .875rem; }
-.stand-status { font-weight: 700; font-size: .95rem; text-align: right; color: var(--ok); }
+.stand-status { font-weight: 700; color: var(--ok); }
 .stand-status.need-text { color: var(--primary-on-tonal); }
-.stand { display: flex; flex-direction: column; gap: 12px; padding: 20px 0; border-top: 1px solid var(--line); scroll-margin-top: 12px; }
-.stand > p { margin: 0; }
-.stand-head { display: flex; align-items: center; gap: 8px; }
-.stand-head h3 { flex: 1; display: flex; align-items: center; gap: 10px; font-size: 1.3rem; margin: 0; }
+/* The organiser page is cut into sections (links, moments, stands, tools),
+   each with a rule and some air above its title. */
+main.admin > .admin-section { border-top: 1.5px solid var(--line-strong); padding-top: 28px; margin-top: 12px; }
+.admin-section { display: flex; flex-direction: column; gap: 14px; }
+.admin-section .section-head { margin-bottom: 0; }
+.admin-section > h2, .admin-section .section-head h2 { margin: 0; display: flex; align-items: center; gap: 10px; font-size: 1.5rem; }
+.section-count { min-width: 28px; padding: 2px 9px; border-radius: 999px; background: var(--fill); color: var(--muted); font-size: .85rem; text-align: center; }
+/* A stand is a card that folds: its head (name, numbers, status) opens and
+   closes it. Open, the head is a grey band above its tools and its slots. */
+.stand { border: 1.5px solid var(--line-strong); border-radius: var(--radius); background: var(--surface); scroll-margin-top: 12px; }
+details.stand > summary.stand-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 12px; row-gap: 2px; align-items: center; padding: 14px 18px 14px 16px; border-radius: var(--radius); }
+details.stand > summary.stand-head::after { grid-column: 2; grid-row: 1 / span 2; margin-left: 0; }
+.stand-head:hover { background: var(--fill); }
+.stand[open] > .stand-head { background: var(--fill); border-bottom: 1px solid var(--line); border-radius: var(--radius) var(--radius) 0 0; }
+.stand-head.striped { padding-left: 18px; box-shadow: inset 5px 0 0 var(--stand, transparent); }
+.stand-head h3 { font-size: 1.2rem; margin: 0; overflow-wrap: anywhere; }
+.stand-stats { font-size: .925rem; font-weight: 400; color: var(--muted); }
+.stand-tools .row-actions { margin-left: auto; }
+.stand-body { display: flex; flex-direction: column; gap: 14px; padding: 14px; }
+.stand-body > p { margin: 0; }
+.stand-slots { display: flex; flex-direction: column; gap: 10px; }
+/* A tool is a button that opens a form panel below it. Only one tool of a
+   stand is open at a time. The open one takes the whole width. */
+.stand-tools { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 8px; }
+.stand-tools > details[open] { flex-basis: 100%; }
+details.tool > summary.btn { display: inline-flex; width: fit-content; }
+details.tool > summary.btn::after { content: none; }
+details.tool[open] > summary.btn:not(.tonal) { background: var(--fill); border-color: var(--text); }
+details.tool[open] > summary.btn.tonal { background: var(--tonal-hover); }
+details.tool[open] > .panel { margin-top: 10px; }
+.panel { display: flex; flex-direction: column; gap: 16px; padding: 16px; border: 1.5px solid var(--line-strong); border-radius: 12px; background: var(--surface); box-shadow: 0 6px 20px var(--shadow); }
+.panel h3, .panel h4 { margin: 0; font-size: 1.1rem; overflow-wrap: anywhere; }
+.panel > form { margin: 0; }
+.panel-foot { display: flex; flex-wrap: wrap; gap: 8px; }
+.panel-danger { border-top: 1px solid var(--line); padding-top: 12px; }
+.admin-moment details.tool { margin-top: 4px; }
 .row-actions { display: flex; gap: 4px; }
 .row-actions form { margin: 0; }
 .admin-slot { border: 1.5px solid var(--line-strong); border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; }
 .admin-slot.need { background: var(--primary-tonal); border-color: transparent; }
 .admin-slot.room, .admin-slot.full { background: var(--slot-full-bg); border-color: var(--slot-full-border); color: var(--slot-full-text); }
 .admin-slot > p { margin: 0; }
-.moments { display: flex; flex-direction: column; gap: 12px; }
 .moments > p, .moments h2 { margin: 0; }
 .admin-moment .admin-slot-head h4 { white-space: normal; overflow-wrap: anywhere; }
 .admin-slot-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 10px; }

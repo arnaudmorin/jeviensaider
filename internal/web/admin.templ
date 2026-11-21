@@ -48,46 +48,40 @@ templ adminView(d adminPage) {
 		}
 		@adminLinks(d)
 		@momentsSection(d)
-		<section aria-labelledby="stands-title">
+		<section id="stands" class="admin-section" aria-labelledby="stands-title">
 			<div class="section-head">
-				<h2 id="stands-title">Stands</h2>
+				<h2 id="stands-title">Stands <span class="section-count">{ itoa(len(d.P.Stands)) }</span></h2>
 			</div>
+			<details class="tool" open?={ len(d.P.Stands) == 0 }>
+				<summary class="btn tonal">
+					@iconPlus()
+					Nouveau stand
+				</summary>
+				<form method="post" action={ templ.SafeURL(d.AdminPath + "/stands") } class="panel">
+					<h3>Nouveau stand</h3>
+					<label>Nom <input name="name" required maxlength="80" placeholder="Buvette, accueil, rangement…"/></label>
+					<div class="add-stand">
+						@colorFields(d.NextColor, false)
+					</div>
+					<label class="check"><input type="checkbox" name="fill_row" value="1"/> <span>Colorer toute la ligne du planning</span></label>
+					@panelFoot("Ajouter le stand")
+				</form>
+			</details>
 			if len(d.P.Stands) == 0 {
-				<p class="empty">Aucun stand pour l'instant. Ajoutez-en un ci-dessous, par exemple « Buvette ».</p>
+				<p class="empty">Aucun stand pour l'instant, par exemple « Buvette ».</p>
 			} else {
-				<ul class="stand-list">
-					for _, st := range d.P.Stands {
-						<li>
-							<a href={ templ.SafeURL("#stand-" + i64(st.ID)) } style={ standStyle(st.Color) }>
-								<span class="grow">
-									<strong>{ st.Name }</strong>
-									<span class="muted">{ itoa(len(st.Slots)) } { plural(len(st.Slots), "créneau", "créneaux") } · { itoa(st.Count) }/{ itoa(st.Needed) }</span>
-								</span>
-								<span class={ "stand-status", templ.KV("need-text", st.Missing > 0) }>{ standStatus(st) }</span>
-							</a>
-						</li>
-					}
-				</ul>
+				<p class="hint">Ouvrez un stand pour voir ses créneaux et ses bénévoles, et pour le modifier.</p>
 			}
 			for i, st := range d.P.Stands {
 				@adminStand(d, st, i == 0, i == len(d.P.Stands)-1)
 			}
-			<form method="post" action={ templ.SafeURL(d.AdminPath + "/stands") } class="card add-stand">
-				<label class="grow">Nouveau stand <input name="name" required maxlength="80" placeholder="Buvette, accueil, rangement…"/></label>
-				@colorFields(d.NextColor, false)
-				<label class="check"><input type="checkbox" name="fill_row" value="1"/> <span>Colorer toute la ligne du planning</span></label>
-				<button class="btn primary" type="submit">
-					@iconPlus()
-					Ajouter
-				</button>
-			</form>
 		</section>
 		@adminTools(d)
 	}
 }
 
 templ adminLinks(d adminPage) {
-	<section class="links" aria-labelledby="links-title">
+	<section class="links admin-section" aria-labelledby="links-title">
 		<h2 id="links-title">Les deux liens de l'événement</h2>
 		<div class="link-block secret">
 			<h3>
@@ -134,11 +128,22 @@ templ adminLinks(d adminPage) {
 // momentsSection lists the titled parts of the day and lets the organiser
 // add, change and delete them.
 templ momentsSection(d adminPage) {
-	<section id="moments" class="moments" aria-labelledby="moments-title">
+	<section id="moments" class="moments admin-section" aria-labelledby="moments-title">
 		<div class="section-head">
-			<h2 id="moments-title">Déroulé de la journée</h2>
+			<h2 id="moments-title">Déroulé de la journée <span class="section-count">{ itoa(len(d.Moments)) }</span></h2>
 		</div>
 		<p class="hint">Les grandes parties de la journée, par exemple « Spectacle des enfants ». Les bénévoles les voient sur la page de l'événement. On ne s'y inscrit pas. Un moment prend le titre d'un créneau seulement si les heures de début et de fin sont exactement les mêmes. Sinon, il a sa propre colonne.</p>
+		<details class="tool">
+			<summary class="btn tonal">
+				@iconPlus()
+				Nouveau moment
+			</summary>
+			<form method="post" action={ templ.SafeURL(d.AdminPath + "/moments") } class="panel">
+				<h3>Nouveau moment</h3>
+				@momentFields(d.MomentDate, "", "", "", d.MomentColor, false, false)
+				@panelFoot("Ajouter le moment")
+			</form>
+		</details>
 		if len(d.Moments) == 0 {
 			<p class="empty">Aucun moment pour l'instant.</p>
 		}
@@ -154,30 +159,24 @@ templ momentsSection(d adminPage) {
 					<h4>@momentTitle("moment-title", m.Title)</h4>
 					<span class="count">{ capitalize(when(d.P.MultiDay, m.StartsAt, m.EndsAt)) }</span>
 				</div>
-				<div class="admin-slot-actions">
-					<details class="sub">
-						<summary>Modifier</summary>
+				<details class="tool">
+					<summary class="btn small">
+						@iconEdit()
+						Modifier
+					</summary>
+					<div class="panel">
+						<h4>Modifier « { m.Title } »</h4>
 						<form method="post" action={ templ.SafeURL(d.AdminPath + "/moments/" + i64(m.ID)) } class="stack">
 							@momentFields(m.StartsAt.Format(model.DateLayout), m.StartsAt.Format("15:04"), m.EndsAt.Format("15:04"), m.Title, momentPickerColor(m.Color), m.Color == "", m.Fill)
-							<div><button class="btn primary" type="submit">Enregistrer</button></div>
+							@panelFoot("Enregistrer")
 						</form>
-						<form method="post" action={ templ.SafeURL(d.AdminPath + "/moments/" + i64(m.ID) + "/delete") } data-confirm={ "Supprimer le moment « " + m.Title + " » ?" }>
-							<p><button class="btn danger-text" type="submit">Supprimer ce moment</button></p>
+						<form method="post" action={ templ.SafeURL(d.AdminPath + "/moments/" + i64(m.ID) + "/delete") } data-confirm={ "Supprimer le moment « " + m.Title + " » ?" } class="panel-danger">
+							<button class="btn danger-text" type="submit">Supprimer ce moment</button>
 						</form>
-					</details>
-				</div>
+					</div>
+				</details>
 			</article>
 		}
-		<form method="post" action={ templ.SafeURL(d.AdminPath + "/moments") } class="card stack">
-			<h3>Ajouter un moment</h3>
-			@momentFields(d.MomentDate, "", "", "", d.MomentColor, false, false)
-			<div>
-				<button class="btn primary" type="submit">
-					@iconPlus()
-					Ajouter
-				</button>
-			</div>
-		</form>
 	</section>
 }
 
@@ -208,55 +207,80 @@ templ colorFields(color string, noColor bool) {
 }
 
 templ adminStand(d adminPage, st *model.StandView, first, last bool) {
-	<section class="stand" id={ "stand-" + i64(st.ID) } style={ standStyle(st.Color) }>
-		<header class={ "stand-head", templ.KV("striped", validColor(st.Color)) }>
+	<details class="stand" id={ "stand-" + i64(st.ID) } style={ standStyle(st.Color) } open?={ st.ID == d.OpenStand }>
+		<summary class={ "stand-head", templ.KV("striped", validColor(st.Color)) }>
 			<h3>{ st.Name }</h3>
-			<div class="row-actions">
-				<form method="post" action={ templ.SafeURL(d.AdminPath + "/stands/" + i64(st.ID) + "/move") }><input type="hidden" name="dir" value="up"/><button class="btn icon" type="submit" title="Monter" aria-label={ "Monter " + st.Name } disabled?={ first }>↑</button></form>
-				<form method="post" action={ templ.SafeURL(d.AdminPath + "/stands/" + i64(st.ID) + "/move") }><input type="hidden" name="dir" value="down"/><button class="btn icon" type="submit" title="Descendre" aria-label={ "Descendre " + st.Name } disabled?={ last }>↓</button></form>
-			</div>
-		</header>
-		if st.Description != "" {
-			<p class="muted">{ st.Description }</p>
-		}
-		if len(st.Slots) > 0 {
-			<p>
-				<strong>{ itoa(len(st.Slots)) } { plural(len(st.Slots), "créneau", "créneaux") }</strong> · { itoa(st.Count) } { plural(st.Count, "inscrit", "inscrits") }
-				if st.Missing > 0 {
-					· <strong class="need-text">{ lower(placesLeft(st.Missing)) }</strong>
-				}
-			</p>
-		}
-		for _, s := range st.Slots {
-			@adminSlot(d, s)
-		}
-		<details class="sub" open?={ len(st.Slots) == 0 }>
-			<summary>
-				@iconPlus()
+			<span class="stand-stats">
 				if len(st.Slots) > 0 {
-					Ajouter des créneaux
-				} else {
-					Créer les créneaux
+					{ itoa(len(st.Slots)) } { plural(len(st.Slots), "créneau", "créneaux") } · { itoa(st.Count) }/{ itoa(st.Needed) } ·
 				}
-			</summary>
-			@slotGenerator(d, st)
-		</details>
-		<details class="sub">
-			<summary>Modifier le stand</summary>
-			<form method="post" action={ templ.SafeURL(d.AdminPath + "/stands/" + i64(st.ID)) } class="stack">
-				<div class="add-stand">
-					<label class="grow">Nom <input name="name" value={ st.Name } required maxlength="80"/></label>
-					@colorFields(standPickerColor(st.Color), st.Color == "")
+				<strong class={ "stand-status", templ.KV("need-text", st.Missing > 0) }>{ standStatus(st) }</strong>
+			</span>
+		</summary>
+		<div class="stand-body">
+			if st.Description != "" {
+				<p class="muted">{ st.Description }</p>
+			}
+			<div class="stand-tools">
+				<details class="tool" name={ "stand-tools-" + i64(st.ID) }>
+					<summary class="btn small">
+						@iconEdit()
+						Modifier
+					</summary>
+					<div class="panel">
+						<h4>Modifier « { st.Name } »</h4>
+						<form method="post" action={ templ.SafeURL(d.AdminPath + "/stands/" + i64(st.ID)) } class="stack">
+							<label>Nom <input name="name" value={ st.Name } required maxlength="80"/></label>
+							<div class="add-stand">
+								@colorFields(standPickerColor(st.Color), st.Color == "")
+							</div>
+							<label class="check"><input type="checkbox" name="fill_row" value="1" checked?={ st.FillRow }/> <span>Colorer toute la ligne du planning</span></label>
+							<label><span class="label-text">Description <span class="opt">ce que font les bénévoles</span></span> <textarea name="description" rows="2" maxlength="1000">{ st.Description }</textarea></label>
+							@panelFoot("Enregistrer")
+						</form>
+						<form method="post" action={ templ.SafeURL(d.AdminPath + "/stands/" + i64(st.ID) + "/delete") } data-confirm={ "Supprimer le stand « " + st.Name + " » avec tous ses créneaux et inscriptions ?" } class="panel-danger">
+							<button class="btn danger-text" type="submit">Supprimer ce stand</button>
+						</form>
+					</div>
+				</details>
+				<details class="tool" name={ "stand-tools-" + i64(st.ID) } open?={ len(st.Slots) == 0 }>
+					<summary class="btn small">
+						@iconPlus()
+						if len(st.Slots) > 0 {
+							Ajouter des créneaux
+						} else {
+							Créer les créneaux
+						}
+					</summary>
+					<div class="panel">
+						<h4>Nouveaux créneaux pour « { st.Name } »</h4>
+						@slotGenerator(d, st)
+					</div>
+				</details>
+				<div class="row-actions">
+					<form method="post" action={ templ.SafeURL(d.AdminPath + "/stands/" + i64(st.ID) + "/move") }><input type="hidden" name="dir" value="up"/><button class="btn icon small" type="submit" title="Monter" aria-label={ "Monter " + st.Name } disabled?={ first }>↑</button></form>
+					<form method="post" action={ templ.SafeURL(d.AdminPath + "/stands/" + i64(st.ID) + "/move") }><input type="hidden" name="dir" value="down"/><button class="btn icon small" type="submit" title="Descendre" aria-label={ "Descendre " + st.Name } disabled?={ last }>↓</button></form>
 				</div>
-				<label class="check"><input type="checkbox" name="fill_row" value="1" checked?={ st.FillRow }/> <span>Colorer toute la ligne du planning</span></label>
-				<label><span class="label-text">Description <span class="opt">ce que font les bénévoles</span></span> <textarea name="description" rows="2" maxlength="1000">{ st.Description }</textarea></label>
-				<div><button class="btn primary" type="submit">Enregistrer</button></div>
-			</form>
-			<form method="post" action={ templ.SafeURL(d.AdminPath + "/stands/" + i64(st.ID) + "/delete") } data-confirm={ "Supprimer le stand « " + st.Name + " » avec tous ses créneaux et inscriptions ?" }>
-				<p><button class="btn danger-text" type="submit">Supprimer ce stand</button></p>
-			</form>
-		</details>
-	</section>
+			</div>
+			if len(st.Slots) > 0 {
+				<div class="stand-slots">
+					for _, s := range st.Slots {
+						@adminSlot(d, s)
+					}
+				</div>
+			}
+		</div>
+	</details>
+}
+
+// panelFoot is the bottom of a form panel: the submit button, and a button
+// that closes the panel (it needs the script; without it, the button of the
+// panel closes it too).
+templ panelFoot(label string) {
+	<div class="panel-foot">
+		<button class="btn primary" type="submit">{ label }</button>
+		<button class="btn" type="button" data-close-panel>Annuler</button>
+	</div>
 }
 
 templ adminSlot(d adminPage, s *model.SlotView) {
@@ -357,7 +381,10 @@ templ slotGenerator(d adminPage, st *model.StandView) {
 			<label><span class="label-text">Maximum <span class="opt">facultatif</span></span> <input type="number" name="max" min="1" max="1000"/></label>
 		</div>
 		<div class="slot-preview" aria-live="polite" hidden></div>
-		<div><button class="btn primary" type="submit" data-preview-submit>Créer les créneaux</button></div>
+		<div class="panel-foot">
+			<button class="btn primary" type="submit" data-preview-submit>Créer les créneaux</button>
+			<button class="btn" type="button" data-close-panel>Annuler</button>
+		</div>
 	</form>
 }
 
@@ -401,7 +428,7 @@ templ adminGrid(p *model.Planning) {
 }
 
 templ adminTools(d adminPage) {
-	<section aria-labelledby="tools-title">
+	<section class="admin-section" aria-labelledby="tools-title">
 		<h2 id="tools-title">Outils</h2>
 		<div class="tool-links">
 			<a class="btn" href={ templ.SafeURL(d.AdminPath + "/planning.pdf") }>Planning à afficher (PDF)</a>

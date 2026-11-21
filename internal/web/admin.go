@@ -32,11 +32,13 @@ func (s *Server) withAdmin(h func(http.ResponseWriter, *http.Request, *model.Eve
 
 func adminURL(ev *model.Event) string { return "/a/" + ev.AdminToken }
 
-// backToStand redirects to the admin page, scrolled to a stand.
+// backToStand redirects to the admin page, scrolled to a stand, with that
+// stand open.
 func backToStand(w http.ResponseWriter, r *http.Request, ev *model.Event, standID int64) {
 	u := adminURL(ev)
 	if standID != 0 {
-		u += "#stand-" + strconv.FormatInt(standID, 10)
+		id := strconv.FormatInt(standID, 10)
+		u += "?stand=" + id + "#stand-" + id
 	}
 	redirect(w, r, u)
 }
@@ -86,6 +88,17 @@ type adminPage struct {
 	// creation password too.
 	NeedPassword bool
 	MailEnabled  bool // e-mails really leave the server (SMTP is set up)
+	// OpenStand is the stand whose card is open: the one that the organiser
+	// just changed (?stand=<id>), else none.
+	OpenStand int64
+}
+
+func openStand(r *http.Request) int64 {
+	id, err := strconv.ParseInt(r.URL.Query().Get("stand"), 10, 64)
+	if err != nil {
+		return 0
+	}
+	return id
 }
 
 func (s *Server) adminPage(w http.ResponseWriter, r *http.Request, ev *model.Event) {
@@ -128,6 +141,7 @@ func (s *Server) adminPage(w http.ResponseWriter, r *http.Request, ev *model.Eve
 		Retention:      days,
 		RetentionField: s.retentionField(ev.RetentionDays),
 		NeedPassword:   s.cfg.CreatePassword != "",
+		OpenStand:      openStand(r),
 		MailEnabled:    s.cfg.MailEnabled,
 	}))
 }

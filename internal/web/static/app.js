@@ -88,6 +88,24 @@
     }
 
     if (t.closest("[data-back]")) { history.back(); return; }
+
+    // "Annuler" in a form panel: put the form back as it was and close the
+    // panel. The focus goes back to the button that opened it.
+    var cancel = t.closest("[data-close-panel]");
+    if (cancel) {
+      var form = cancel.form, panel = cancel.closest("details");
+      if (form) {
+        form.reset();
+        var first = form.querySelector("input, select, textarea");
+        if (first) first.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+      if (panel) {
+        panel.open = false;
+        var summary = panel.querySelector("summary");
+        if (summary) summary.focus();
+      }
+      return;
+    }
   });
 
   // Confirmation for destructive forms: <form data-confirm="Sûr ?">.
@@ -167,6 +185,15 @@
   }
   document.addEventListener("input", syncColorBoxes);
   document.addEventListener("change", syncColorBoxes);
+
+  // A link to a stand of the organiser page (#stand-<id>) opens its card.
+  function openTarget() {
+    var id = location.hash.slice(1);
+    var el = id && document.getElementById(id);
+    if (el && el.tagName === "DETAILS") el.open = true;
+  }
+  window.addEventListener("hashchange", openTarget);
+  openTarget();
 
   // Select-on-focus for read-only link fields.
   document.addEventListener("focusin", function (e) {
