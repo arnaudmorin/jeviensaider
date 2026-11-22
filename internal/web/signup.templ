@@ -64,7 +64,7 @@ templ signupForm(d signupPage, page bool) {
 			@volunteerFields("signup", d.Form.Name, d.Form.Phone) {
 				<label>
 					<span class="label-text">Un mot pour l'équipe <span class="opt">facultatif</span></span>
-					<input name="comment" value={ d.Form.Comment } maxlength="300"/>
+					<input autocapitalize="sentences" name="comment" value={ d.Form.Comment } maxlength="300"/>
 				</label>
 			}
 			<button type="submit" class="btn primary block big">
@@ -85,7 +85,7 @@ templ signupForm(d signupPage, page bool) {
 templ volunteerFields(prefix, name, phone string) {
 	<div class="field">
 		<label for={ prefix + "-name" }>Prénom et nom</label>
-		<input id={ prefix + "-name" } aria-describedby={ prefix + "-name-hint" } name="name" value={ name } required maxlength="80" autocomplete="name"/>
+		<input autocapitalize="words" id={ prefix + "-name" } aria-describedby={ prefix + "-name-hint" } name="name" value={ name } required maxlength="80" autocomplete="name"/>
 		<span class="hint" id={ prefix + "-name-hint" }>Sur la page, les autres verront votre prénom et l'initiale de votre nom.</span>
 	</div>
 	<div class="field">

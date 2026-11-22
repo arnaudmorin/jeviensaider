@@ -324,7 +324,7 @@ templ mySlots(d eventPage) {
 		<section class="card">
 			<h2>Mes coordonnées</h2>
 			<form method="post" action={ templ.SafeURL(d.MeURL) } class="stack">
-				<label>Prénom et nom <input name="name" value={ d.Me.Name } required maxlength="80" autocomplete="name"/></label>
+				<label>Prénom et nom <input autocapitalize="words" name="name" value={ d.Me.Name } required maxlength="80" autocomplete="name"/></label>
 				<label><span class="label-text">Téléphone <span class="opt">facultatif, vu seulement par les organisateurs</span></span> <input type="tel" name="phone" value={ d.Me.Phone } maxlength="30" autocomplete="tel"/></label>
 				<div><button class="btn" type="submit">Enregistrer</button></div>
 			</form>

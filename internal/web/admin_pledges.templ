@@ -76,7 +76,7 @@ templ adminPledgeList(d adminPage, l *model.PledgeListView) {
 							<form method="post" action={ templ.SafeURL(d.AdminPath + "/pledges") } class="stack">
 								<input type="hidden" name="list" value={ i64(l.ID) }/>
 								<p class="hint">Pour quelqu'un qui a répondu par téléphone ou sur papier, même si les inscriptions sont closes.</p>
-								<label>Prénom et nom <input name="name" required maxlength="80"/></label>
+								<label>Prénom et nom <input autocapitalize="words" name="name" required maxlength="80"/></label>
 								<label><span class="label-text">Téléphone <span class="opt">facultatif</span></span> <input type="tel" name="phone" maxlength="30"/></label>
 								<label>Quantité <input type="number" name="quantity" value="1" min="1" max={ itoa(model.MaxPledgeQuantity) } required/></label>
 								@panelFoot("Inscrire")
@@ -113,12 +113,12 @@ templ adminPledgeList(d adminPage, l *model.PledgeListView) {
 // pledgeListFields are the fields of the new list form and of the edit form.
 // An unset minimum or maximum is an empty field, because the server refuses 0.
 templ pledgeListFields(l model.PledgeList) {
-	<label>Nom <input name="name" value={ l.Name } required maxlength="80"/></label>
-	<label><span class="label-text">Description <span class="opt">facultatif</span></span> <textarea name="description" rows="2" maxlength="1000">{ l.Description }</textarea></label>
+	<label>Nom <input autocapitalize="sentences" name="name" value={ l.Name } required maxlength="80"/></label>
+	<label><span class="label-text">Description <span class="opt">facultatif</span></span> <textarea autocapitalize="sentences" name="description" rows="2" maxlength="1000">{ l.Description }</textarea></label>
 	<label><span class="label-text">Heure de dépôt <span class="opt">facultatif</span></span> <input type="time" name="drop_off" value={ l.DropOff }/></label>
 	<div class="row2">
-		<label><span class="label-text">Unité au singulier <span class="opt">facultatif</span></span> <input name="unit_one" value={ l.UnitOne } maxlength="30"/></label>
-		<label><span class="label-text">Unité au pluriel <span class="opt">facultatif</span></span> <input name="unit" value={ l.Unit } maxlength="30"/></label>
+		<label><span class="label-text">Unité au singulier <span class="opt">facultatif</span></span> <input autocapitalize="none" name="unit_one" value={ l.UnitOne } maxlength="30"/></label>
+		<label><span class="label-text">Unité au pluriel <span class="opt">facultatif</span></span> <input autocapitalize="none" name="unit" value={ l.Unit } maxlength="30"/></label>
 	</div>
 	<p class="hint">Par exemple « gâteau » et « gâteaux ». Remplissez les deux champs, ou aucun.</p>
 	<div class="row2">
