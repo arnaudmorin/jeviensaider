@@ -62,7 +62,7 @@ templ adminView(d adminPage) {
 				</summary>
 				<form method="post" action={ templ.SafeURL(d.AdminPath + "/stands") } class="panel">
 					<h3>Nouveau stand</h3>
-					<label>Nom <input name="name" required maxlength="80" placeholder="Buvette, accueil, rangement…"/></label>
+					<label>Nom <input autocapitalize="sentences" name="name" required maxlength="80" placeholder="Buvette, accueil, rangement…"/></label>
 					<div class="add-stand">
 						@colorFields(d.NextColor, false)
 					</div>
@@ -193,7 +193,7 @@ templ momentFields(date, from, to, title, color string, noColor, fill bool) {
 		<label>De <input type="time" name="from" value={ from } required/></label>
 		<label>À <input type="time" name="to" value={ to } required/></label>
 	</div>
-	<label>Titre <input name="title" value={ title } required maxlength="80"/></label>
+	<label>Titre <input autocapitalize="sentences" name="title" value={ title } required maxlength="80"/></label>
 	<div class="add-stand">
 		@colorFields(color, noColor)
 	</div>
@@ -234,12 +234,12 @@ templ adminStand(d adminPage, st *model.StandView, first, last bool) {
 					<div class="panel">
 						<h4>Modifier « { st.Name } »</h4>
 						<form method="post" action={ templ.SafeURL(d.AdminPath + "/stands/" + i64(st.ID)) } class="stack">
-							<label>Nom <input name="name" value={ st.Name } required maxlength="80"/></label>
+							<label>Nom <input autocapitalize="sentences" name="name" value={ st.Name } required maxlength="80"/></label>
 							<div class="add-stand">
 								@colorFields(standPickerColor(st.Color), st.Color == "")
 							</div>
 							<label class="check"><input type="checkbox" name="fill_row" value="1" checked?={ st.FillRow }/> <span>Colorer toute la ligne du planning</span></label>
-							<label><span class="label-text">Description <span class="opt">ce que font les bénévoles</span></span> <textarea name="description" rows="2" maxlength="1000">{ st.Description }</textarea></label>
+							<label><span class="label-text">Description <span class="opt">ce que font les bénévoles</span></span> <textarea autocapitalize="sentences" name="description" rows="2" maxlength="1000">{ st.Description }</textarea></label>
 							@panelFoot("Enregistrer")
 						</form>
 						<form method="post" action={ templ.SafeURL(d.AdminPath + "/stands/" + i64(st.ID) + "/delete") } data-confirm={ "Supprimer le stand « " + st.Name + " » avec tous ses créneaux et inscriptions ?" } class="panel-danger">
@@ -330,7 +330,7 @@ templ adminSlot(d adminPage, s *model.SlotView) {
 					<form method="post" action={ templ.SafeURL(d.AdminPath + "/signups") } class="stack">
 						<input type="hidden" name="slot" value={ i64(s.ID) }/>
 						<p class="hint">Pour quelqu'un qui a répondu par téléphone ou sur papier, même si les inscriptions sont closes.</p>
-						<label>Prénom et nom <input name="name" required maxlength="80"/></label>
+						<label>Prénom et nom <input autocapitalize="words" name="name" required maxlength="80"/></label>
 						<label><span class="label-text">Téléphone <span class="opt">facultatif</span></span> <input type="tel" name="phone" maxlength="30"/></label>
 						<div><button class="btn primary" type="submit">Inscrire</button></div>
 					</form>
@@ -441,12 +441,12 @@ templ adminTools(d adminPage) {
 		<details class="card">
 			<summary>Modifier l'événement</summary>
 			<form method="post" action={ templ.SafeURL(d.AdminPath + "/event") } class="stack">
-				<label>Nom <input name="title" value={ d.Event.Title } required maxlength="120"/></label>
+				<label>Nom <input autocapitalize="sentences" name="title" value={ d.Event.Title } required maxlength="120"/></label>
 				<div class="row2">
 					<label><span class="label-text">Date <span class="opt">facultatif</span></span> <input type="date" name="date" value={ d.Event.Date }/></label>
-					<label><span class="label-text">Lieu <span class="opt">facultatif</span></span> <input name="location" value={ d.Event.Location } maxlength="120"/></label>
+					<label><span class="label-text">Lieu <span class="opt">facultatif</span></span> <input autocapitalize="sentences" name="location" value={ d.Event.Location } maxlength="120"/></label>
 				</div>
-				<label><span class="label-text">Message aux bénévoles <span class="opt">facultatif</span></span> <textarea name="description" rows="3" maxlength="2000">{ d.Event.Description }</textarea></label>
+				<label><span class="label-text">Message aux bénévoles <span class="opt">facultatif</span></span> <textarea autocapitalize="sentences" name="description" rows="3" maxlength="2000">{ d.Event.Description }</textarea></label>
 				<label>E-mail de l'organisateur <input type="email" name="admin_email" value={ d.Event.AdminEmail } required maxlength="120" autocomplete="email"/></label>
 				<label class="check"><input type="checkbox" name="notify" value="1" checked?={ d.Event.NotifySignups }/> <span>Me prévenir par e-mail à chaque inscription ou désinscription</span></label>
 				@retentionInput(d.RetentionField, "admin-retention")
@@ -458,7 +458,7 @@ templ adminTools(d adminPage) {
 			<form method="post" action={ templ.SafeURL(d.AdminPath + "/duplicate") } class="stack">
 				<p class="hint">Copie les stands, les créneaux et les listes à apporter, sans les bénévoles. Avec une nouvelle date, les créneaux sont décalés d'autant.</p>
 				<div class="row2">
-					<label>Nouveau nom <input name="title" required maxlength="120" value={ d.Event.Title + " (copie)" }/></label>
+					<label>Nouveau nom <input autocapitalize="sentences" name="title" required maxlength="120" value={ d.Event.Title + " (copie)" }/></label>
 					<label>Nouvelle date <input type="date" name="date"/></label>
 				</div>
 				if d.NeedPassword {

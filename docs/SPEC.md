@@ -635,6 +635,10 @@ The code should stay small and readable by one person in an afternoon.
   validation in `forms.go`, SQL in `store`, domain rules and everything a
   view needs to decide (can I sign up here? is this mine?) in `model`.
   Templates only display; they do not compute rules.
+- Every free-text field sets `autocapitalize`, so that a phone keyboard
+  starts it with a capital: `words` for the name of a person, `sentences`
+  for titles, places, names of stands and lists, descriptions and comments,
+  `none` for the unit of a list, which goes in the middle of a sentence.
 - Every feature and every security rule above has a test; tests read like
   the scenario they check.
 - `gofmt`, `go vet`, `staticcheck` and `govulncheck` are clean in CI.

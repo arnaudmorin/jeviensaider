@@ -18,15 +18,15 @@ templ homeView(d homePage) {
 			<form method="post" action="/events" class="stack">
 				<label>
 					Nom de l'événement
-					<input name="title" value={ d.Form.Title } required maxlength="120" placeholder="Fête de l'école, fest-noz, vide-grenier…"/>
+					<input autocapitalize="sentences" name="title" value={ d.Form.Title } required maxlength="120" placeholder="Fête de l'école, fest-noz, vide-grenier…"/>
 				</label>
 				<div class="row2">
 					<label><span class="label-text">Date <span class="opt">facultatif</span></span> <input type="date" name="date" value={ d.Form.Date }/></label>
-					<label><span class="label-text">Lieu <span class="opt">facultatif</span></span> <input name="location" value={ d.Form.Location } maxlength="120" placeholder="Salle des fêtes"/></label>
+					<label><span class="label-text">Lieu <span class="opt">facultatif</span></span> <input autocapitalize="sentences" name="location" value={ d.Form.Location } maxlength="120" placeholder="Salle des fêtes"/></label>
 				</div>
 				<label>
 					<span class="label-text">Message aux bénévoles <span class="opt">facultatif, affiché en haut de la page</span></span>
-					<textarea name="description" rows="3" maxlength="2000" placeholder="Rendez-vous 15 minutes avant votre créneau au stand accueil.">{ d.Form.Description }</textarea>
+					<textarea autocapitalize="sentences" name="description" rows="3" maxlength="2000" placeholder="Rendez-vous 15 minutes avant votre créneau au stand accueil.">{ d.Form.Description }</textarea>
 				</label>
 				<div class="field">
 					<label for="home-email">Votre e-mail</label>
