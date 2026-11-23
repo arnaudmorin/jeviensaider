@@ -154,8 +154,6 @@ func dateFR(s string) string {
 // eventStatusLabel is the French name of an event status.
 func eventStatusLabel(status string) string {
 	switch status {
-	case model.StatusDraft:
-		return "Brouillon"
 	case model.StatusOpen:
 		return "Ouvertes"
 	case model.StatusClosed:

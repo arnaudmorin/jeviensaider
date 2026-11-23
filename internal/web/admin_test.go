@@ -22,6 +22,23 @@ func TestDuplicateNeedsCreatePassword(t *testing.T) {
 	}
 }
 
+// A new event is open at once: volunteers can sign up as soon as there is a
+// slot. The organiser can only choose between open and closed.
+func TestNewEventIsOpen(t *testing.T) {
+	e := newEnv(t, Config{})
+	admin := e.client()
+	adminPath, pub, slot := openEventWithSlot(t, e, admin, url.Values{"title": {"Fête"}, "admin_email": {"orga@example.org"}})
+	body := e.get(admin, adminPath).body
+	expect(t, resp{code: 200, body: body}, 200, `value="open" class="on"`, `value="closed"`)
+	if strings.Contains(body, "Brouillon") || strings.Contains(body, `value="draft"`) {
+		t.Error("the admin page still offers a draft status")
+	}
+	e.signUp(e.client(), pub, slot, "Marie Dupont")
+
+	expect(t, e.post(admin, adminPath+"/status", url.Values{"status": {"draft"}}), http.StatusSeeOther)
+	expect(t, e.get(admin, adminPath), 200, "Statut inconnu", `value="open" class="on"`)
+}
+
 // Editing stands, slots and sign-ups from the admin page.
 func TestAdminEditing(t *testing.T) {
 	e := newEnv(t, Config{})

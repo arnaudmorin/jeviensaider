@@ -10,41 +10,37 @@ templ eventView(d eventPage) {
 			if d.Event.Description != "" {
 				<p class="desc">{ d.Event.Description }</p>
 			}
-			if d.Event.IsDraft() {
-				<div class="callout info">{ msgNotOpenYet }</div>
-			} else if d.Event.IsClosed() {
+			if d.Event.IsClosed() {
 				<div class="callout info">Les inscriptions sont closes. Merci à toutes et à tous !</div>
 			}
 		</section>
-		if !d.Event.IsDraft() {
-			<div id="planning">
-				if d.Me != nil {
-					<nav class="tabs" aria-label="Vues">
-						<a
-							class={ "tab", templ.KV("active", d.Tab != "me") }
-							href={ templ.SafeURL(todoURL(d.EventURL, d.TodoOnly)) }
-							if d.Tab != "me" {
-								aria-current="page"
-							}
-						>Tous les créneaux</a>
-						<a
-							class={ "tab", templ.KV("active", d.Tab == "me") }
-							href={ templ.SafeURL(d.MeURL) }
-							if d.Tab == "me" {
-								aria-current="page"
-							}
-						>
-							Mes créneaux <span class="count">{ itoa(len(d.P.MySlots) + len(d.P.MyPledges)) }</span>
-						</a>
-					</nav>
-				}
-				if d.Tab == "me" {
-					@mySlots(d)
-				} else {
-					@overview(d)
-				}
-			</div>
-		}
+		<div id="planning">
+			if d.Me != nil {
+				<nav class="tabs" aria-label="Vues">
+					<a
+						class={ "tab", templ.KV("active", d.Tab != "me") }
+						href={ templ.SafeURL(todoURL(d.EventURL, d.TodoOnly)) }
+						if d.Tab != "me" {
+							aria-current="page"
+						}
+					>Tous les créneaux</a>
+					<a
+						class={ "tab", templ.KV("active", d.Tab == "me") }
+						href={ templ.SafeURL(d.MeURL) }
+						if d.Tab == "me" {
+							aria-current="page"
+						}
+					>
+						Mes créneaux <span class="count">{ itoa(len(d.P.MySlots) + len(d.P.MyPledges)) }</span>
+					</a>
+				</nav>
+			}
+			if d.Tab == "me" {
+				@mySlots(d)
+			} else {
+				@overview(d)
+			}
+		</div>
 	}
 }
 

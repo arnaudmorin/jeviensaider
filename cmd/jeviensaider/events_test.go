@@ -75,7 +75,7 @@ func TestEventsCommand(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("list: exit %d", code)
 	}
-	mustContain(out, "SLUG", evs[0].Slug, "Marché de Noël", "Loto", "draft", "EXPIRES")
+	mustContain(out, "SLUG", evs[0].Slug, "Marché de Noël", "Loto", "open", "EXPIRES")
 
 	code, out, _ = run("", "show", evs[0].Slug)
 	if code != 0 {

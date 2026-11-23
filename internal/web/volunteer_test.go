@@ -9,20 +9,11 @@ import (
 	"testing"
 )
 
-func TestDraftHidesSlotsAndClosedLocksDetails(t *testing.T) {
+func TestClosedLocksDetails(t *testing.T) {
 	e := newEnv(t, Config{})
 	admin := e.client()
 	adminPath, pub, slots := setupEvent(t, e, admin)
 
-	expect(t, e.post(admin, adminPath+"/status", url.Values{"status": {"draft"}}), http.StatusSeeOther)
-	r := e.get(e.client(), pub+"/slots/"+slots[0]+"/signup")
-	expect(t, r, 404, "pas encore ouvertes")
-	if strings.Contains(r.body, "Pêche aux canards") {
-		t.Error("draft sign-up form shows the stand")
-	}
-	expect(t, e.post(e.client(), pub+"/slots/"+slots[0]+"/signup", url.Values{"name": {"Marie"}}), 404)
-
-	expect(t, e.post(admin, adminPath+"/status", url.Values{"status": {"open"}}), http.StatusSeeOther)
 	v := e.client()
 	me := strings.TrimSuffix(e.post(v, pub+"/slots/"+slots[0]+"/signup", url.Values{"name": {"Marie"}}).location, "?welcome=1")
 	expect(t, e.post(admin, adminPath+"/status", url.Values{"status": {"closed"}}), http.StatusSeeOther)
@@ -115,8 +106,7 @@ func TestPersonalCalendarExport(t *testing.T) {
 	}
 }
 
-// A draft is not public, so its calendar file is not either: the sign-up form
-// gives the same answer. A closed event keeps the sign-ups that it has.
+// A closed event keeps the sign-ups that it has, so its calendar file too.
 func TestPersonalCalendarExportFollowsEventStatus(t *testing.T) {
 	e := newEnv(t, Config{})
 	admin := e.client()
@@ -127,12 +117,6 @@ func TestPersonalCalendarExportFollowsEventStatus(t *testing.T) {
 	expect(t, e.post(admin, adminPath+"/status", url.Values{"status": {"closed"}}), http.StatusSeeOther)
 	expect(t, e.get(v, me+"/agenda.ics"), 200, "BEGIN:VEVENT")
 	expect(t, e.get(v, me), 200, "Ajouter à mon agenda")
-
-	expect(t, e.post(admin, adminPath+"/status", url.Values{"status": {"draft"}}), http.StatusSeeOther)
-	expect(t, e.get(v, me+"/agenda.ics"), 404, "pas encore ouvertes")
-	if body := e.get(v, me).body; strings.Contains(body, "agenda.ics") {
-		t.Error("the page offers a calendar file for a draft event")
-	}
 }
 
 func TestPersonalCalendarExportErrors(t *testing.T) {
@@ -207,9 +191,6 @@ func TestStandDescriptions(t *testing.T) {
 	}
 	expect(t, e.get(e.client(), pub+"/stands/"+standID), 200, "<html", "Tous les créneaux", desc)
 	expect(t, e.get(e.client(), pub+"/stands/999999"), 404, "Stand introuvable")
-	expect(t, e.post(admin, adminPath+"/status", url.Values{"status": {"draft"}}), http.StatusSeeOther)
-	expect(t, e.get(e.client(), pub+"/stands/"+standID), 404, "pas encore ouvertes")
-	expect(t, e.post(admin, adminPath+"/status", url.Values{"status": {"open"}}), http.StatusSeeOther)
 
 	// The views bar only appears for a known volunteer.
 	if strings.Contains(e.get(e.client(), pub).body, `class="tabs"`) {

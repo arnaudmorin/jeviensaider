@@ -65,11 +65,8 @@ func (s *Server) createPasswordOK(r *http.Request) bool {
 		subtle.ConstantTimeCompare([]byte(r.FormValue("password")), []byte(s.cfg.CreatePassword)) == 1
 }
 
-// Messages shown when the event does not accept changes.
-const (
-	msgNotOpenYet = "Les inscriptions ne sont pas encore ouvertes. Revenez bientôt !"
-	msgClosed     = "Les inscriptions sont closes : contactez les organisateurs pour toute modification."
-)
+// msgClosed is shown when the event does not accept changes.
+const msgClosed = "Les inscriptions sont closes : contactez les organisateurs pour toute modification."
 
 // volunteerID is v's ID, or 0 for an unknown visitor.
 func volunteerID(v *model.Volunteer) int64 {
@@ -271,18 +268,8 @@ func (s *Server) loadSlotView(ctx context.Context, ev *model.Event, slotID, myID
 	return sv, p.MyOverlaps(sv), nil
 }
 
-// publicID reads the {id} of a public URL about an event's planning (a
-// slot, a stand). A draft's planning is not public yet: "not found".
-func (s *Server) publicID(w http.ResponseWriter, r *http.Request, ev *model.Event) (int64, bool) {
-	if ev.IsDraft() {
-		s.renderError(w, r, http.StatusNotFound, msgNotOpenYet)
-		return 0, false
-	}
-	return s.pathID(w, r)
-}
-
 func (s *Server) signupForm(w http.ResponseWriter, r *http.Request, ev *model.Event) {
-	id, ok := s.publicID(w, r, ev)
+	id, ok := s.pathID(w, r)
 	if !ok {
 		return
 	}
@@ -304,7 +291,7 @@ func (s *Server) signupForm(w http.ResponseWriter, r *http.Request, ev *model.Ev
 }
 
 func (s *Server) signupSubmit(w http.ResponseWriter, r *http.Request, ev *model.Event) {
-	id, ok := s.publicID(w, r, ev)
+	id, ok := s.pathID(w, r)
 	if !ok {
 		return
 	}
@@ -373,7 +360,7 @@ type standPage struct {
 // standInfo shows a stand's full description ("Voir plus" in the overview),
 // as a dialog with htmx or as a page.
 func (s *Server) standInfo(w http.ResponseWriter, r *http.Request, ev *model.Event) {
-	id, ok := s.publicID(w, r, ev)
+	id, ok := s.pathID(w, r)
 	if !ok {
 		return
 	}

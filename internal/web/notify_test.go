@@ -63,7 +63,6 @@ func TestOrganiserEmails(t *testing.T) {
 	expect(t, e.post(admin, adminPath+"/stands", url.Values{"name": {"Buvette"}}), http.StatusSeeOther)
 	standID := regexp.MustCompile(`id="stand-(\d+)"`).FindStringSubmatch(e.get(admin, adminPath).body)[1]
 	expect(t, e.post(admin, adminPath+"/stands/"+standID+"/slots", url.Values{"date": {"2026-06-20"}, "from": {"14:00"}, "to": {"15:00"}, "step": {"60"}, "min": {"2"}}), http.StatusSeeOther)
-	expect(t, e.post(admin, adminPath+"/status", url.Values{"status": {"open"}}), http.StatusSeeOther)
 	pub := regexp.MustCompile(`href="(/e/[^"]+)" target="_blank"`).FindStringSubmatch(e.get(admin, adminPath).body)[1]
 	slot := regexp.MustCompile(`/slots/(\d+)/signup`).FindStringSubmatch(e.get(e.client(), pub).body)[1]
 	fm.take()
@@ -171,7 +170,6 @@ func openNotifiedEvent(t *testing.T, e *env, fm *fakeMailer, admin *http.Client)
 	r := e.post(admin, "/events", url.Values{"admin_email": {"orga@example.org"}, "title": {"Kermesse"}, "date": {"2026-06-20"}, "notify": {"1"}})
 	expect(t, r, http.StatusSeeOther)
 	adminPath = r.location
-	expect(t, e.post(admin, adminPath+"/status", url.Values{"status": {"open"}}), http.StatusSeeOther)
 	pub = publicRe.FindStringSubmatch(e.get(admin, adminPath).body)[1]
 	fm.take()
 	return adminPath, pub

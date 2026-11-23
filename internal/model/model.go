@@ -23,19 +23,18 @@ const TimeLayout = "2006-01-02 15:04"
 // DateLayout is the layout of Event.Date.
 const DateLayout = "2006-01-02"
 
-// Event statuses.
+// Event statuses. An event starts open.
 const (
-	StatusDraft  = "draft"
 	StatusOpen   = "open"
 	StatusClosed = "closed"
 )
 
 // Statuses lists the event statuses in their natural order.
-var Statuses = []string{StatusDraft, StatusOpen, StatusClosed}
+var Statuses = []string{StatusOpen, StatusClosed}
 
 // ValidStatus reports whether s is one of Statuses.
 func ValidStatus(s string) bool {
-	return s == StatusDraft || s == StatusOpen || s == StatusClosed
+	return s == StatusOpen || s == StatusClosed
 }
 
 type Event struct {
@@ -68,7 +67,6 @@ func (e *Event) ParsedDate() time.Time {
 }
 
 func (e *Event) IsOpen() bool   { return e.Status == StatusOpen }
-func (e *Event) IsDraft() bool  { return e.Status == StatusDraft }
 func (e *Event) IsClosed() bool { return e.Status == StatusClosed }
 
 type Stand struct {
