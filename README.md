@@ -73,11 +73,10 @@ in a single SQLite file.
   `.ics` file for any calendar app. The file also has the drop-off time of
   each pledge, when the list has a drop-off time and the event has a date.
   Each entry has a reminder one day and one hour before. The file does not
-  contain the personal link, and it is not available while the event is a
-  draft. Importing it again updates the entries that still exist and does
-  not add copies. A slot or a pledge that the volunteer cancels, or that an
-  organiser deletes, stays in the calendar app until the volunteer removes it
-  there. The times have no time zone, so a calendar shows the same clock time
+  contain the personal link. Importing it again updates the entries that
+  still exist and does not add copies. A slot or a pledge that the volunteer
+  cancels, or that an organiser deletes, stays in the calendar app until the
+  volunteer removes it there. The times have no time zone, so a calendar shows the same clock time
   as the event page.
 
 ## Quick start

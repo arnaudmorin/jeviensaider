@@ -35,9 +35,10 @@ secret links (random 256-bit tokens, base64url).
 
 - **Event**: title, description, location, optional date, status, organiser
   e-mail (mandatory), "notify me of sign-ups" flag, public slug, admin token.
-  - Status: `draft` (planning not public, no sign-ups), `open` (sign-ups
-    allowed), `closed` (read-only for volunteers; the organiser can still add
-    people).
+  - Status: `open` (sign-ups allowed; a new event, or a duplicate, starts
+    open), `closed` (read-only for volunteers; the organiser can still add
+    people). There is no draft: the planning is public as soon as the
+    organiser shares the link.
 - **Stand**: belongs to an event; name, description, optional colour
   (`#rrggbb`; empty means no colour), display position, and `fill_row` (see
   the planning table: the colour tints the whole row, not only its stripe).
@@ -113,7 +114,7 @@ Pledge rules:
   message gives the items left. Lowering a quantity is always allowed.
 - The organizer cannot set the maximum below the total or below the minimum.
 - Event status works as for slots. Only the organizer can add a pledge to a
-  draft or closed event.
+  closed event.
 
 ## 4. Features
 
@@ -128,7 +129,7 @@ Pledge rules:
 ### 4.2 Public event page `/e/<slug>`
 
 - Header: title, date, location, description.
-- Draft: only a "not open yet" notice. Closed: a "closed" notice.
+- Closed: a "closed" notice.
 - **"Tous les créneaux"** (the overview):
   - Progress: "Il reste N places" (or "Tous les créneaux sont couverts,
     merci !"), a bar and "N places prises sur M".
@@ -164,7 +165,6 @@ Pledge rules:
     these groups on phones and keeps every column in the table. An event
     with moments and no slot (no stand, or stands without slots) shows the
     list on every screen size, not "Aucun créneau n'a encore été proposé". A
-    draft event shows no moment. A
     moment never appears in "Mes créneaux", the PDF, the CSV export or the
     calendar file.
   - The color of a stand or of a moment shows as a stripe, and never as a
@@ -199,8 +199,7 @@ Pledge rules:
   - "Je m'en charge" opens the pledge form (see 4.3). A volunteer who has
     a pledge sees "Vous en apportez N" and "Changer" instead. A full list shows
     "Complet" to everyone else.
-  - A closed event shows the cards with no button. A draft event shows no
-    list.
+  - A closed event shows the cards with no button.
   - Under the filter (`?todo=1`), a list shows only while it still wants
     items. It is not full, and it has no minimum or is under it.
   - An event with lists and no slots shows only this section. The page hides
@@ -226,9 +225,8 @@ Pledge rules:
     link) and two reminders, one day and one hour before. Times are written
     without a time zone, like the stored times. Each slot entry has a stable
     UID (event, slot, volunteer), so a second import updates the entries that
-    still exist. A cancelled or deleted slot stays in the calendar app. Not
-    available for a draft event (404), like the sign-up form; a closed event
-    still gives its file.
+    still exist. A cancelled or deleted slot stays in the calendar app. A
+    closed event still gives its file.
     - A pledge gives an entry only when its list has a drop-off time and the
       event has a date. The entry starts at the drop-off time and lasts 30
       minutes. It has the same location, public link and two reminders.
@@ -289,7 +287,7 @@ It works like a slot sign-up, with these differences:
   volunteer.
 - The app compares the total with the maximum and saves the pledge in one
   transaction, so two people cannot take the last items.
-- A draft event gives 404, as for slots. A list has no end time, so it never
+- A list has no end time, so it never
   clashes with a slot, and the form shows no overlap warning.
 - A pledge from a new volunteer creates the volunteer, sets the cookie and
   shows the personal link ("welcome"). Otherwise, the event page shows the
@@ -301,7 +299,7 @@ It works like a slot sign-up, with these differences:
 ### 4.4 Organiser page `/a/<token>`
 
 - One column that works on a phone (the badge "Organisation" in the header).
-- "Inscriptions": Brouillon / Ouvertes / Closes, with what each means.
+- "Inscriptions": Ouvertes / Closes, with what each means.
 - Progress: places still needed, places taken, number of volunteers. An
   event with pledge lists and no slots does not show it.
 - "Les deux liens de l'événement": the secret organiser link and the public

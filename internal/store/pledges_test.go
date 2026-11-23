@@ -86,7 +86,7 @@ func TestPledgeFlow(t *testing.T) {
 
 func TestPledgeClosedLeavesNoVolunteer(t *testing.T) {
 	s := openTest(t)
-	ev := &model.Event{Title: "Brouillon", Date: "2026-06-20", Status: model.StatusDraft}
+	ev := &model.Event{Title: "Kermesse", Date: "2026-06-20", Status: model.StatusClosed}
 	if err := s.CreateEvent(ctx, ev); err != nil {
 		t.Fatal(err)
 	}
@@ -94,22 +94,12 @@ func TestPledgeClosedLeavesNoVolunteer(t *testing.T) {
 	req := PledgeRequest{EventID: ev.ID, ListID: l.ID, Name: "Marie", Quantity: 1}
 
 	if _, err := s.Pledge(ctx, req); !errors.Is(err, ErrEventNotOpen) {
-		t.Fatalf("draft event: want ErrEventNotOpen, got %v", err)
+		t.Fatalf("closed event: want ErrEventNotOpen, got %v", err)
 	}
 	wantVolunteers(t, s, ev.ID, 0)
 	if n := countPledges(t, s, l.ID); n != 0 {
 		t.Fatalf("refused pledge left %d rows", n)
 	}
-
-	// A closed event refuses a pledge too.
-	ev.Status = model.StatusClosed
-	if err := s.UpdateEvent(ctx, ev); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := s.Pledge(ctx, req); !errors.Is(err, ErrEventNotOpen) {
-		t.Fatalf("closed event: want ErrEventNotOpen, got %v", err)
-	}
-	wantVolunteers(t, s, ev.ID, 0)
 
 	// The organiser can pledge whatever the status.
 	req.Admin = true

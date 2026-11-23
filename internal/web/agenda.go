@@ -22,12 +22,6 @@ var reminders = []time.Duration{24 * time.Hour, time.Hour}
 // their personal link: people can share a calendar file, and the link lets
 // anyone edit the sign-ups.
 func (s *Server) meCalendar(w http.ResponseWriter, r *http.Request, ev *model.Event, vol *model.Volunteer) {
-	// A draft is not public: the page and the sign-up form show nothing of
-	// it, so this file must not either. A closed event keeps its sign-ups.
-	if ev.IsDraft() {
-		s.renderError(w, r, http.StatusNotFound, msgNotOpenYet)
-		return
-	}
 	p, err := s.planning(r.Context(), ev, vol.ID)
 	if err != nil {
 		s.serverError(w, r, err)

@@ -21,9 +21,8 @@ var (
 	textareaRe = regexp.MustCompile(`(?s)<textarea\b([^>]*)>(.*?)</textarea>`)
 )
 
-// newDraftEvent creates a draft event dated 2026-06-20 and returns its admin
-// path.
-func newDraftEvent(t *testing.T, e *env, admin *http.Client) string {
+// newEvent creates an event dated 2026-06-20 and returns its admin path.
+func newEvent(t *testing.T, e *env, admin *http.Client) string {
 	t.Helper()
 	r := e.post(admin, "/events", url.Values{"admin_email": {"orga@example.org"}, "title": {"Kermesse"}, "date": {"2026-06-20"}})
 	expect(t, r, http.StatusSeeOther)
@@ -54,9 +53,8 @@ func listLocation(adminPath, id string) string {
 // and returns the admin path, the public path and the list ID.
 func openEventWithList(t *testing.T, e *env, admin *http.Client, list url.Values) (adminPath, pub, listID string) {
 	t.Helper()
-	adminPath = newDraftEvent(t, e, admin)
+	adminPath = newEvent(t, e, admin)
 	expect(t, e.post(admin, adminPath+"/lists", list), http.StatusSeeOther)
-	expect(t, e.post(admin, adminPath+"/status", url.Values{"status": {"open"}}), http.StatusSeeOther)
 	page := e.get(admin, adminPath).body
 	m := listIDRe.FindStringSubmatch(page)
 	if m == nil {
@@ -129,7 +127,7 @@ func formValues(t *testing.T, page, action string) url.Values {
 func TestAdminPledgeLists(t *testing.T) {
 	e := newEnv(t, Config{})
 	admin := e.client()
-	adminPath := newDraftEvent(t, e, admin)
+	adminPath := newEvent(t, e, admin)
 	expect(t, e.get(admin, adminPath), 200, "À apporter", "Nouvelle liste", "Aucune liste")
 
 	id := addList(t, e, admin, adminPath, url.Values{
@@ -187,7 +185,7 @@ func TestAdminPledgeLists(t *testing.T) {
 func TestAdminPledgeListSavesUnchanged(t *testing.T) {
 	e := newEnv(t, Config{})
 	admin := e.client()
-	adminPath := newDraftEvent(t, e, admin)
+	adminPath := newEvent(t, e, admin)
 	for name, list := range map[string]url.Values{
 		"none": {"name": {"Sans limite"}},
 		"min":  {"name": {"Avec minimum"}, "min": {"5"}},
@@ -213,7 +211,7 @@ func TestAdminPledgeListSavesUnchanged(t *testing.T) {
 func TestAdminPledgeListErrors(t *testing.T) {
 	e := newEnv(t, Config{})
 	admin := e.client()
-	adminPath := newDraftEvent(t, e, admin)
+	adminPath := newEvent(t, e, admin)
 
 	for _, c := range []struct {
 		name string
@@ -250,7 +248,7 @@ func TestAdminPledgeListErrors(t *testing.T) {
 func TestAdminPledgeListLimit(t *testing.T) {
 	e := newEnv(t, Config{})
 	admin := e.client()
-	adminPath := newDraftEvent(t, e, admin)
+	adminPath := newEvent(t, e, admin)
 	for i := 1; i <= 10; i++ {
 		addList(t, e, admin, adminPath, url.Values{"name": {"Liste " + strconv.Itoa(i)}})
 	}
@@ -265,8 +263,9 @@ func TestAdminPledgeListLimit(t *testing.T) {
 func TestAdminAddAndRemovePledge(t *testing.T) {
 	e := newEnv(t, Config{})
 	admin := e.client()
-	// The event stays a draft: an organizer can add by hand at any time.
-	adminPath := newDraftEvent(t, e, admin)
+	// The event is closed: an organizer can add by hand at any time.
+	adminPath := newEvent(t, e, admin)
+	expect(t, e.post(admin, adminPath+"/status", url.Values{"status": {"closed"}}), http.StatusSeeOther)
 	id := addList(t, e, admin, adminPath, url.Values{"name": {"Gâteaux"}, "unit_one": {"gâteau"}, "unit": {"gâteaux"}, "max": {"2"}})
 
 	expect(t, addPledge(e, admin, adminPath, id, "Marie Dupont", 2), http.StatusSeeOther)
@@ -326,7 +325,7 @@ func TestAdminAddAndRemovePledge(t *testing.T) {
 func TestAdminHasNoOverallTotal(t *testing.T) {
 	e := newEnv(t, Config{})
 	admin := e.client()
-	adminPath := newDraftEvent(t, e, admin)
+	adminPath := newEvent(t, e, admin)
 
 	sweet := addList(t, e, admin, adminPath, url.Values{"name": {"Gâteaux sucrés"}, "unit_one": {"gâteau"}, "unit": {"gâteaux"}, "min": {"18"}})
 	drinks := addList(t, e, admin, adminPath, url.Values{"name": {"Boissons"}, "unit_one": {"bouteille"}, "unit": {"bouteilles"}, "min": {"3"}})
@@ -344,8 +343,8 @@ func TestAdminHasNoOverallTotal(t *testing.T) {
 func TestAdminPledgeScoping(t *testing.T) {
 	e := newEnv(t, Config{})
 	admin := e.client()
-	adminA := newDraftEvent(t, e, admin)
-	adminB := newDraftEvent(t, e, admin)
+	adminA := newEvent(t, e, admin)
+	adminB := newEvent(t, e, admin)
 	listB := addList(t, e, admin, adminB, url.Values{"name": {"Liste B"}, "max": {"5"}})
 	expect(t, addPledge(e, admin, adminB, listB, "Marie Dupont", 2), http.StatusSeeOther)
 	pledgeB := pledgeIDRe.FindStringSubmatch(e.get(admin, adminB).body)[1]
@@ -376,7 +375,7 @@ func TestAdminPledgeScoping(t *testing.T) {
 func TestAdminPledgeRoutesNeedToken(t *testing.T) {
 	e := newEnv(t, Config{})
 	admin := e.client()
-	adminPath := newDraftEvent(t, e, admin)
+	adminPath := newEvent(t, e, admin)
 	form := url.Values{"name": {"Cakes"}, "list": {"1"}}
 	// A real token reaches the route: the 404s below come from the token.
 	expect(t, e.post(admin, adminPath+"/lists", form), http.StatusSeeOther)
@@ -389,7 +388,7 @@ func TestAdminPledgeRoutesNeedToken(t *testing.T) {
 func TestAdminPledgeEscaping(t *testing.T) {
 	e := newEnv(t, Config{})
 	admin := e.client()
-	adminPath := newDraftEvent(t, e, admin)
+	adminPath := newEvent(t, e, admin)
 	name, unit, person := `"><script>alert(1)</script>`, `<b>x</b>`, `<img src=x onerror=alert(1)>`
 	id := addList(t, e, admin, adminPath, url.Values{"name": {name}, "unit_one": {unit}, "unit": {unit}, "description": {"<i>d</i>"}})
 	expect(t, addPledge(e, admin, adminPath, id, person, 2), http.StatusSeeOther)
@@ -405,18 +404,10 @@ func TestAdminPledgeEscaping(t *testing.T) {
 func TestPledgeSignupFlow(t *testing.T) {
 	e := newEnv(t, Config{})
 	admin := e.client()
-	adminPath := newDraftEvent(t, e, admin)
+	adminPath := newEvent(t, e, admin)
 	id := addList(t, e, admin, adminPath, url.Values{"name": {"Gâteaux sucrés"}, "unit_one": {"gâteau"}, "unit": {"gâteaux"}})
 	pub := publicRe.FindStringSubmatch(e.get(admin, adminPath).body)[1]
 	form := pub + "/lists/" + id + "/signup"
-
-	// A draft hides its lists.
-	expect(t, e.get(e.client(), form), http.StatusNotFound)
-	expect(t, pledge(e, e.client(), pub, id, "Marie Dupont", 2), http.StatusNotFound)
-	if strings.Contains(e.get(e.client(), pub).body, "À apporter") {
-		t.Error("the page of a draft shows its lists")
-	}
-	expect(t, e.post(admin, adminPath+"/status", url.Values{"status": {"open"}}), http.StatusSeeOther)
 
 	// The card and the form, as an htmx dialog and as a full page.
 	marie := e.client()
@@ -866,10 +857,9 @@ func TestListsOnlyEmptyPersonalPage(t *testing.T) {
 func TestAdminListsOnlyEvent(t *testing.T) {
 	e := newEnv(t, Config{})
 	admin := e.client()
-	adminPath := newDraftEvent(t, e, admin)
+	adminPath := newEvent(t, e, admin)
 	// Without a stand and a list, the progress card stays.
-	expect(t, e.get(admin, adminPath), 200, "Pas encore de créneau",
-		"Ajoutez vos stands ou vos listes à apporter, puis choisissez « Ouvertes ».")
+	expect(t, e.get(admin, adminPath), 200, "Pas encore de créneau")
 
 	id := addList(t, e, admin, adminPath, url.Values{"name": {"Gâteaux sucrés"}, "min": {"6"}})
 	r := e.get(admin, adminPath)
@@ -1004,7 +994,7 @@ func TestCSVExportWithoutDate(t *testing.T) {
 func TestCSVExportListsOnly(t *testing.T) {
 	e := newEnv(t, Config{})
 	admin := e.client()
-	adminPath := newDraftEvent(t, e, admin)
+	adminPath := newEvent(t, e, admin)
 	sweet := addList(t, e, admin, adminPath, url.Values{"name": {"Gâteaux sucrés"}, "drop_off": {"08:30"}})
 	addList(t, e, admin, adminPath, url.Values{"name": {"Salades"}, "min": {"4"}})
 	expect(t, addPledge(e, admin, adminPath, sweet, "Marie Dupont", 2), http.StatusSeeOther)
@@ -1024,7 +1014,7 @@ func TestCSVExportListsOnly(t *testing.T) {
 func TestCSVNeutralisesNames(t *testing.T) {
 	e := newEnv(t, Config{})
 	admin := e.client()
-	adminPath := newDraftEvent(t, e, admin)
+	adminPath := newEvent(t, e, admin)
 	expect(t, e.post(admin, adminPath+"/stands", url.Values{"name": {"=1+1"}}), http.StatusSeeOther)
 	standID := regexp.MustCompile(`id="stand-(\d+)"`).FindStringSubmatch(e.get(admin, adminPath).body)[1]
 	expect(t, e.post(admin, adminPath+"/stands/"+standID+"/slots", url.Values{"date": {"2026-06-20"}, "from": {"14:00"}, "to": {"15:00"}, "step": {"60"}, "min": {"1"}}), http.StatusSeeOther)
@@ -1040,10 +1030,9 @@ func TestCSVNeutralisesNames(t *testing.T) {
 	})
 }
 
-// openEvent opens a draft event and returns its public path.
-func openEvent(t *testing.T, e *env, admin *http.Client, adminPath string) string {
+// publicPathOf returns the public path of an event, read on its admin page.
+func publicPathOf(t *testing.T, e *env, admin *http.Client, adminPath string) string {
 	t.Helper()
-	expect(t, e.post(admin, adminPath+"/status", url.Values{"status": {"open"}}), http.StatusSeeOther)
 	m := publicRe.FindStringSubmatch(e.get(admin, adminPath).body)
 	if m == nil {
 		t.Fatal("public link not found on the admin page")
@@ -1060,10 +1049,10 @@ var agendaNone = html.EscapeString("Vous n'avez aucun créneau à ajouter à l'a
 func TestCalendarPledgeEntry(t *testing.T) {
 	e := newEnv(t, Config{})
 	admin := e.client()
-	adminPath := newDraftEvent(t, e, admin)
+	adminPath := newEvent(t, e, admin)
 	salads := addList(t, e, admin, adminPath, url.Values{"name": {"Salades"}})
 	cakes := addList(t, e, admin, adminPath, url.Values{"name": {"Gâteaux sucrés"}, "description": {"Sans arachides"}, "drop_off": {"08:30"}})
-	pub := openEvent(t, e, admin, adminPath)
+	pub := publicPathOf(t, e, admin, adminPath)
 	marie := e.client()
 	r := pledge(e, marie, pub, salads, "Marie Dupont", 1)
 	expect(t, r, http.StatusSeeOther)
@@ -1162,7 +1151,7 @@ func TestCalendarPledgeWithoutDateOrDropOff(t *testing.T) {
 	expect(t, r, http.StatusSeeOther)
 	adminPath := r.location
 	id := addList(t, e, admin, adminPath, url.Values{"name": {"Gâteaux sucrés"}, "drop_off": {"08:30"}})
-	pub := openEvent(t, e, admin, adminPath)
+	pub := publicPathOf(t, e, admin, adminPath)
 	marie := e.client()
 	r = pledge(e, marie, pub, id, "Marie Dupont", 2)
 	expect(t, r, http.StatusSeeOther)
@@ -1186,25 +1175,6 @@ func TestCalendarPledgeWithoutDateOrDropOff(t *testing.T) {
 	expect(t, r, 200, "SUMMARY:Buvette (Kermesse)")
 	if n := strings.Count(r.body, "BEGIN:VEVENT"); n != 1 || strings.Contains(r.body, "À apporter") {
 		t.Errorf("want the slot entry only, got %d events:\n%s", n, r.body)
-	}
-}
-
-// A draft event has no calendar file, even for a volunteer with a pledge.
-func TestCalendarDraftStillHidden(t *testing.T) {
-	e := newEnv(t, Config{})
-	admin := e.client()
-	adminPath, pub, id := openEventWithList(t, e, admin, url.Values{"name": {"Gâteaux sucrés"}, "drop_off": {"08:30"}})
-	marie := e.client()
-	r := pledge(e, marie, pub, id, "Marie Dupont", 2)
-	expect(t, r, http.StatusSeeOther)
-	me := strings.TrimSuffix(r.location, "?welcome=1")
-	expect(t, e.get(marie, me+"/agenda.ics"), 200, "BEGIN:VEVENT")
-
-	expect(t, e.post(admin, adminPath+"/status", url.Values{"status": {"draft"}}), http.StatusSeeOther)
-	r = e.get(marie, me+"/agenda.ics")
-	expect(t, r, 404, "pas encore ouvertes")
-	if strings.Contains(r.body, "BEGIN:VEVENT") {
-		t.Error("the file of a draft event has an entry")
 	}
 }
 
@@ -1238,7 +1208,7 @@ func TestPledgeListsWithMomentsAndNoSlot(t *testing.T) {
 func TestPledgeListCardOpensAfterAChange(t *testing.T) {
 	e := newEnv(t, Config{})
 	admin := e.client()
-	adminPath := newDraftEvent(t, e, admin)
+	adminPath := newEvent(t, e, admin)
 	first := addList(t, e, admin, adminPath, url.Values{"name": {"Gâteaux"}})
 	second := addList(t, e, admin, adminPath, url.Values{"name": {"Boissons"}})
 
@@ -1301,7 +1271,7 @@ func TestPledgeCardStates(t *testing.T) {
 func TestAdminPledgeStatusColors(t *testing.T) {
 	e := newEnv(t, Config{})
 	admin := e.client()
-	adminPath := newDraftEvent(t, e, admin)
+	adminPath := newEvent(t, e, admin)
 	addList(t, e, admin, adminPath, url.Values{"name": {"Avec minimum"}, "min": {"5"}})
 	addList(t, e, admin, adminPath, url.Values{"name": {"Sans limite"}})
 	done := addList(t, e, admin, adminPath, url.Values{"name": {"Fait"}, "min": {"1"}})
@@ -1323,7 +1293,7 @@ func TestAdminPledgeStatusColors(t *testing.T) {
 func TestPledgeUnitForms(t *testing.T) {
 	e := newEnv(t, Config{})
 	admin := e.client()
-	adminPath := newDraftEvent(t, e, admin)
+	adminPath := newEvent(t, e, admin)
 
 	for _, f := range []url.Values{
 		{"name": {"Gâteaux"}, "unit": {"gâteaux"}},

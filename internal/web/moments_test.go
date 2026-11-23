@@ -82,7 +82,6 @@ func TestEventWithOnlyMoments(t *testing.T) {
 	r := e.post(admin, "/events", url.Values{"title": {"Kermesse"}, "admin_email": {"orga@example.org"}, "date": {"2026-06-20"}})
 	expect(t, r, http.StatusSeeOther)
 	adminPath := r.location
-	expect(t, e.post(admin, adminPath+"/status", url.Values{"status": {"open"}}), http.StatusSeeOther)
 	addMoment(t, e, adminPath, "Spectacle", "2026-06-20 14:00", "2026-06-20 15:00")
 
 	pub := publicLinkRe.FindStringSubmatch(e.get(admin, adminPath).body)[1]
@@ -111,7 +110,6 @@ func TestEventWithAStandButNoSlotShowsTheMomentList(t *testing.T) {
 	expect(t, r, http.StatusSeeOther)
 	adminPath := r.location
 	expect(t, e.post(admin, adminPath+"/stands", url.Values{"name": {"Buvette"}}), http.StatusSeeOther)
-	expect(t, e.post(admin, adminPath+"/status", url.Values{"status": {"open"}}), http.StatusSeeOther)
 	addMoment(t, e, adminPath, "Spectacle", "2026-06-20 14:00", "2026-06-20 15:00")
 
 	pub := publicLinkRe.FindStringSubmatch(e.get(admin, adminPath).body)[1]
@@ -122,23 +120,6 @@ func TestEventWithAStandButNoSlotShowsTheMomentList(t *testing.T) {
 	if strings.Contains(body, `class="grid"`) {
 		t.Error("the table has no slot to show: it must not appear")
 	}
-}
-
-func TestDraftEventHidesMoments(t *testing.T) {
-	e := newEnv(t, Config{})
-	admin := e.client()
-	r := e.post(admin, "/events", url.Values{"title": {"Kermesse"}, "admin_email": {"orga@example.org"}, "date": {"2026-06-20"}})
-	expect(t, r, http.StatusSeeOther)
-	adminPath := r.location
-	addMoment(t, e, adminPath, "Spectacle secret", "2026-06-20 14:00", "2026-06-20 15:00")
-	pub := publicLinkRe.FindStringSubmatch(e.get(admin, adminPath).body)[1]
-
-	if body := e.get(e.client(), pub).body; strings.Contains(body, "Spectacle secret") {
-		t.Error("a draft event must not show its moments")
-	}
-	// Control: once the event is open, the same page shows the moment.
-	expect(t, e.post(admin, adminPath+"/status", url.Values{"status": {"open"}}), http.StatusSeeOther)
-	expect(t, e.get(e.client(), pub), 200, "Spectacle secret")
 }
 
 // A moment is public information on the page only: it must not reach the
@@ -176,7 +157,6 @@ func TestTodoFilterKeepsMomentsWhenThereIsNoSlot(t *testing.T) {
 	r := e.post(admin, "/events", url.Values{"title": {"Kermesse"}, "admin_email": {"orga@example.org"}, "date": {"2026-06-20"}})
 	expect(t, r, http.StatusSeeOther)
 	adminPath := r.location
-	expect(t, e.post(admin, adminPath+"/status", url.Values{"status": {"open"}}), http.StatusSeeOther)
 	addMoment(t, e, adminPath, "Spectacle", "2026-06-20 14:00", "2026-06-20 15:00")
 
 	pub := publicLinkRe.FindStringSubmatch(e.get(admin, adminPath).body)[1]

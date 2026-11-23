@@ -20,8 +20,6 @@ templ adminView(d adminPage) {
 			</form>
 			<p class="muted">
 				switch d.Event.Status {
-					case model.StatusDraft:
-						Les bénévoles ne voient pas encore les créneaux. Ajoutez vos stands ou vos listes à apporter, puis choisissez « Ouvertes ».
 					case model.StatusOpen:
 						Les bénévoles peuvent s'inscrire et se désinscrire.
 					default:
@@ -121,9 +119,6 @@ templ adminLinks(d adminPage) {
 				@iconShare()
 				Partager le message
 			</button>
-			if d.Event.IsDraft() {
-				<p class="hint">Les bénévoles verront la page dès maintenant, mais ne pourront s'inscrire qu'une fois les inscriptions ouvertes.</p>
-			}
 		</div>
 		if d.ExpiresOn != "" {
 			<p class="hint">L'événement et ses inscriptions seront supprimés automatiquement le { dateFR(d.ExpiresOn) }, { itoa(d.Retention) } jours après l'événement.</p>

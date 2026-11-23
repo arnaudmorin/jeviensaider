@@ -270,7 +270,7 @@ func TestDuplicate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if dup.Status != model.StatusDraft || dup.AdminToken == ev.AdminToken {
+	if dup.Status != model.StatusOpen || dup.AdminToken == ev.AdminToken {
 		t.Errorf("unexpected dup: %+v", dup)
 	}
 	stands, _ := s.ListStands(ctx, dup.ID)

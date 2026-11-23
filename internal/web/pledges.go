@@ -50,7 +50,7 @@ func (s *Server) loadPledgeList(ctx context.Context, ev *model.Event, listID, my
 }
 
 func (s *Server) pledgeForm(w http.ResponseWriter, r *http.Request, ev *model.Event) {
-	id, ok := s.publicID(w, r, ev)
+	id, ok := s.pathID(w, r)
 	if !ok {
 		return
 	}
@@ -77,7 +77,7 @@ func (s *Server) pledgeForm(w http.ResponseWriter, r *http.Request, ev *model.Ev
 }
 
 func (s *Server) pledgeSubmit(w http.ResponseWriter, r *http.Request, ev *model.Event) {
-	id, ok := s.publicID(w, r, ev)
+	id, ok := s.pathID(w, r)
 	if !ok {
 		return
 	}

@@ -127,7 +127,7 @@ func setupEvent(t *testing.T, e *env, admin *http.Client) (adminPath, publicPath
 		t.Fatalf("unexpected redirect %q", adminPath)
 	}
 	r = e.get(admin, adminPath)
-	expect(t, r, 200, "Événement créé", "Fête de l&#39;école", "Brouillon")
+	expect(t, r, 200, "Événement créé", "Fête de l&#39;école", `value="open" class="on"`)
 	m := regexp.MustCompile(`href="(/e/[^"]+)" target="_blank"`).FindStringSubmatch(r.body)
 	if m == nil {
 		t.Fatal("public link not found on admin page")
@@ -142,8 +142,6 @@ func setupEvent(t *testing.T, e *env, admin *http.Client) (adminPath, publicPath
 	})
 	expect(t, r, http.StatusSeeOther)
 	expect(t, e.get(admin, adminPath), 200, "3 créneau(x) ajouté(s)", "Il reste 6 places")
-
-	expect(t, e.post(admin, adminPath+"/status", url.Values{"status": {"open"}}), http.StatusSeeOther)
 
 	r = e.get(e.client(), publicPath)
 	expect(t, r, 200, "Pêche aux canards", "Il reste 2 places", "Il reste 6 places", "st-empty")
@@ -168,8 +166,7 @@ func setupEvent(t *testing.T, e *env, admin *http.Client) (adminPath, publicPath
 }
 
 // openEventWithSlot creates an event from form (dated 2026-06-20), adds a
-// "Buvette" stand with one 14h–15h slot for 2 people, opens the event, and
-// returns the admin path, the public path and the slot ID.
+// "Buvette" stand with one 14h–15h slot for 2 people, and returns the admin path, the public path and the slot ID.
 func openEventWithSlot(t *testing.T, e *env, admin *http.Client, form url.Values) (adminPath, pub, slot string) {
 	t.Helper()
 	form.Set("date", "2026-06-20")
@@ -179,7 +176,6 @@ func openEventWithSlot(t *testing.T, e *env, admin *http.Client, form url.Values
 	expect(t, e.post(admin, adminPath+"/stands", url.Values{"name": {"Buvette"}}), http.StatusSeeOther)
 	standID := regexp.MustCompile(`id="stand-(\d+)"`).FindStringSubmatch(e.get(admin, adminPath).body)[1]
 	expect(t, e.post(admin, adminPath+"/stands/"+standID+"/slots", url.Values{"date": {"2026-06-20"}, "from": {"14:00"}, "to": {"15:00"}, "step": {"60"}, "min": {"2"}}), http.StatusSeeOther)
-	expect(t, e.post(admin, adminPath+"/status", url.Values{"status": {"open"}}), http.StatusSeeOther)
 	pub = regexp.MustCompile(`href="(/e/[^"]+)" target="_blank"`).FindStringSubmatch(e.get(admin, adminPath).body)[1]
 	slot = slotLinkRe.FindStringSubmatch(e.get(e.client(), pub).body)[1]
 	return adminPath, pub, slot

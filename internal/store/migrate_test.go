@@ -143,3 +143,41 @@ func TestUpgradeToFill(t *testing.T) {
 		}
 	}
 }
+
+// Events have no draft status any more: migration 008 opens the drafts and
+// leaves the other events as they are.
+func TestUpgradeOpensDrafts(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "old.db")
+	old, err := sql.Open("sqlite", path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	names, _ := fs.Glob(migrationsFS, "migrations/00[1-7]_*.sql")
+	for _, name := range names {
+		body, _ := migrationsFS.ReadFile(name)
+		if _, err := old.Exec(string(body)); err != nil {
+			t.Fatal(name, err)
+		}
+	}
+	if _, err := old.Exec(`PRAGMA user_version = 7;
+		INSERT INTO events (id, slug, title, admin_token, status) VALUES
+			(1, 'draft', 'Draft', 'tok1', 'draft'),
+			(2, 'open', 'Open', 'tok2', 'open'),
+			(3, 'closed', 'Closed', 'tok3', 'closed');`); err != nil {
+		t.Fatal(err)
+	}
+	old.Close()
+
+	s, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	for slug, want := range map[string]string{"draft": model.StatusOpen, "open": model.StatusOpen, "closed": model.StatusClosed} {
+		var got string
+		s.db.QueryRow(`SELECT status FROM events WHERE slug = ?`, slug).Scan(&got)
+		if got != want {
+			t.Errorf("%s: status %q, want %q", slug, got, want)
+		}
+	}
+}

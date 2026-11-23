@@ -57,13 +57,13 @@ func (s *Store) CreateEvent(ctx context.Context, e *model.Event) error {
 	return insertEvent(ctx, s.db, e)
 }
 
-// insertEvent inserts e with a new slug and admin token, as a draft unless
+// insertEvent inserts e with a new slug and admin token, open unless
 // e.Status is set, and fills in its ID.
 func insertEvent(ctx context.Context, q querier, e *model.Event) error {
 	e.Slug = Slugify(e.Title) + "-" + shortID()
 	e.AdminToken = Token()
 	if e.Status == "" {
-		e.Status = model.StatusDraft
+		e.Status = model.StatusOpen
 	}
 	res, err := q.ExecContext(ctx,
 		`INSERT INTO events (slug, title, description, location, date, admin_token, status, admin_email, notify_signups, retention_days) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -109,7 +109,7 @@ func (s *Store) PurgeVolunteers(ctx context.Context, eventID int64) (int64, erro
 }
 
 // DuplicateEvent copies the structure (stands, slots, moments and pledge
-// lists, no volunteers or pledges) of src into a new draft event. If both
+// lists, no volunteers or pledges) of src into a new event, open like any new event. If both
 // events have a date, slots and moments are moved by the same number of days.
 // Drop-off times of pledge lists are times of the day, so they stay as they
 // are.
