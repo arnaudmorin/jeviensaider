@@ -38,6 +38,14 @@ func TestAdminEditing(t *testing.T) {
 	if i, j := strings.Index(body, `id="stand-`+tombola+`"`), strings.Index(body, `id="stand-`+buvette+`"`); i < 0 || j < 0 || i > j {
 		t.Error("stand not moved down")
 	}
+	// Drag and drop sends the whole order.
+	expect(t, e.post(admin, adminPath+"/stands/order", url.Values{"id": {buvette, tombola}}), http.StatusNoContent)
+	body = e.get(admin, adminPath).body
+	if i, j := strings.Index(body, `id="stand-`+buvette+`"`), strings.Index(body, `id="stand-`+tombola+`"`); i < 0 || j < 0 || i > j {
+		t.Error("stands not reordered")
+	}
+	expect(t, e.post(admin, adminPath+"/stands/order", url.Values{"id": {buvette}}), 404)
+	expect(t, e.post(admin, adminPath+"/stands/order", url.Values{"id": {buvette, "x"}}), 400)
 	expect(t, e.get(e.client(), pub), 200, "Buvette et crêpes", "#2e9e6a")
 	expect(t, e.post(admin, adminPath+"/stands/"+buvette, url.Values{"name": {""}}), http.StatusSeeOther)
 	expect(t, e.get(admin, adminPath), 200, "Le nom du stand est obligatoire")

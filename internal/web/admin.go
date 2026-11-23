@@ -293,6 +293,29 @@ func (s *Server) adminMoveStand(w http.ResponseWriter, r *http.Request, ev *mode
 	backToStand(w, r, ev, id)
 }
 
+// adminOrderStands saves the order of the stands after a drag and drop on
+// the organiser page: the form lists every stand id, in the new order. Only
+// the script calls it, so it answers 204 with no page.
+func (s *Server) adminOrderStands(w http.ResponseWriter, r *http.Request, ev *model.Event) {
+	if err := r.ParseForm(); err != nil {
+		s.renderError(w, r, http.StatusBadRequest, "Requête invalide.")
+		return
+	}
+	var ids []int64
+	for _, v := range r.PostForm["id"] {
+		id, err := strconv.ParseInt(v, 10, 64)
+		if err != nil {
+			s.renderError(w, r, http.StatusBadRequest, "Requête invalide.")
+			return
+		}
+		ids = append(ids, id)
+	}
+	if s.storeError(w, r, s.store.ReorderStands(r.Context(), ev.ID, ids)) {
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (s *Server) adminGenerateSlots(w http.ResponseWriter, r *http.Request, ev *model.Event) {
 	standID, ok := s.pathID(w, r)
 	if !ok {

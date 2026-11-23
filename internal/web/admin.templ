@@ -75,9 +75,11 @@ templ adminView(d adminPage) {
 			} else {
 				<p class="hint">Ouvrez un stand pour voir ses créneaux et ses bénévoles, et pour le modifier.</p>
 			}
-			for i, st := range d.P.Stands {
-				@adminStand(d, st, i == 0, i == len(d.P.Stands)-1)
-			}
+			<div class="stand-list" data-reorder={ d.AdminPath + "/stands/order" }>
+				for i, st := range d.P.Stands {
+					@adminStand(d, st, i == 0, i == len(d.P.Stands)-1)
+				}
+			</div>
 		</section>
 		@adminPledges(d)
 		@adminTools(d)
@@ -213,6 +215,8 @@ templ colorFields(color string, noColor bool) {
 templ adminStand(d adminPage, st *model.StandView, first, last bool) {
 	<details class="stand" id={ "stand-" + i64(st.ID) } style={ standStyle(st.Color) } open?={ st.ID == d.OpenStand }>
 		<summary class={ "stand-head", templ.KV("striped", validColor(st.Color)) }>
+			// The script shows the handle when there are stands to reorder.
+			<span class="drag-handle" data-stand-id={ i64(st.ID) } title="Glisser pour déplacer" aria-hidden="true" hidden></span>
 			<h3>{ st.Name }</h3>
 			<span class="stand-stats">
 				if len(st.Slots) > 0 {

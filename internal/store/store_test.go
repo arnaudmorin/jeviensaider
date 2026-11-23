@@ -303,6 +303,38 @@ func TestMoveStand(t *testing.T) {
 	}
 }
 
+func TestReorderStands(t *testing.T) {
+	s := openTest(t)
+	ev, a, _ := fixture(t, s, 0)
+	b := &model.Stand{EventID: ev.ID, Name: "Buvette"}
+	c := &model.Stand{EventID: ev.ID, Name: "Tombola"}
+	s.CreateStand(ctx, b)
+	s.CreateStand(ctx, c)
+	if err := s.ReorderStands(ctx, ev.ID, []int64{c.ID, a.ID, b.ID}); err != nil {
+		t.Fatal(err)
+	}
+	st, _ := s.ListStands(ctx, ev.ID)
+	if st[0].ID != c.ID || st[1].ID != a.ID || st[2].ID != b.ID {
+		t.Errorf("order after reorder: %v", st)
+	}
+	other, _, _ := fixture(t, s, 0)
+	others, _ := s.ListStands(ctx, other.ID)
+	for name, ids := range map[string][]int64{
+		"missing":   {c.ID, a.ID},
+		"duplicate": {c.ID, a.ID, a.ID},
+		"extra":     {c.ID, a.ID, b.ID, others[0].ID},
+		"foreign":   {c.ID, a.ID, others[0].ID},
+	} {
+		if err := s.ReorderStands(ctx, ev.ID, ids); err != ErrNotFound {
+			t.Errorf("%s: want ErrNotFound, got %v", name, err)
+		}
+	}
+	st, _ = s.ListStands(ctx, ev.ID)
+	if st[0].ID != c.ID || st[1].ID != a.ID || st[2].ID != b.ID {
+		t.Errorf("a refused order changed the stands: %v", st)
+	}
+}
+
 // The row fill is a setting of each stand: it is saved, and a duplicate of
 // the event keeps it.
 func TestStandFillRow(t *testing.T) {
