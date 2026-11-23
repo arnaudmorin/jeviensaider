@@ -424,6 +424,21 @@ details.stand > summary.stand-head::after { grid-column: 2; grid-row: 1 / span 2
 .stand-head h3 { font-size: 1.2rem; margin: 0; overflow-wrap: anywhere; }
 .stand-stats { font-size: .925rem; font-weight: 400; color: var(--muted); }
 .stand-tools .row-actions { margin-left: auto; }
+/* With the script, a stand is dragged by the handle at the left of its
+   head to change the order. */
+.stand-list { display: flex; flex-direction: column; gap: 14px; }
+.stand-list.sortable details.stand > summary.stand-head { grid-template-columns: auto minmax(0, 1fr) auto; padding-left: 6px; }
+.stand-list.sortable details.stand > summary.stand-head::after { grid-column: 3; }
+.stand-list.sortable .stand-head > h3, .stand-list.sortable .stand-head > .stand-stats { grid-column: 2; }
+.drag-handle { grid-column: 1; grid-row: 1 / span 2; align-self: stretch; display: flex; align-items: center; justify-content: center; width: 32px; margin: -14px 0; cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; }
+.drag-handle::before { content: ""; width: 10px; height: 15px; background: radial-gradient(circle, var(--muted) 1.5px, transparent 2px) 0 0 / 5px 5px; }
+.drag-handle:hover::before { background-image: radial-gradient(circle, var(--text) 1.5px, transparent 2px); }
+.drag-handle[hidden] { display: none; }
+.stand-list.dragging, .stand-list.dragging * { cursor: grabbing; user-select: none; -webkit-user-select: none; }
+.stand-list.sortable > .stand { transition: transform .18s ease; }
+.stand.drag-source { box-shadow: 0 12px 32px var(--shadow); border-color: var(--text); position: relative; z-index: 2; }
+.stand-list.sortable > .stand.drag-active { transition: none; }
+@media (prefers-reduced-motion: reduce) { .stand-list.sortable > .stand { transition: none; } }
 .stand-body { display: flex; flex-direction: column; gap: 14px; padding: 14px; }
 .stand-body > p { margin: 0; }
 .stand-slots { display: flex; flex-direction: column; gap: 10px; }

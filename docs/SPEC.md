@@ -350,7 +350,12 @@ It works like a slot sign-up, with these differences:
   stand ("Modifier") and the slot generator ("Ajouter des créneaux", or
   "Créer les créneaux" and open while the stand has no slot), only one of the
   two open at a time, the buttons that move the stand up and down, and then
-  the slots of the stand. The colour of a stand is optional and works
+  the slots of the stand. With the script, and two stands or more, the head
+  of each card also has a handle at its left: dragging it (mouse or finger)
+  moves the card, and dropping it saves the new order at once
+  (`POST /a/<token>/stands/order` with every stand `id` in the new order,
+  204). The order must list exactly the stands of the event; if one was
+  added or deleted in the meantime it is refused (404) and the page reloads. The colour of a stand is optional and works
   like the colour of a moment: the add form starts with the next colour of
   the stand palette, the "Modifier" panel shows the stand's colour (or the
   default blue if it has none), and the box "Sans couleur", with the hidden

@@ -103,6 +103,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /a/{token}/stands/{id}", s.withAdmin(s.adminUpdateStand))
 	mux.HandleFunc("POST /a/{token}/stands/{id}/delete", s.withAdmin(s.adminDeleteStand))
 	mux.HandleFunc("POST /a/{token}/stands/{id}/move", s.withAdmin(s.adminMoveStand))
+	mux.HandleFunc("POST /a/{token}/stands/order", s.withAdmin(s.adminOrderStands))
 	mux.HandleFunc("POST /a/{token}/stands/{id}/slots", s.withAdmin(s.adminGenerateSlots))
 	mux.HandleFunc("POST /a/{token}/slots/{id}", s.withAdmin(s.adminUpdateSlot))
 	mux.HandleFunc("POST /a/{token}/slots/{id}/delete", s.withAdmin(s.adminDeleteSlot))

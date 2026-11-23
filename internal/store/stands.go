@@ -93,3 +93,34 @@ func (s *Store) MoveStand(ctx context.Context, eventID, id int64, delta int) err
 		return nil
 	})
 }
+
+// ReorderStands puts the stands of an event in the order of ids. The ids
+// must be exactly the stands of the event; if one was added or deleted in
+// the meantime, nothing changes and ErrNotFound is returned.
+func (s *Store) ReorderStands(ctx context.Context, eventID int64, ids []int64) error {
+	return s.withTx(ctx, func(tx *sql.Tx) error {
+		stands, err := listStands(ctx, tx, eventID)
+		if err != nil {
+			return err
+		}
+		if len(ids) != len(stands) {
+			return ErrNotFound
+		}
+		left := make(map[int64]bool, len(stands))
+		for _, st := range stands {
+			left[st.ID] = true
+		}
+		for _, id := range ids {
+			if !left[id] {
+				return ErrNotFound
+			}
+			delete(left, id)
+		}
+		for k, id := range ids {
+			if _, err := tx.ExecContext(ctx, `UPDATE stands SET position = ? WHERE id = ? AND event_id = ?`, k+1, id, eventID); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
