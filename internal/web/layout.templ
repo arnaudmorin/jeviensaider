@@ -18,6 +18,9 @@ templ layout(c Common, o pageOpts) {
 			<meta name="color-scheme" content="light dark"/>
 			<meta name="htmx-config" content='{"historyCacheSize":0,"refreshOnHistoryMiss":true,"allowEval":false}'/>
 			<title>{ c.Title }</title>
+			if c.Share != nil {
+				@shareTags(c.Title, c.Share)
+			}
 			<link rel="icon" href={ asset("logo.svg") } type="image/svg+xml"/>
 			<link rel="stylesheet" href={ asset("app.css") }/>
 			<script src={ asset("htmx.min.js") } defer></script>
@@ -43,6 +46,21 @@ templ layout(c Common, o pageOpts) {
 			<div id="modal"></div>
 		</body>
 	</html>
+}
+
+// shareTags are the tags that messaging apps read to build the card under a
+// pasted link. There is no image: the apps read only PNG and JPEG.
+templ shareTags(title string, s *shareCard) {
+	<meta property="og:type" content="website"/>
+	<meta property="og:site_name" content="Je viens aider"/>
+	<meta property="og:title" content={ title }/>
+	<meta property="og:url" content={ s.URL }/>
+	<meta property="og:locale" content="fr_FR"/>
+	<meta name="twitter:card" content="summary"/>
+	if s.Description != "" {
+		<meta property="og:description" content={ s.Description }/>
+		<meta name="description" content={ s.Description }/>
+	}
 }
 
 templ flash(f *Flash) {

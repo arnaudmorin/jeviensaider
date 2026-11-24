@@ -40,6 +40,8 @@ func (s *Server) staticHandler() http.Handler {
 type Common struct {
 	Title string
 	Flash *Flash
+	// Share holds the data of the link preview tags. A nil Share means no tags.
+	Share *shareCard
 }
 
 // Flash is a one-shot message carried by a cookie across a redirect.
