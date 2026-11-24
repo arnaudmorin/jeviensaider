@@ -227,6 +227,10 @@ func (s *Server) showEvent(w http.ResponseWriter, r *http.Request, ev *model.Eve
 		EventURL: eventURL(ev),
 		Me:       me,
 	}
+	// The personal link has no card: it is secret, and nobody pastes it.
+	if !meTab {
+		data.Share = &shareCard{Description: shareDescription(ev, p, s.now()), URL: s.absURL(r, eventURL(ev))}
+	}
 	if me != nil {
 		data.MeURL = meURL(ev, me)
 		data.MeAbsURL = s.absURL(r, data.MeURL)

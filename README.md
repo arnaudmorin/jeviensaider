@@ -78,6 +78,12 @@ in a single SQLite file.
   cancels, or that an organiser deletes, stays in the calendar app until the
   volunteer removes it there. The times have no time zone, so a calendar shows the same clock time
   as the event page.
+- A **link preview**: when someone pastes the event link in a messaging app,
+  the card shows the title, the date, the place and how many places are left.
+  The personal link has no card. The description that the organiser wrote is
+  not in the card, but the place is, as they typed it. There is no image.
+  Set `JEVIENSAIDER_BASE_URL`: without it, the address in the card comes from
+  the `Host` header of the request.
 
 ## Quick start
 

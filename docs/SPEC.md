@@ -243,6 +243,30 @@ Pledge rules:
 - **Stand view** `/e/<slug>/stands/<id>`: name and full description, as a
   dialog (htmx) or a page; a "Fermer" button.
 - Pages follow the device's light or dark setting.
+- **Link preview**: the page has `og:` and `twitter:card` tags, so a messaging
+  app shows a card under the pasted link.
+  - Tags: `og:type` (`website`), `og:site_name`, `og:title` (the event title),
+    `og:url`, `og:locale` (`fr_FR`) and `twitter:card` (`summary`). If the
+    description below is not empty, there are also `og:description` and
+    `description`.
+  - `og:url` is the public URL of the event, built like the other shared
+    links. If `JEVIENSAIDER_BASE_URL` is set, the URL starts with it. If not,
+    the URL comes from the `Host` header, so a visitor who uses another host
+    name gets a card for that name. A public site must set the variable.
+  - The description is one line: the date in French, the place and the state,
+    joined by " · ". An empty part is left out. The state is one of three
+    texts. "Il reste N places" shows for an open event that needs people.
+    "Équipe complète" shows for an open event that needs nobody, when no
+    pledge list is under its minimum. "Inscriptions fermées" shows for a
+    closed event. An open event with only pledge lists has no state. An open
+    event with a date before today has no state, because it is over. The
+    line has at most 200 characters. A longer one is cut, loses the spaces
+    and "·" at the cut, and ends with "…".
+  - The personal link, the sign-up pages, the admin pages and the home page
+    have no such tag. The description that the organiser wrote is never in a
+    tag. The place is, as the organiser typed it.
+  - There is no image: the apps read only PNG and JPEG.
+  - Apps keep a card for a while, so the number of places can be out of date.
 
 ### 4.3 Signing up `/e/<slug>/slots/<id>/signup`
 
@@ -661,3 +685,4 @@ The code should stay small and readable by one person in an afternoon.
   writes a name to promise one item.
 - Reordering of pledge lists.
 - A link between a pledge list and a stand.
+- An image in the link preview.
