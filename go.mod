@@ -6,7 +6,7 @@ toolchain go1.27.4
 
 require (
 	github.com/a-h/templ v0.3.1118
-	github.com/signintech/gopdf v0.38.4
+	github.com/signintech/gopdf v0.38.6
 	golang.org/x/image v0.48.0
 	golang.org/x/text v0.44.0
 	modernc.org/sqlite v1.62.0
